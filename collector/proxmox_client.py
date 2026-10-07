@@ -83,6 +83,8 @@ def _get_data(transport, url, settings, timeout=DEFAULT_TIMEOUT):
         ) from exc
     except json.JSONDecodeError as exc:
         raise ProxmoxClientError(f"Proxmox: réponse JSON invalide sur {url}") from exc
+    except (ssl.SSLError, ValueError) as exc:
+        raise ProxmoxClientError(f"Proxmox: échec du transport sur {url}") from exc
     if not isinstance(payload, dict):
         raise ProxmoxClientError(
             f"Proxmox: objet JSON attendu sur {url} — réponse inattendue"

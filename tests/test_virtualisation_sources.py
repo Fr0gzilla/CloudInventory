@@ -16,6 +16,7 @@ et les clients réels reçoivent un transport de test.
 """
 import inspect
 import json
+import ssl
 import urllib.error
 import urllib.request
 
@@ -310,6 +311,24 @@ def test_connection_error_raises_an_explicit_error(proxmox_env):
     message = str(excinfo.value)
     assert "connexion impossible" in message
     assert "refus de connexion" in message
+
+
+def test_ssl_error_is_converted_to_proxmox_client_error(proxmox_env):
+    transport = RaisingTransport(ssl.SSLError("certificate verification failed"))
+
+    with pytest.raises(ProxmoxClientError):
+        fetch_proxmox_vms(transport=transport)
+
+    assert transport.calls == 1
+
+
+def test_value_error_is_converted_to_proxmox_client_error(proxmox_env):
+    transport = RaisingTransport(ValueError("invalid transport value"))
+
+    with pytest.raises(ProxmoxClientError):
+        fetch_proxmox_vms(transport=transport)
+
+    assert transport.calls == 1
 
 
 def test_invalid_json_response_raises_an_explicit_error(proxmox_env):

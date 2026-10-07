@@ -85,6 +85,8 @@ def _get_page(transport, url, settings, timeout=DEFAULT_TIMEOUT):
         ) from exc
     except json.JSONDecodeError as exc:
         raise NetBoxClientError(f"NetBox: réponse JSON invalide sur {url}") from exc
+    except (ssl.SSLError, ValueError) as exc:
+        raise NetBoxClientError(f"NetBox: échec du transport sur {url}") from exc
     if not isinstance(payload, dict):
         raise NetBoxClientError(
             f"NetBox: objet JSON attendu sur {url} — réponse inattendue"

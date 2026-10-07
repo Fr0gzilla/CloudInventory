@@ -17,6 +17,7 @@ et le client réel reçoit un transport de test.
 """
 import inspect
 import json
+import ssl
 import urllib.error
 import urllib.request
 from collections import Counter
@@ -324,6 +325,19 @@ def test_connection_error_raises_an_explicit_error(netbox_env):
     with pytest.raises(NetBoxClientError) as excinfo:
         fetch_ipam_records(transport=RaisingTransport(error))
     assert "connexion impossible" in str(excinfo.value)
+
+
+@pytest.mark.parametrize("error_type", [ssl.SSLError, ValueError],
+                         ids=["ssl_error", "value_error"])
+def test_transport_ssl_and_value_errors_raise_netbox_client_error(
+    netbox_env, error_type
+):
+    transport = RaisingTransport(error_type("transport failure"))
+
+    with pytest.raises(NetBoxClientError):
+        fetch_ipam_records(transport=transport)
+
+    assert transport.calls == 1
 
 
 def test_invalid_json_response_raises_an_explicit_error(netbox_env):
