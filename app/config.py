@@ -40,3 +40,13 @@ class Config:
                 ". Renseignez-les (cf. .env.example) avant de démarrer."
             )
         cls.SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+
+    @classmethod
+    def use_mock_virt(cls) -> bool:
+        """Bascule source simulée/réelle de la virtualisation (USE_MOCK_VIRT, défaut true)."""
+        return os.getenv("USE_MOCK_VIRT", "true").lower() == "true"
+
+    @classmethod
+    def use_mock_ipam(cls) -> bool:
+        """Bascule source simulée/réelle de l'IPAM (USE_MOCK_IPAM, défaut true)."""
+        return os.getenv("USE_MOCK_IPAM", "true").lower() == "true"
