@@ -1,7 +1,6 @@
 # MLD — CloudInventory v2.0 (Merise, niveau logique)
 
-Source : `.sdv/modele/mcd.md` (5 entités, 6 associations), `.sdv/modele/dictionnaire.md` (5 tables / 44 colonnes),
-`.sdv/modele/regles.md` (RG01→RG34), `CAHIER_DES_CHARGES.md` §6.2, §7, §8.
+Source : `docs/modele/mcd.md` (5 entités, 6 associations), `docs/modele/dictionnaire.md` (5 tables / 44 colonnes), `docs/modele/regles.md` (RG01→RG34), `cahier des charges` §6.2, §7, §8.
 Règle de passage : PK du côté (x,1), FK dans la table du côté (x,1) de l'association ; aucune colonne hors dictionnaire.
 Types SQL = type + longueur du dictionnaire (`integer`→INT, `varchar`→VARCHAR(n), `datetime`→DATETIME, `text`→TEXT, `boolean`→BOOLEAN) ;
 le diagramme porte le type atomique du dictionnaire, les longueurs figurent dans les tableaux.

@@ -1,7 +1,6 @@
 # Classes — CloudInventory v2.0 (UML statique, déduit du MCD/MLD)
 
-Source : `.sdv/modele/mcd.md` (5 entités, 6 associations), `.sdv/modele/mld.md` (5 tables, 44 colonnes, 6 FK),
-`.sdv/modele/dictionnaire.md` (44 colonnes typées), `.sdv/modele/regles.md` (RG01→RG34), `CAHIER_DES_CHARGES.md` §6.2, §7, §8.
+Source : `docs/modele/mcd.md` (5 entités, 6 associations), `docs/modele/mld.md` (5 tables, 44 colonnes, 6 FK), `docs/modele/dictionnaire.md` (44 colonnes typées), `docs/modele/regles.md` (RG01→RG34), `cahier des charges` §6.2, §7, §8.
 
 Règles de passage :
 - Une classe par entité MCD, nom PascalCase (`Run`, `Asset`, `IpamRecord`, `ConsolidatedAsset`, `Anomaly`) ; table MLD homonyme.

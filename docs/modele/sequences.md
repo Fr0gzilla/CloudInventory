@@ -1,7 +1,7 @@
 # Diagrammes de séquence — CloudInventory v2.0
 
 Deux scénarios nominaux, un par cas ; les variantes sont dans des fragments `alt` / `opt`.
-Entrées : `regles.md` (RG), `classes.md` (participants), `CAHIER_DES_CHARGES.md` §6, §7, §8, §10, §13.
+Entrées : `regles.md` (RG), `classes.md` (participants), `cahier des charges` §6, §7, §8, §10, §13.
 
 ---
 
@@ -13,7 +13,7 @@ Entrées : `GET /login`, `POST /login` (`username`, `password`, `csrf_token`). S
 `200` (formulaire + message d'erreur), `302` (session créée ou redirection vers `/login`), `200` (route protégée rendue).
 Formes Mermaid : `->>` appel synchrone, `-->>` retour, `alt/else/end` choix (imbriqués), `Note over` remarque.
 RG citées : **RG25** (session signée par `SECRET_KEY`), **RG26** (toutes les routes web sous `@login_required`).
-Jeton CSRF et limitation des essais : contraintes du SDV (`CAHIER_DES_CHARGES.md`, « Sécurité ») — **sans numéro de RG**,
+Jeton CSRF et limitation des essais : contraintes du SDV (`cahier des charges`, « Sécurité ») — **sans numéro de RG**,
 `regles.md` ne contenant aucune RG pour ces deux mesures.
 
 ### Diagramme
@@ -62,10 +62,10 @@ sequenceDiagram
 |---|---|
 | Création de session signée avec `SECRET_KEY` | RG25 |
 | Routes rendues ou redirigées selon la session (`@login_required`) | RG26 |
-| Vérification du jeton CSRF | Contraintes SDV, `CAHIER_DES_CHARGES.md` « Sécurité » (aucune RG) |
-| Limitation des essais de connexion | Contraintes SDV, `CAHIER_DES_CHARGES.md` « Sécurité » (aucune RG) |
-| Comparaison `ADMIN_USERNAME` / `ADMIN_PASSWORD` haché | `CAHIER_DES_CHARGES.md` §10.1, §10.3 |
-| Participants (route, session) | Composants Flask/Flask-Login, `CAHIER_DES_CHARGES.md` §5.2, §10.1 — hors `classes.md` |
+| Vérification du jeton CSRF | Contraintes SDV, `cahier des charges` « Sécurité » (aucune RG) |
+| Limitation des essais de connexion | Contraintes SDV, `cahier des charges` « Sécurité » (aucune RG) |
+| Comparaison `ADMIN_USERNAME` / `ADMIN_PASSWORD` haché | `cahier des charges` §10.1, §10.3 |
+| Participants (route, session) | Composants Flask/Flask-Login, `cahier des charges` §5.2, §10.1 — hors `classes.md` |
 
 ### Non représenté
 
@@ -160,7 +160,7 @@ sequenceDiagram
 | `status=SUCCESS`, `end_date`, `matched_name_count`, `matched_fqdn_count`, `matched_ip_count`, `no_match_count` | RG19 |
 | `rollback`, `status=FAIL`, `error_message` | RG20 |
 | Collecte de tous les noeuds, `type`, `tenant`, `site` | RG31, RG32, RG33, RG34 |
-| Anomalies attendues (3 NO_MATCH, 1 statut MATCHED_IP + anomalie HOSTNAME_MISMATCH, 2 STATUS_MISMATCH, 1 DUPLICATE_DNS, 1 DUPLICATE_IP) | `CAHIER_DES_CHARGES.md` §13.3 |
+| Anomalies attendues (3 NO_MATCH, 1 statut MATCHED_IP + anomalie HOSTNAME_MISMATCH, 2 STATUS_MISMATCH, 1 DUPLICATE_DNS, 1 DUPLICATE_IP) | `cahier des charges` §13.3 |
 
 ### Non représenté
 

@@ -1,6 +1,6 @@
 # MCD — CloudInventory v2.0 (Merise)
 
-Source : `.sdv/modele/regles.md` (RG01→RG34), `.sdv/modele/dictionnaire.md` (5 tables / 44 colonnes).
+Source : `docs/modele/regles.md` (RG01→RG34), `docs/modele/dictionnaire.md` (5 tables / 44 colonnes).
 Lecture des cardinalités : le symbole Merise collé à l'entité de gauche traduit la cardinalité portée par
 l'entité de droite (double barre = (1,1), barre et cercle = (0,1), accolade = (0,n), accolade barrée = (1,n)).
 Exemple Run–Asset : un asset appartient à exactement un run ; un run produit zéro ou plusieurs assets.
