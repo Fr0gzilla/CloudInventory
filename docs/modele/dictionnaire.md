@@ -25,7 +25,7 @@
 | Asset | source | varchar | 10 | NULL | | Source (VIRT/IPAM) | RG04 |
 | Asset | consolidated_run_id | integer | — | NOT NULL | FK | Run auquel cet asset appartient | RG18 |
 | IpamRecord | id | integer | auto-increment | NOT NULL | PK | Identifiant unique enregistrement IPAM | RG18 |
-| IpamRecord | ip | varchar | 45 | UNIQUE NOT NULL | | Adresse IP | RG04, RG06, RG09, RG13 |
+| IpamRecord | ip | varchar | 45 | NOT NULL | | Adresse IP | RG04, RG06, RG09, RG13 |
 | IpamRecord | dns_name | varchar | 200 | NOT NULL | | Nom DNS de l'enregistrement | RG02, RG03, RG10, RG12 |
 | IpamRecord | tenant | varchar | 50 | NULL | | Tenant (Production/Infra/Dev/Staging/Supervision/DevOps) | RG33 |
 | IpamRecord | site | varchar | 50 | NULL | | Site (DC1/DC2 ou zone) | RG34 |

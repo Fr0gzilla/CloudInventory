@@ -68,17 +68,15 @@ def test_ipam_record_duplicate_ip_and_dns_is_rejected(db):
     db.session.rollback()
 
 
-def test_ipam_record_same_ip_with_other_dns_is_rejected(db):
-    """uk_ipam_record_ip : une adresse IP n'existe qu'une seule fois."""
+def test_ipam_record_same_ip_with_other_dns_is_accepted(db):
+    """Deux enregistrements de même IP mais DNS différents sont acceptés."""
     db.session.add(IpamRecord(ip="10.0.0.1", dns_name="host-a"))
     db.session.commit()
 
-    with pytest.raises(IntegrityError) as excinfo:
-        db.session.add(IpamRecord(ip="10.0.0.1", dns_name="host-b"))
-        db.session.flush()
+    db.session.add(IpamRecord(ip="10.0.0.1", dns_name="host-b"))
+    db.session.commit()
 
-    assert "UNIQUE constraint failed: ipam_record.ip" in str(excinfo.value.orig)
-    db.session.rollback()
+    assert db.session.query(IpamRecord).count() == 2
 
 
 def test_asset_upsert_by_vm_id_updates_existing_row(db, run):

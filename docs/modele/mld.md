@@ -44,7 +44,7 @@ erDiagram
     }
     ipam_record {
         integer id PK
-        varchar ip UK
+        varchar ip
         varchar dns_name
         varchar tenant
         varchar site
@@ -131,7 +131,7 @@ erDiagram
 
 - PK : id
 - FK : aucune
-- Index : uk_ipam_record_ip UNIQUE (ip), idx_ipam_record_dns_name (dns_name)
+- Index : idx_ipam_record_dns_name (dns_name)
 - Origine : entité IpamRecord — RG02, RG03, RG04, RG06, RG09, RG10, RG12, RG13, RG16, RG18, RG33, RG34
 
 ### consolidated_asset
@@ -252,8 +252,7 @@ Aucune association ne porte d'attribut : aucun attribut déplacé au passage MCD
 
 ### Écarts documentés (de mcd.md, non tranchés ici)
 
-1. **Clé d'upsert IpamRecord** — RG18 impose `ip + dns_name`, le dictionnaire marque `ip` UNIQUE seul : le MLD retient
-   UNIQUE(ip) ; un index composite `(ip, dns_name)` reste optionnel, faute de RG tranchant la question (mcd.md, Écart 1).
+1. **Clé d'upsert IpamRecord** — RG18 impose `ip + dns_name` ; l'individualité de `ip` n'est plus contrainte unique ; un index composite `(ip, dns_name)` reste pour l'upsert RG18.
 2. **FK du dictionnaire** — `consolidated_run_id`, `asset_id`, `ipam_record_id`, `run_id` étaient portés par les associations
    du MCD et deviennent des colonnes FK au stade MLD, sans changement de nom ni de type (mcd.md, Écart 2).
 3. **Lien run → consolidated_asset** — absent du dictionnaire : le rattachement au run reste transitif via `asset.consolidated_run_id` ;

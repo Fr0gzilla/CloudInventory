@@ -22,7 +22,6 @@ EXPECTED_INDEXES = {
         "idx_run_start_date": False,
     },
     "ipam_record": {
-        "uk_ipam_record_ip": True,
         "uq_ipam_record_ip_dns": True,
         "idx_ipam_record_dns_name": False,
     },
@@ -174,4 +173,4 @@ def test_all_indexes_declared(db):
             assert found[name] is unique, f"index {table}.{name} (unique={unique})"
             checked += 1
 
-    assert checked == 21
+    assert checked == 20

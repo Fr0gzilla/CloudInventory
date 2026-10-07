@@ -27,7 +27,6 @@ CREATE INDEX `idx_run_status` ON `run` (`status`);
 CREATE INDEX `idx_run_start_date` ON `run` (`start_date`);
 
 -- 2. ipam_record — aucune FK (Entité IpamRecord)
---    uk_ipam_record_ip : UNIQUE(ip) du MLD (dictionnaire, clé candidate).
 --    uq_ipam_record_ip_dns : clé d'upsert RG18 (ip + dns_name), index composite optionnel (mld.md, Écart 1).
 CREATE TABLE `ipam_record` (
   `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
@@ -39,7 +38,6 @@ CREATE TABLE `ipam_record` (
   `is_duplicate_dns` BOOLEAN DEFAULT FALSE,
   `is_duplicate_ip` BOOLEAN DEFAULT FALSE
 );
-CREATE UNIQUE INDEX `uk_ipam_record_ip` ON `ipam_record` (`ip`);
 CREATE UNIQUE INDEX `uq_ipam_record_ip_dns` ON `ipam_record` (`ip`, `dns_name`);
 CREATE INDEX `idx_ipam_record_dns_name` ON `ipam_record` (`dns_name`);
 

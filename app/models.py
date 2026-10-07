@@ -56,7 +56,6 @@ class IpamRecord(db.Model):
     )
 
     __table_args__ = (
-        db.Index("uk_ipam_record_ip", "ip", unique=True),
         db.Index("uq_ipam_record_ip_dns", "ip", "dns_name", unique=True),
         db.Index("idx_ipam_record_dns_name", "dns_name"),
         {"sqlite_autoincrement": True},
