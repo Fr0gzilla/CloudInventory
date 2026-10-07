@@ -43,10 +43,12 @@ def app(monkeypatch):
         SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
 
     application = create_app(TestConfig)
-    with application.app_context():
+    try:
         yield application
-        db.session.remove()
-        db.drop_all()
+    finally:
+        with application.app_context():
+            db.session.remove()
+            db.drop_all()
 
 
 @pytest.fixture()
@@ -54,7 +56,9 @@ def db(app):
     """Session SQLAlchemy dans le contexte de l'application de test."""
     from app.extensions import db as extensions_db
 
-    return extensions_db
+    with app.app_context():
+        yield extensions_db
+        extensions_db.session.remove()
 
 
 @pytest.fixture()
