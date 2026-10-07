@@ -10,7 +10,7 @@
 | RG06 | [matching] | Si un asset matche par IP mais que le hostname diffère du DNS NetBox, l'anomalie HOSTNAME_MISMATCH doit être déclenchée | §7.1, §6.2 |
 | RG07 | [matching] | Si un asset est arrêté (stopped) mais que son IP est active dans NetBox, l'anomalie STATUS_MISMATCH doit être déclenchée | §7.1, §6.2 |
 | RG08 | [anomalies] | Le code NO_MATCH doit être déclenché lorsqu'aucune correspondance n'est trouvée (ni hostname, ni FQDN, ni IP) | §6.2, §13.3 |
-| RG09 | [anomalies] | Le code MATCHED_IP doit être déclenché lorsqu'une IP correspond mais que le hostname ne correspond pas au DNS NetBox | §6.2, §13.3 |
+| RG09 | [matching] | Le statut de correspondance MATCHED_IP doit être attribué lorsque l'IP rapportée correspond à l'adresse IP d'un enregistrement IPAM ; dans ce cas l'anomalie HOSTNAME_MISMATCH est levée si le hostname diffère du DNS NetBox. | §7.1, §6.2 |
 | RG10 | [anomalies] | Le code HOSTNAME_MISMATCH doit être déclenché lorsqu'une VM est matcheée par IP mais que le hostname diffère du DNS NetBox | §6.2, §13.3 |
 | RG11 | [anomalies] | Le code STATUS_MISMATCH doit être déclenché lorsqu'une VM est arrêtée (stopped) mais que son IP est active dans NetBox | §6.2, §13.3 |
 | RG12 | [anomalies] | Le code DUPLICATE_DNS doit être déclenché lorsqu'un même nom DNS normalisé apparaît dans plusieurs enregistrements IPAM | §6.2, §7.4, §13.3 |

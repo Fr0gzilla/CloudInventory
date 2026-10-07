@@ -100,7 +100,7 @@ Tableau des associations MCD → relations UML ; multiplicités croisées (cardi
 | consolider | consolider | Asset | (1,n) | ConsolidatedAsset | (1,1) | `1` | `1..*` | association navigable `ConsolidatedAsset --> Asset` | consolidated_asset.asset_id | RG01, RG18, RG24 |
 | renseigner | renseigner | IpamRecord | (0,n) | ConsolidatedAsset | (0,1) | `0..1` | `0..*` | association navigable `ConsolidatedAsset --> IpamRecord` | consolidated_asset.ipam_record_id | RG04, RG05, RG08, RG18 |
 | signaler | signaler | Asset | (0,n) | Anomaly | (0,1) | `0..1` | `0..*` | association navigable `Anomaly --> Asset` | anomaly.asset_id | RG06, RG07, RG10, RG11, RG12, RG13 |
-| concerner | concerner | IpamRecord | (0,n) | Anomaly | (0,1) | `0..1` | `0..*` | association navigable `Anomaly --> IpamRecord` | anomaly.ipam_record_id | RG12, RG13, RG08, RG09 |
+| concerner | concerner | IpamRecord | (0,n) | Anomaly | (0,1) | `0..1` | `0..*` | association navigable `Anomaly --> IpamRecord` | anomaly.ipam_record_id | RG12, RG13, RG08, RG10 |
 
 Contrôle croisé : côté `1` ↔ cardinalité (1,1), côté `0..1` ↔ cardinalité (0,1), côté `0..*` ↔ (0,n), côté `1..*` ↔ (1,n) ;
 6 associations MCD → 6 relations UML, aucune relation en moins ni en plus, aucune généralisation (pas d'héritage dans le MCD).

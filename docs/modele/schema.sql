@@ -1,12 +1,13 @@
 -- schema.sql — CloudInventory v2.0, DDL des 5 tables du MLD
--- Source   : .sdv/modele/mld.md (5 tables, 44 colonnes, 6 FK, « Ordre de création »),
---            .sdv/modele/classes.md, .sdv/modele/dictionnaire.md (types et longueurs),
---            .sdv/modele/mcd.md (cardinalités des 6 associations)
--- Dialecte : SQLite (CAHIER_DES_CHARGES.md : base de données SQLite intégrée)
+-- Source   : docs/modele/mld.md (5 tables, 44 colonnes, 6 FK, « Ordre de création »),
+--            docs/modele/classes.md, docs/modele/dictionnaire.md (types et longueurs),
+--            docs/modele/mcd.md (cardinalités des 6 associations)
+-- Dialecte : SQLite (cahier des charges : base de données SQLite intégrée)
 -- Date     : 2026-10-07
 -- Hors script : aucune donnée, aucun secret.
 -- Ordre des tables : run, ipam_record, asset, consolidated_asset, anomaly —
 --   chaque table est créée après toutes celles qu'elle référence (aucun cycle de FK).
+-- Note     : MATCHED_IP est un statut de correspondance, pas un code d'anomalie (RG09, comme CloudInventory.v2).
 
 PRAGMA foreign_keys = ON;
 
@@ -98,7 +99,7 @@ CREATE TABLE `anomaly` (
   `run_id` INTEGER NOT NULL,
   `asset_id` INTEGER,
   `ipam_record_id` INTEGER,
-  `code` VARCHAR(20) NOT NULL CHECK (`code` IN ('NO_MATCH','MATCHED_IP','HOSTNAME_MISMATCH','STATUS_MISMATCH','DUPLICATE_DNS','DUPLICATE_IP')),
+  `code` VARCHAR(20) NOT NULL CHECK (`code` IN ('NO_MATCH','HOSTNAME_MISMATCH','STATUS_MISMATCH','DUPLICATE_DNS','DUPLICATE_IP')),
   `description` TEXT,
   `detected_at` DATETIME NOT NULL,
   FOREIGN KEY (`run_id`) REFERENCES `run` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,

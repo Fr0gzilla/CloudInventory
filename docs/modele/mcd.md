@@ -94,7 +94,7 @@ Aucune association ne porte d'attribut : toutes les données du dictionnaire son
 | consolider | Asset | (1,n) | ConsolidatedAsset | (1,1) | aucun | RG01 (chaque exécution applique le matching 4 niveaux), RG18 (un asset persiste et re-consolide à chaque run), RG24 (champs consolidés) |
 | renseigner | IpamRecord | (0,n) | ConsolidatedAsset | (0,1) | aucun | RG04, RG05, RG08 (NO_MATCH : `ipam_record_id` NULL), RG18 (upsert des IpamRecord) |
 | signaler | Asset | (0,n) | Anomaly | (0,1) | aucun | RG06, RG07, RG10, RG11 (anomalies portées par un asset), RG12, RG13 (`asset_id` NULL pour les doublons IPAM purs) |
-| concerner | IpamRecord | (0,n) | Anomaly | (0,1) | aucun | RG12, RG13 (DUPLICATE_DNS / DUPLICATE_IP portés par un enregistrement), RG08, RG09 (`ipam_record_id` NULL pour les anomalies de VM) |
+| concerner | IpamRecord | (0,n) | Anomaly | (0,1) | aucun | RG12, RG13 (DUPLICATE_DNS / DUPLICATE_IP portés par un enregistrement), RG08, RG10 (\`ipam_record_id\` NULL pour les anomalies de VM) |
 
 Lecture en langage :
 - produire — un asset appartient à exactement un run ; un run produit zéro ou plusieurs assets.
@@ -110,7 +110,7 @@ Lecture en langage :
 |---------|--------|----|
 | produire, detecter | association | RG17, RG18, RG19, RG20, RG31, RG32, RG08→RG13 |
 | consolider, renseigner | association | RG01, RG02, RG03, RG04, RG05, RG08, RG18, RG24 |
-| signaler, concerner | association | RG06, RG07, RG09, RG10, RG11, RG12, RG13 |
+| signaler, concerner | association | RG06, RG07, RG10, RG11, RG12, RG13 |
 | Run, status, start_date, end_date, compteurs, error_message | entité + attributs | RG17, RG19, RG20 |
 | Asset.vm_id (UK), IpamRecord.ip (UK) | clé candidate d'upsert | RG18 |
 | Asset.vm_name, Asset.fqdn, IpamRecord.dns_name, Asset.match_status, ConsolidatedAsset.match_status | attributs | RG02, RG03, RG04, RG05, RG14 (normalisation appliquée à ces colonnes) |

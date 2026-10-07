@@ -43,6 +43,6 @@
 | Anomaly | run_id | integer | — | NOT NULL | FK | Run associé | RG17, RG19 |
 | Anomaly | asset_id | integer | — | NULL | FK | Asset associé (peut être NULL) | RG06, RG07, RG11 |
 | Anomaly | ipam_record_id | integer | — | NULL | FK | IpamRecord associé (peut être NULL) | RG12, RG13 |
-| Anomaly | code | varchar | 20 | NOT NULL | | Code anomalie (NO_MATCH/MATCHED_IP/HOSTNAME_MISMATCH/STATUS_MISMATCH/DUPLICATE_DNS/DUPLICATE_IP) | RG08-RG13 |
+| Anomaly | code | varchar | 20 | NOT NULL | | Code anomalie (NO_MATCH/HOSTNAME_MISMATCH/STATUS_MISMATCH/DUPLICATE_DNS/DUPLICATE_IP) | RG08-RG13 |
 | Anomaly | description | text | — | NULL | | Description détaillée de l'anomalie | RG08 |
 | Anomaly | detected_at | datetime | — | NOT NULL | | Timestamp de détection | RG19 |

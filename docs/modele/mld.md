@@ -161,7 +161,7 @@ erDiagram
 | run_id | INT | NOT NULL | — | FK → run(id) |
 | asset_id | INT | NULL | — | FK → asset(id) |
 | ipam_record_id | INT | NULL | — | FK → ipam_record(id) |
-| code | VARCHAR(20) | NOT NULL | — | CHECK IN ('NO_MATCH','MATCHED_IP','HOSTNAME_MISMATCH','STATUS_MISMATCH','DUPLICATE_DNS','DUPLICATE_IP') |
+| code | VARCHAR(20) | NOT NULL | — | CHECK IN ('NO_MATCH','HOSTNAME_MISMATCH','STATUS_MISMATCH','DUPLICATE_DNS','DUPLICATE_IP') |
 | description | TEXT | NULL | — | |
 | detected_at | DATETIME | NOT NULL | — | |
 
@@ -236,7 +236,7 @@ erDiagram
 5. **anomaly.asset_id → asset(id)** — association *signaler*, Asset (0,n) – Anomaly (0,1) : FK côté Anomaly (max = 1) ;
    NULL car min = 0 (doublons IPAM purs sans asset, RG12/RG13 ; le dictionnaire fait foi — voir Écart 5 de mcd.md).
 6. **anomaly.ipam_record_id → ipam_record(id)** — association *concerner*, IpamRecord (0,n) – Anomaly (0,1) :
-   FK côté Anomaly (max = 1) ; NULL car min = 0 (anomalies de VM sans enregistrement IPAM, RG08/RG09).
+   FK côté Anomaly (max = 1) ; NULL car min = 0 (anomalies de VM sans enregistrement IPAM, RG08/RG10).
 
 Aucune association (x,n)-(x,n) ni n-aire : 6 associations → 6 FK, 0 table de jointure.
 Aucune association ne porte d'attribut : aucun attribut déplacé au passage MCD → MLD.

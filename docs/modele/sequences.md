@@ -119,7 +119,7 @@ sequenceDiagram
         else ip_reported == ip
             Web->>C: create/update match_status=MATCHED_IP [RG01, RG04]
             Web->>Web: cumul local matched_ip_count
-            Web->>N: anomalie MATCHED_IP + HOSTNAME_MISMATCH [RG06, RG09, RG10]
+            Web->>N: statut MATCHED_IP + anomalie HOSTNAME_MISMATCH [RG06, RG09, RG10]
         else aucune des 3 strategies
             Web->>C: create/update match_status=NO_MATCH [RG01, RG05]
             Web->>Web: cumul local no_match_count
@@ -153,14 +153,14 @@ sequenceDiagram
 | `MATCHED_FQDN` / premier segment du FQDN | RG03 |
 | `MATCHED_IP` / `ip_reported == ip` | RG04 |
 | `NO_MATCH` en dernier recours | RG05, RG08 |
-| `MATCHED_IP` + `HOSTNAME_MISMATCH` | RG06, RG09, RG10 |
+| `statut MATCHED_IP` + `anomalie HOSTNAME_MISMATCH` | RG06, RG09, RG10 |
 | `STATUS_MISMATCH` (`stopped` + IP active) | RG07, RG11 |
 | `DUPLICATE_DNS` / `DUPLICATE_IP` | RG12, RG13 |
 | Upserts `vm_id` et `ip + dns_name` | RG18 |
 | `status=SUCCESS`, `end_date`, `matched_name_count`, `matched_fqdn_count`, `matched_ip_count`, `no_match_count` | RG19 |
 | `rollback`, `status=FAIL`, `error_message` | RG20 |
 | Collecte de tous les noeuds, `type`, `tenant`, `site` | RG31, RG32, RG33, RG34 |
-| Anomalies attendues (3 NO_MATCH, 1 MATCHED_IP + HOSTNAME_MISMATCH, 2 STATUS_MISMATCH, 1 DUPLICATE_DNS, 1 DUPLICATE_IP) | `CAHIER_DES_CHARGES.md` §13.3 |
+| Anomalies attendues (3 NO_MATCH, 1 statut MATCHED_IP + anomalie HOSTNAME_MISMATCH, 2 STATUS_MISMATCH, 1 DUPLICATE_DNS, 1 DUPLICATE_IP) | `CAHIER_DES_CHARGES.md` §13.3 |
 
 ### Non représenté
 
