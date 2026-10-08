@@ -1,9 +1,10 @@
 """Lectures de base partagées entre les routes web et l'API REST.
 
 Aligné sur reference/CloudInventory.v2/app/queries.py, adapté au schéma
-docs/modele/schema.sql : ``consolidated_asset`` n'a pas de ``run_id``, le run se
-retrouve via ``asset.consolidated_run_id`` ; les colonnes de métriques et
-``meta_zone`` du projet d'origine n'existent pas dans ce schéma.
+docs/modele/schema.sql : l'inventaire d'un run se lit par
+``consolidated_asset.run_id`` (FK NOT NULL vers run, RG35), exactement comme
+la référence ; la colonne ``meta_zone`` du projet d'origine n'existe pas
+dans ce schéma.
 Les colonnes de tri sont lues via une liste blanche (jamais concaténées).
 """
 import csv
@@ -21,6 +22,8 @@ _SORT_COLUMNS = {
     "type": Asset.type,
     "ip": Asset.ip_reported,
     "fqdn": Asset.fqdn,
+    "cpu": Asset.cpu_usage,
+    "ram": Asset.ram_used,
     "match": ConsolidatedAsset.match_status,
     "role": ConsolidatedAsset.role,
 }
@@ -32,7 +35,7 @@ def _inventory_rows(run_id):
         db.session.query(ConsolidatedAsset, Asset, IpamRecord)
         .join(Asset, ConsolidatedAsset.asset_id == Asset.id)
         .outerjoin(IpamRecord, ConsolidatedAsset.ipam_record_id == IpamRecord.id)
-        .filter(Asset.consolidated_run_id == run_id)
+        .filter(ConsolidatedAsset.run_id == run_id)
     )
 
 

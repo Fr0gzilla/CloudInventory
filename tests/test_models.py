@@ -20,8 +20,28 @@ EXPECTED_NOT_NULL = {
     "run": {"status", "start_date"},
     "asset": {"vm_id", "vm_name", "consolidated_run_id"},
     "ipam_record": {"ip", "dns_name"},
-    "consolidated_asset": {"asset_id", "match_status"},
+    "consolidated_asset": {"run_id", "asset_id", "match_status"},
     "anomaly": {"run_id", "code", "detected_at"},
+}
+
+# Colonnes ajoutées par T026 (docs/modele/schema.sql) : nom -> type attendu.
+EXPECTED_T026_COLUMNS = {
+    "asset": {
+        "os": "VARCHAR(100)",
+        "annotation": "TEXT",
+        "cpu_count": "INT",
+        "cpu_usage": "FLOAT",
+        "ram_max": "BIGINT",
+        "ram_used": "BIGINT",
+        "disk_max": "BIGINT",
+        "disk_used": "BIGINT",
+        "uptime": "INT",
+    },
+    "consolidated_asset": {
+        "ip_final": "VARCHAR(45)",
+        "dns_final": "VARCHAR(200)",
+        "vm_status": "VARCHAR(20)",
+    },
 }
 
 
@@ -59,8 +79,9 @@ def test_ipam_record_creation(db):
     assert record.is_duplicate_ip is False
 
 
-def test_consolidated_asset_creation(db, asset, ipam_record):
+def test_consolidated_asset_creation(db, run, asset, ipam_record):
     consolidated = ConsolidatedAsset(
+        run_id=run.id,
         asset_id=asset.id,
         ipam_record_id=ipam_record.id,
         match_status="MATCHED_IP",
@@ -69,6 +90,8 @@ def test_consolidated_asset_creation(db, asset, ipam_record):
     db.session.commit()
 
     assert consolidated.id is not None
+    assert consolidated.run_id == run.id
+    assert consolidated.run.id == run.id
     assert consolidated.asset_id == asset.id
     assert consolidated.match_status == "MATCHED_IP"
     assert consolidated.consolidated_at is None
@@ -161,14 +184,19 @@ def test_ipam_record_missing_required_column_is_rejected(db, overrides):
 @pytest.mark.parametrize(
     "overrides",
     [
+        pytest.param({"run_id": None}, id="consolidated-without-run_id"),
         pytest.param({"asset_id": None}, id="consolidated-without-asset_id"),
         pytest.param({"match_status": None}, id="consolidated-without-match_status"),
     ],
 )
 def test_consolidated_asset_missing_required_column_is_rejected(
-    db, asset, overrides
+    db, run, asset, overrides
 ):
-    params = {"asset_id": asset.id, "match_status": "MATCHED_NAME"}
+    params = {
+        "run_id": run.id,
+        "asset_id": asset.id,
+        "match_status": "MATCHED_NAME",
+    }
     params.update(overrides)
 
     with pytest.raises(IntegrityError) as excinfo:
@@ -197,3 +225,49 @@ def test_anomaly_missing_required_column_is_rejected(db, run, overrides):
 
     assert "NOT NULL constraint failed" in str(excinfo.value.orig)
     db.session.rollback()
+
+
+def test_t026_columns_are_declared_with_expected_types(db):
+    """T026 — métriques asset et finals consolidé : nom, type et nullabilité."""
+    inspector = inspect(db.engine)
+
+    for table, expected in EXPECTED_T026_COLUMNS.items():
+        columns = {column["name"]: column for column in inspector.get_columns(table)}
+        for name, type_name in expected.items():
+            assert name in columns, f"{table}.{name} absente"
+            declared = " ".join(str(columns[name]["type"]).upper().split())
+            # L'inspecteur SQLAlchemy normalise tout entier 32 bits en Integer()
+            # (str = "INTEGER") alors que le DDL de schema.sql écrit "INT".
+            assert declared.replace("INTEGER", "INT") == type_name, (
+                f"{table}.{name} = {declared}"
+            )
+            assert columns[name]["nullable"] is True, f"{table}.{name} NOT NULL"
+
+
+def test_t026_columns_persist_collected_values(db, run, asset):
+    """Valeurs collectées : métriques sur Asset, ip/dns/statut final consolidé."""
+    asset.os = "Debian 12"
+    asset.annotation = "gééré via T026"
+    asset.cpu_count = 4
+    asset.cpu_usage = 12.5
+    asset.ram_max = 8192
+    asset.ram_used = 2048
+    asset.disk_max = 100_000
+    asset.disk_used = 42_000
+    asset.uptime = 86_400
+    consolidated = ConsolidatedAsset(
+        run_id=run.id,
+        asset_id=asset.id,
+        match_status="MATCHED_IP",
+        ip_final="10.0.0.42",
+        dns_final="web-a500.internal",
+        vm_status="running",
+    )
+    db.session.add(consolidated)
+    db.session.commit()
+
+    assert asset.cpu_usage == 12.5 and asset.ram_used == 2048
+    assert asset.uptime == 86_400 and asset.os == "Debian 12"
+    assert consolidated.ip_final == "10.0.0.42"
+    assert consolidated.dns_final == "web-a500.internal"
+    assert consolidated.vm_status == "running"

@@ -3,13 +3,19 @@
 RG18 (docs/modele/regles.md) : l'upsert s'effectue par vm_id pour Asset et par
 ip+dns_name pour IpamRecord. Un doublon de clé est rejeté par la contrainte
 UNIQUE, une seconde écriture sur la même clé met la ligne à jour (pas de 2e ligne).
+T024 : la réécriture d'un Asset dans un nouveau run repointe
+`consolidated_run_id` vers ce run (une seule ligne par vm_id, un seul run).
 """
+from datetime import datetime
+
 import pytest
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 
 from app.extensions import db
-from app.models import Asset, IpamRecord
+from app.models import Asset, IpamRecord, Run
+
+NOW = datetime(2026, 1, 1, 12, 0, 0)
 
 
 def upsert_asset(session, vm_id, **fields):
@@ -104,3 +110,26 @@ def test_ipam_upsert_creates_one_row_per_distinct_key(db):
     upsert_ipam_record(db.session, "10.0.0.2", "host-b")
 
     assert db.session.query(IpamRecord).count() == 2
+
+
+def test_asset_upsert_creates_one_row_per_distinct_vm_id(db, run):
+    upsert_asset(db.session, "100", vm_name="a", consolidated_run_id=run.id)
+    upsert_asset(db.session, "200", vm_name="b", consolidated_run_id=run.id)
+
+    assert db.session.query(Asset).count() == 2
+
+
+def test_asset_upsert_repoints_run_id_to_the_new_run(db, run):
+    """RG18 + T024 : une nouvelle exécution réécrit l'asset sur le nouveau run."""
+    other_run = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(other_run)
+    db.session.commit()
+
+    first = upsert_asset(
+        db.session, "100", vm_name="before", consolidated_run_id=run.id
+    )
+    second = upsert_asset(db.session, "100", consolidated_run_id=other_run.id)
+
+    assert db.session.query(Asset).count() == 1
+    assert second.id == first.id
+    assert second.consolidated_run_id == other_run.id

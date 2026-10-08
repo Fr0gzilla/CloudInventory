@@ -36,3 +36,7 @@
 | RG32 | [structure] | Le type d'asset (qemu/lxc) doit être enregistré (§13.1) | §13.1 |
 | RG33 | [structure] | Le tenant doit être attribué à chaque enregistrement IPAM (§13.2) | §13.2 |
 | RG34 | [structure] | Le site doit être attribué à chaque enregistrement IPAM (§13.2) | §13.2 |
+| RG35 | [run pipeline] | Chaque asset consolidé doit être rattaché au run qui l'a produit (consolidated_asset.run_id, clé étrangère NOT NULL vers run.id) : l'historique et la comparaison de deux runs en dépendent | §8.5, §8.6 |
+| RG36 | [index] | Un index sur consolidated_asset.run_id doit être créé pour soutenir les requêtes de comparaison de runs | §8.6 |
+| RG37 | [structure] | Les attributs collectés de chaque VM (OS, annotation, vCPU et utilisation CPU, RAM et disque alloués et utilisés, uptime) doivent être enregistrés sur l'asset à chaque run ; une valeur absente de la source reste vide (NULL) | §8.3, §8.7, RG24 |
+| RG38 | [structure] | Chaque asset consolidé doit conserver l'IP, le DNS et le statut de la VM retenus lors de son run (instantané) ; une valeur absente reste vide (NULL) | §8.6, §8.7, RG24 |

@@ -182,10 +182,21 @@ def test_indexes_match_schema_sql(app):
 
 
 def test_foreign_keys_match_schema_sql(app):
-    """Les 6 FK ciblent les mêmes colonnes avec les mêmes ON DELETE/UPDATE."""
+    """Les 7 FK ciblent les mêmes colonnes avec les mêmes ON DELETE/UPDATE."""
     gaps = _gaps(_app_snapshot(app), _reference_snapshot())
 
     assert gaps["foreign_keys"] == [], _only(gaps, "foreign_keys")
+
+
+def test_consolidated_asset_run_id_maps_to_run(app):
+    """T024 — `consolidated_asset.run_id` : NOT NULL, FK → run, index (RG35)."""
+    reference = _reference_snapshot()["consolidated_asset"]
+    application = _app_snapshot(app)["consolidated_asset"]
+
+    for snapshot in (reference, application):
+        assert snapshot["columns"]["run_id"]["notnull"] is True
+        assert ("run_id", "run", "id", "CASCADE", "RESTRICT") in snapshot["foreign_keys"]
+        assert snapshot["indexes"]["idx_consolidated_asset_run_id"]["unique"] is False
 
 
 # --- C2 — la comparaison détecte les écarts (test de non-régression) ---------

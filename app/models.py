@@ -1,5 +1,18 @@
-"""Modèles SQLAlchemy — mapping 1:1 de docs/modele/schema.sql (5 tables, 6 FK)."""
+"""Modèles SQLAlchemy — mapping 1:1 de docs/modele/schema.sql (5 tables, 7 FK)."""
+from sqlalchemy.ext.compiler import compiles
+
 from app.extensions import db
+
+
+class SqliteInt(db.Integer):
+    """Colonne « INT » de schema.sql : db.Integer rendrait « INTEGER »."""
+
+    __visit_name__ = "INT"
+
+
+@compiles(SqliteInt)
+def _compile_sqlite_int(_type, _compiler, **_kw):
+    return "INT"
 
 
 class Run(db.Model):
@@ -17,14 +30,8 @@ class Run(db.Model):
 
     assets = db.relationship("Asset", back_populates="run", lazy=True)
     anomalies = db.relationship("Anomaly", back_populates="run", lazy=True)
-    # Pas de FK directe : chaîne run → asset → consolidated_asset (schema.sql).
     consolidated_assets = db.relationship(
-        "ConsolidatedAsset",
-        primaryjoin="Run.id == Asset.consolidated_run_id",
-        secondaryjoin="Asset.id == ConsolidatedAsset.asset_id",
-        secondary="asset",
-        viewonly=True,
-        lazy=True,
+        "ConsolidatedAsset", back_populates="run", lazy=True
     )
 
     __table_args__ = (
@@ -82,6 +89,15 @@ class Asset(db.Model):
         db.ForeignKey("run.id", ondelete="RESTRICT", onupdate="CASCADE"),
         nullable=False,
     )
+    os = db.Column(db.String(100), nullable=True)
+    annotation = db.Column(db.Text, nullable=True)
+    cpu_count = db.Column(SqliteInt, nullable=True)
+    cpu_usage = db.Column(db.Float, nullable=True)
+    ram_max = db.Column(db.BigInteger, nullable=True)
+    ram_used = db.Column(db.BigInteger, nullable=True)
+    disk_max = db.Column(db.BigInteger, nullable=True)
+    disk_used = db.Column(db.BigInteger, nullable=True)
+    uptime = db.Column(SqliteInt, nullable=True)
 
     run = db.relationship("Run", back_populates="assets", lazy=True)
     consolidated_assets = db.relationship(
@@ -109,6 +125,15 @@ class Asset(db.Model):
         db.Index("idx_asset_node", "node"),
         db.Index("idx_asset_type", "type"),
         db.Index("idx_asset_match_status", "match_status"),
+        db.Index("idx_asset_os", "os"),
+        db.Index("idx_asset_annotation", "annotation"),
+        db.Index("idx_asset_cpu_count", "cpu_count"),
+        db.Index("idx_asset_cpu_usage", "cpu_usage"),
+        db.Index("idx_asset_ram_max", "ram_max"),
+        db.Index("idx_asset_ram_used", "ram_used"),
+        db.Index("idx_asset_disk_max", "disk_max"),
+        db.Index("idx_asset_disk_used", "disk_used"),
+        db.Index("idx_asset_uptime", "uptime"),
         {"sqlite_autoincrement": True},
     )
 
@@ -117,6 +142,11 @@ class ConsolidatedAsset(db.Model):
     __tablename__ = "consolidated_asset"
 
     id = db.Column(db.Integer, primary_key=True)
+    run_id = db.Column(
+        db.Integer,
+        db.ForeignKey("run.id", ondelete="RESTRICT", onupdate="CASCADE"),
+        nullable=False,
+    )
     asset_id = db.Column(
         db.Integer,
         db.ForeignKey("asset.id", ondelete="CASCADE", onupdate="CASCADE"),
@@ -131,19 +161,27 @@ class ConsolidatedAsset(db.Model):
     role = db.Column(db.String(50), nullable=True)
     anomaly_codes = db.Column(db.Text, nullable=True)
     consolidated_at = db.Column(db.DateTime, nullable=True)
+    ip_final = db.Column(db.String(45), nullable=True)
+    dns_final = db.Column(db.String(200), nullable=True)
+    vm_status = db.Column(db.String(20), nullable=True)
 
     asset = db.relationship("Asset", back_populates="consolidated_assets", lazy=True)
     ipam_record = db.relationship(
         "IpamRecord", back_populates="consolidated_assets", lazy=True
     )
+    run = db.relationship("Run", back_populates="consolidated_assets", lazy=True)
 
     __table_args__ = (
         db.CheckConstraint(
             "match_status IN ('MATCHED_NAME','MATCHED_FQDN','MATCHED_IP','NO_MATCH')"
         ),
         db.Index("idx_consolidated_asset_asset_id", "asset_id"),
+        db.Index("idx_consolidated_asset_run_id", "run_id"),
         db.Index("idx_consolidated_asset_ipam_record_id", "ipam_record_id"),
         db.Index("idx_consolidated_asset_match_status", "match_status"),
+        db.Index("idx_consolidated_asset_ip_final", "ip_final"),
+        db.Index("idx_consolidated_asset_dns_final", "dns_final"),
+        db.Index("idx_consolidated_asset_vm_status", "vm_status"),
         {"sqlite_autoincrement": True},
     )
 

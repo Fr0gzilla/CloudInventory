@@ -35,13 +35,14 @@ def _add_run(db_session, status="SUCCESS", **counts):
 def _add_item(db_session, run, vm_name, *, vm_type="qemu", vm_status="running",
               node="pve1", tags=None, ip_reported=None, fqdn=None,
               match_status="MATCHED_NAME", role=None, anomaly_codes=None,
-              source="VIRT", ipam=None):
+              source="VIRT", ipam=None, cpu_usage=None, ram_used=None):
     """Asset + ConsolidatedAsset (+ IpamRecord facultatif) pour un run."""
     session = db_session.session
     asset = Asset(
         vm_id=vm_name, vm_name=vm_name, node=node, type=vm_type,
         status=vm_status, tags=tags, ip_reported=ip_reported, fqdn=fqdn,
         source=source, consolidated_run_id=run.id,
+        cpu_usage=cpu_usage, ram_used=ram_used,
     )
     session.add(asset)
     session.flush()
@@ -53,6 +54,7 @@ def _add_item(db_session, run, vm_name, *, vm_type="qemu", vm_status="running",
         session.flush()
 
     ca = ConsolidatedAsset(
+        run_id=run.id,
         asset_id=asset.id, ipam_record_id=record.id if record else None,
         match_status=match_status, role=role, anomaly_codes=anomaly_codes,
     )
@@ -109,6 +111,41 @@ def test_inventory_query_returns_only_the_requested_run(db):
 
     assert len(rows_a) == 3
     assert [asset.vm_name for _ca, asset, _ipam in rows_b] == ["other-c700"]
+
+
+def test_inventory_is_filtered_by_consolidated_run_id(db):
+    """T024 — le filtre historique lit `consolidated_asset.run_id` (RG35).
+
+    L'asset reste rattaché à run_a (collecte) alors que sa ligne consolidée
+    appartient à run_b : l'inventaire de run_b la voit, celui de run_a non.
+    """
+    run_a = _add_run(db)
+    run_b = _add_run(db, matched_name_count=1)
+    asset = Asset(vm_id="vm-777", vm_name="moved-777",
+                  consolidated_run_id=run_a.id)
+    db.session.add(asset)
+    db.session.flush()
+    db.session.add(
+        ConsolidatedAsset(
+            run_id=run_b.id, asset_id=asset.id, match_status="NO_MATCH"
+        )
+    )
+    db.session.commit()
+
+    rows_b = queries.build_inventory_query(run_b.id).all()
+    rows_a = queries.build_inventory_query(run_a.id).all()
+
+    assert asset.consolidated_run_id == run_a.id
+    assert [item.vm_name for _ca, item, _ipam in rows_b] == ["moved-777"]
+    assert rows_a == []
+
+
+def test_module_docstring_no_longer_works_around_missing_run_id(db):
+    """La note « pas de run_id » a été retirée du module (consigne T024)."""
+    doc = queries.__doc__ or ""
+
+    assert "pas de run_id" not in doc
+    assert "consolidated_asset.run_id" in doc
 
 
 def test_free_text_filter_matches_vm_name_ip_and_dns(db):
@@ -179,6 +216,44 @@ def test_unknown_sort_column_falls_back_to_vm_name(db):
     )
 
     assert _names(fallback) == ["cache-n100", "db-b300", "web-a500"]
+
+
+def _seed_metrics(db_session):
+    """Trois VMs d'un même run avec des métriques T026 distinctes (§8.3)."""
+    run = _add_run(db_session)
+    _add_item(db_session, run, "alpha-100", cpu_usage=12.5, ram_used=8192)
+    _add_item(db_session, run, "beta-200", cpu_usage=3.0, ram_used=512)
+    _add_item(db_session, run, "gamma-300", cpu_usage=40.0, ram_used=2048)
+    return run
+
+
+def test_sort_whitelist_exposes_cpu_and_ram_metric_columns(db):
+    """Liste blanche : « cpu » et « ram » pointent les colonnes de métriques."""
+    assert queries._SORT_COLUMNS["cpu"] is Asset.cpu_usage
+    assert queries._SORT_COLUMNS["ram"] is Asset.ram_used
+    assert "evil; DROP TABLE asset" not in queries._SORT_COLUMNS
+
+
+def test_sort_by_cpu_ascending_and_descending(db):
+    """§8.3 — tri CPU (cpu_usage) dans les deux sens."""
+    run = _seed_metrics(db)
+
+    ascending = _names(queries.build_inventory_query(run.id, sort="cpu", order="asc"))
+    descending = _names(queries.build_inventory_query(run.id, sort="cpu", order="desc"))
+
+    assert ascending == ["beta-200", "alpha-100", "gamma-300"]
+    assert descending == list(reversed(ascending))
+
+
+def test_sort_by_ram_ascending_and_descending(db):
+    """§8.3 — tri RAM (ram_used) dans les deux sens."""
+    run = _seed_metrics(db)
+
+    ascending = _names(queries.build_inventory_query(run.id, sort="ram", order="asc"))
+    descending = _names(queries.build_inventory_query(run.id, sort="ram", order="desc"))
+
+    assert ascending == ["beta-200", "gamma-300", "alpha-100"]
+    assert descending == list(reversed(ascending))
 
 
 def test_query_object_supports_limit_and_offset(db):

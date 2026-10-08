@@ -1,6 +1,7 @@
 # Classes — CloudInventory v2.0 (UML statique, déduit du MCD/MLD)
 
-Source : `docs/modele/mcd.md` (5 entités, 6 associations), `docs/modele/mld.md` (5 tables, 44 colonnes, 6 FK), `docs/modele/dictionnaire.md` (44 colonnes typées), `docs/modele/regles.md` (RG01→RG34), `cahier des charges` §6.2, §7, §8.
+Source : `docs/modele/mcd.md` (5 entités, 6 associations), `docs/modele/mld.md` (5 tables, 44 colonnes, 6 FK),
+`docs/modele/dictionnaire.md` (44 colonnes typées), `docs/modele/regles.md` (RG01→RG34), `cahier des charges §6.2, §7, §8`.
 
 Règles de passage :
 - Une classe par entité MCD, nom PascalCase (`Run`, `Asset`, `IpamRecord`, `ConsolidatedAsset`, `Anomaly`) ; table MLD homonyme.
@@ -40,6 +41,15 @@ classDiagram
         -String role
         -String match_status
         -String source
+        -String os
+        -String annotation
+        -Integer cpu_count
+        -Float cpu_usage
+        -Long ram_max
+        -Long ram_used
+        -Long disk_max
+        -Long disk_used
+        -Integer uptime
     }
     class IpamRecord {
         -String ip
@@ -55,6 +65,9 @@ classDiagram
         -String role
         -String anomaly_codes
         -DateTime consolidated_at
+        -String ip_final
+        -String dns_final
+        -String vm_status
     }
     class Anomaly {
         -String code
@@ -67,6 +80,7 @@ classDiagram
     ConsolidatedAsset "0..*" --> "0..1" IpamRecord : renseigner
     Anomaly "0..*" --> "0..1" Asset : signaler
     Anomaly "0..*" --> "0..1" IpamRecord : concerner
+    ConsolidatedAsset "0..*" --> "1" Run : rattacher
     note for Asset "UK vm_id = cle d'upsert (RG18) ; PK id et FK Run non modeles"
     note for IpamRecord "Cle d'upsert RG18 : ip + dns_name, UK sur ip seul (mcd.md, Ecart 1)"
 ```
@@ -76,14 +90,15 @@ classDiagram
 | Classe | Entité MCD | Table MLD | Colonnes MLD | Attributs UML | Nb attributs | Méthodes (RG) | RG |
 |--------|------------|-----------|--------------|---------------|--------------|---------------|----|
 | Run | Run | run | 9 | status, start_date, end_date, matched_name_count, matched_fqdn_count, matched_ip_count, no_match_count, error_message | 8 | aucune (aucune RG [comportement]) | RG17, RG19, RG20 (statut, dates, compteurs, error_message) |
-| Asset | Asset | asset | 13 | vm_id, vm_name, fqdn, ip_reported, node, type, status, tags, role, match_status, source | 11 | aucune | RG02, RG04→RG08, RG14, RG15, RG16, RG18 (uk vm_id), RG31, RG32 |
+| Asset | Asset | asset | 22 | vm_id, vm_name, fqdn, ip_reported, node, type, status, tags, role, match_status, source, os, annotation, cpu_count, cpu_usage, ram_max, ram_used, disk_max, disk_used, uptime | 20 | aucune | RG02, RG04→RG08, RG14, RG15, RG16, RG18 (uk vm_id), RG31, RG32, RG37 |
 | IpamRecord | IpamRecord | ipam_record | 8 | ip, dns_name, tenant, site, tags, is_duplicate_dns, is_duplicate_ip | 7 | aucune | RG02→RG04, RG06, RG09, RG10, RG12, RG13, RG16, RG18 (clé ip+dns_name), RG33, RG34 |
-| ConsolidatedAsset | ConsolidatedAsset | consolidated_asset | 7 | match_status, role, anomaly_codes, consolidated_at | 4 | aucune | RG01→RG05, RG08→RG13, RG15, RG16, RG19, RG24 |
+| ConsolidatedAsset | ConsolidatedAsset | consolidated_asset | 10 | match_status, role, anomaly_codes, consolidated_at, ip_final, dns_final, vm_status | 7 | aucune | RG01→RG05, RG08→RG13, RG15, RG16, RG19, RG24, RG38 |
 | Anomaly | Anomaly | anomaly | 7 | code, description, detected_at | 3 | aucune | RG08→RG13, RG17, RG19 |
 
 Justification : chaque classe est une entité du MCD (une-to-one avec sa table MLD) ; les 5 PK `id` et les 6 FK
 (`asset.consolidated_run_id`, `consolidated_asset.asset_id/ipam_record_id`, `anomaly.run_id/asset_id/ipam_record_id`)
 ne sont pas des attributs : les FK deviennent les 6 relations, les PK restent implicites — d'où 44 = 8+11+7+4+3 (33) + 5 + 6.
+Les 12 colonnes de métriques de la VM (9 sur Asset) et d'instantané du run (3 sur ConsolidatedAsset) sont NULL par défaut (RG37, RG38).
 Aucune méthode : aucune RG n'exige un comportement porté par une classe (RG01→RG13 matching/anomalies, RG17→RG20 pipeline,
 RG24 export, RG18 identifiants d'upsert sont couverts par les attributs et les notes du diagramme).
 Aucune classe-association : aucune association du MCD ne porte d'attribut (`mcd.md:88`).
@@ -100,9 +115,10 @@ Tableau des associations MCD → relations UML ; multiplicités croisées (cardi
 | renseigner | renseigner | IpamRecord | (0,n) | ConsolidatedAsset | (0,1) | `0..1` | `0..*` | association navigable `ConsolidatedAsset --> IpamRecord` | consolidated_asset.ipam_record_id | RG04, RG05, RG08, RG18 |
 | signaler | signaler | Asset | (0,n) | Anomaly | (0,1) | `0..1` | `0..*` | association navigable `Anomaly --> Asset` | anomaly.asset_id | RG06, RG07, RG10, RG11, RG12, RG13 |
 | concerner | concerner | IpamRecord | (0,n) | Anomaly | (0,1) | `0..1` | `0..*` | association navigable `Anomaly --> IpamRecord` | anomaly.ipam_record_id | RG12, RG13, RG08, RG10 |
+| rattacher | rattacher | Run | (0,n) | ConsolidatedAsset | (1,1) | `1` | `0..*` | association navigable `ConsolidatedAsset --> Run` | consolidated_asset.run_id | RG35, RG36 |
 
 Contrôle croisé : côté `1` ↔ cardinalité (1,1), côté `0..1` ↔ cardinalité (0,1), côté `0..*` ↔ (0,n), côté `1..*` ↔ (1,n) ;
-6 associations MCD → 6 relations UML, aucune relation en moins ni en plus, aucune généralisation (pas d'héritage dans le MCD).
+7 associations MCD → 7 relations UML, aucune relation en moins ni en plus, aucune généralisation (pas d'héritage dans le MCD).
 
 ## Limites Mermaid
 
@@ -110,7 +126,7 @@ Contrôle croisé : côté `1` ↔ cardinalité (1,1), côté `0..1` ↔ cardina
 - **Rôles d'extrémité** : Mermaid n'exprime pas les rôles nommés (« rattaché à », « référence ») : seul figure le label d'association
   après les guillemets ; le sens est donné par la navigabilité `-->` (côté FK).
 - **Contraintes** `{ordered}`, `{xor}`, `{disjoint}` : aucune dans le MCD, rien à noter.
-- **Clés candidates** : l'unicité (`vm_id` UK, `ip` UK, clé d'upsert RG18) n'est pas porteable par un membre UML → portée par deux `note`.
+- **Clés candidates** : l'unicité (`vm_id` UK, couple `ip` + `dns_name` UK, clé d'upsert RG18) n'est pas porteable par un membre UML → portée par deux `note`.
 - **PK et FK** : `id` non modélisé (convention UML) ; FK remplacées par les relations — d'où 33 attributs pour 44 colonnes.
 - **Méthodes** : aucun diagramme UML ne peut deviner une méthode là où `regles.md` n'a pas de RG [comportement] ; les RG01→RG34
   restent traçables via la colonne RG des tableaux ci-dessus.

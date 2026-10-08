@@ -2,12 +2,11 @@
 -- Source   : docs/modele/mld.md (5 tables, 44 colonnes, 6 FK, « Ordre de création »),
 --            docs/modele/classes.md, docs/modele/dictionnaire.md (types et longueurs),
 --            docs/modele/mcd.md (cardinalités des 6 associations)
--- Dialecte : SQLite (cahier des charges : base de données SQLite intégrée)
+-- Dialecte : SQLite (base de données SQLite intégrée, cahier des charges)
 -- Date     : 2026-10-07
 -- Hors script : aucune donnée, aucun secret.
 -- Ordre des tables : run, ipam_record, asset, consolidated_asset, anomaly —
 --   chaque table est créée après toutes celles qu'elle référence (aucun cycle de FK).
--- Note     : MATCHED_IP est un statut de correspondance, pas un code d'anomalie (RG09, comme CloudInventory.v2).
 
 PRAGMA foreign_keys = ON;
 
@@ -27,7 +26,7 @@ CREATE INDEX `idx_run_status` ON `run` (`status`);
 CREATE INDEX `idx_run_start_date` ON `run` (`start_date`);
 
 -- 2. ipam_record — aucune FK (Entité IpamRecord)
---    uq_ipam_record_ip_dns : clé d'upsert RG18 (ip + dns_name), index composite optionnel (mld.md, Écart 1).
+--    uq_ipam_record_ip_dns : clé d'upsert RG18 (ip + dns_name) ; ip seule n'est pas unique, RG13 détecte les doublons (mld.md, Écart 1).
 CREATE TABLE `ipam_record` (
   `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   `ip` VARCHAR(45) NOT NULL,
@@ -58,6 +57,15 @@ CREATE TABLE `asset` (
   `match_status` VARCHAR(20) CHECK (`match_status` IN ('MATCHED_NAME','MATCHED_FQDN','MATCHED_IP','NO_MATCH')),
   `source` VARCHAR(10) CHECK (`source` IN ('VIRT','IPAM')),
   `consolidated_run_id` INTEGER NOT NULL,
+  `os` VARCHAR(100) NULL,
+  `annotation` TEXT NULL,
+  `cpu_count` INT NULL,
+  `cpu_usage` FLOAT NULL,
+  `ram_max` BIGINT NULL,
+  `ram_used` BIGINT NULL,
+  `disk_max` BIGINT NULL,
+  `disk_used` BIGINT NULL,
+  `uptime` INT NULL,
   FOREIGN KEY (`consolidated_run_id`) REFERENCES `run` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 CREATE UNIQUE INDEX `uk_asset_vm_id` ON `asset` (`vm_id`);
@@ -69,25 +77,45 @@ CREATE INDEX `idx_asset_status` ON `asset` (`status`);
 CREATE INDEX `idx_asset_node` ON `asset` (`node`);
 CREATE INDEX `idx_asset_type` ON `asset` (`type`);
 CREATE INDEX `idx_asset_match_status` ON `asset` (`match_status`);
+CREATE INDEX `idx_asset_os` ON `asset` (`os`);
+CREATE INDEX `idx_asset_annotation` ON `asset` (`annotation`);
+CREATE INDEX `idx_asset_cpu_count` ON `asset` (`cpu_count`);
+CREATE INDEX `idx_asset_cpu_usage` ON `asset` (`cpu_usage`);
+CREATE INDEX `idx_asset_ram_max` ON `asset` (`ram_max`);
+CREATE INDEX `idx_asset_ram_used` ON `asset` (`ram_used`);
+CREATE INDEX `idx_asset_disk_max` ON `asset` (`disk_max`);
+CREATE INDEX `idx_asset_disk_used` ON `asset` (`disk_used`);
+CREATE INDEX `idx_asset_uptime` ON `asset` (`uptime`);
 
 -- 4. consolidated_asset — FK → asset : association consolider, Asset (1,n) – ConsolidatedAsset (1,1) ;
 --    NOT NULL (min = 1), ON DELETE CASCADE (lignes dérivées d'un asset, RG18).
+--    FK → run : historique et comparaison de runs (OF9, §8.5-8.6) ;
+--    NOT NULL car chaque asset consolidé rattache directement un run, RG35/RG36.
 --    FK → ipam_record : association renseigner, IpamRecord (0,n) – ConsolidatedAsset (0,1) ;
 --    NULL si NO_MATCH (min = 0, RG05/RG08), ON DELETE RESTRICT.
 CREATE TABLE `consolidated_asset` (
   `id` INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+  `run_id` INTEGER NOT NULL,
   `asset_id` INTEGER NOT NULL,
   `ipam_record_id` INTEGER,
   `match_status` VARCHAR(20) NOT NULL CHECK (`match_status` IN ('MATCHED_NAME','MATCHED_FQDN','MATCHED_IP','NO_MATCH')),
   `role` VARCHAR(50),
   `anomaly_codes` TEXT,
   `consolidated_at` DATETIME,
+  `ip_final` VARCHAR(45) NULL,
+  `dns_final` VARCHAR(200) NULL,
+  `vm_status` VARCHAR(20) NULL,
+  FOREIGN KEY (`run_id`) REFERENCES `run` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE,
   FOREIGN KEY (`asset_id`) REFERENCES `asset` (`id`) ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY (`ipam_record_id`) REFERENCES `ipam_record` (`id`) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 CREATE INDEX `idx_consolidated_asset_asset_id` ON `consolidated_asset` (`asset_id`);
+CREATE INDEX `idx_consolidated_asset_run_id` ON `consolidated_asset` (`run_id`);
 CREATE INDEX `idx_consolidated_asset_ipam_record_id` ON `consolidated_asset` (`ipam_record_id`);
 CREATE INDEX `idx_consolidated_asset_match_status` ON `consolidated_asset` (`match_status`);
+CREATE INDEX `idx_consolidated_asset_ip_final` ON `consolidated_asset` (`ip_final`);
+CREATE INDEX `idx_consolidated_asset_dns_final` ON `consolidated_asset` (`dns_final`);
+CREATE INDEX `idx_consolidated_asset_vm_status` ON `consolidated_asset` (`vm_status`);
 
 -- 5. anomaly — FK → run : association detecter, Run (0,n) – Anomaly (1,1), NOT NULL (min = 1), ON DELETE RESTRICT.
 --    FK → asset : association signaler, Asset (0,n) – Anomaly (0,1), NULL (min = 0), ON DELETE RESTRICT.

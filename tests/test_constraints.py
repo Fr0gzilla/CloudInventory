@@ -1,8 +1,11 @@
 """C1 — Contraintes CHECK et index/unicités déclarés (mapping 1:1 schema.sql).
 
 Chaque colonne sous CHECK doit accepter ses valeurs autorisées et rejeter les
-autres ; les 21 index de docs/modele/schema.sql doivent exister, dont les
-3 index uniques (uk_asset_vm_id, uk_ipam_record_ip, uq_ipam_record_ip_dns).
+autres ; les 33 index de docs/modele/schema.sql doivent exister, dont les
+2 index uniques (uk_asset_vm_id, uq_ipam_record_ip_dns) : ip seule n'est pas
+unique (RG13 détecte les doublons IP).
+Index T026 : métriques asset (idx_asset_os … idx_asset_uptime) et finals
+consolidé (idx_consolidated_asset_run_id, ip_final, dns_final, vm_status).
 """
 from datetime import datetime
 
@@ -35,11 +38,24 @@ EXPECTED_INDEXES = {
         "idx_asset_node": False,
         "idx_asset_type": False,
         "idx_asset_match_status": False,
+        "idx_asset_os": False,
+        "idx_asset_annotation": False,
+        "idx_asset_cpu_count": False,
+        "idx_asset_cpu_usage": False,
+        "idx_asset_ram_max": False,
+        "idx_asset_ram_used": False,
+        "idx_asset_disk_max": False,
+        "idx_asset_disk_used": False,
+        "idx_asset_uptime": False,
     },
     "consolidated_asset": {
         "idx_consolidated_asset_asset_id": False,
+        "idx_consolidated_asset_run_id": False,
         "idx_consolidated_asset_ipam_record_id": False,
         "idx_consolidated_asset_match_status": False,
+        "idx_consolidated_asset_ip_final": False,
+        "idx_consolidated_asset_dns_final": False,
+        "idx_consolidated_asset_vm_status": False,
     },
     "anomaly": {
         "idx_anomaly_run_id": False,
@@ -59,6 +75,7 @@ def test_check_constraints_accept_valid_values(db, run, asset, ipam_record):
     asset.match_status = "MATCHED_IP"
     asset.source = "IPAM"
     consolidated = ConsolidatedAsset(
+        run_id=run.id,
         asset_id=asset.id,
         ipam_record_id=ipam_record.id,
         match_status="MATCHED_FQDN",
@@ -123,10 +140,14 @@ def test_asset_check_rejects_invalid_value(db, run, column, value):
     ["MATCHED", "no_match"],
     ids=["unknown-match-status", "lowercase-match-status"],
 )
-def test_consolidated_asset_check_rejects_invalid_match_status(db, asset, match_status):
+def test_consolidated_asset_check_rejects_invalid_match_status(
+    db, run, asset, match_status
+):
     with pytest.raises(IntegrityError) as excinfo:
         db.session.add(
-            ConsolidatedAsset(asset_id=asset.id, match_status=match_status)
+            ConsolidatedAsset(
+                run_id=run.id, asset_id=asset.id, match_status=match_status
+            )
         )
         db.session.flush()
 
@@ -159,9 +180,13 @@ def test_ipam_record_has_no_check_but_defaults_to_false(db):
 
 
 def test_all_indexes_declared(db):
-    """Les 21 index de schema.sql existent, avec le bon drapeau unique."""
+    """Les 33 index de schema.sql existent, avec le bon drapeau unique.
+
+    Tous les écarts sont listés en une seule fois : aucun index manquant n'est
+    masqué.
+    """
     inspector = inspect(db.engine)
-    checked = 0
+    problems = []
 
     for table, expected in EXPECTED_INDEXES.items():
         found = {
@@ -169,8 +194,9 @@ def test_all_indexes_declared(db):
             for index in inspector.get_indexes(table)
         }
         for name, unique in expected.items():
-            assert name in found, f"index {table}.{name} absent"
-            assert found[name] is unique, f"index {table}.{name} (unique={unique})"
-            checked += 1
+            if name not in found:
+                problems.append(f"index {table}.{name} absent")
+            elif found[name] is not unique:
+                problems.append(f"index {table}.{name} (unique={unique})")
 
-    assert checked == 20
+    assert problems == [], "; ".join(problems)
