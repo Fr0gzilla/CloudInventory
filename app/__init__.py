@@ -5,6 +5,7 @@ from flask import Flask, current_app, request
 from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from flasgger import Swagger
 from dotenv import load_dotenv
 from werkzeug.security import generate_password_hash
 
@@ -21,6 +22,14 @@ CONTENT_SECURITY_POLICY = (
     "script-src 'self'; frame-ancestors 'none'; base-uri 'self'; "
     "form-action 'self'; object-src 'none'"
 )
+
+# /apidocs (Swagger UI, flasgger) exécute son script d'initialisation en ligne
+# dans la page : exception limitée à cette page, le reste du site garde la CSP
+# stricte ci-dessus (cahier « Sécurité »).
+CONTENT_SECURITY_POLICY_APIDOCS = CONTENT_SECURITY_POLICY.replace(
+    "script-src 'self'", "script-src 'self' 'unsafe-inline'"
+)
+
 
 # Mémoïsation des hashes d'ADMIN_PASSWORD, indexée par empreinte SHA-256 :
 # le mot de passe en clair n'est conservé nulle part après l'amorçage.
@@ -91,21 +100,50 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
     jwt.init_app(app)
 
+    # Documentation Swagger (cahier §9.1) : UI sur /apidocs, spec JSON sur
+    # /apispec_1.json ; les routes de app/api.py se documentent par docstring
+    # YAML. La clé de l'UI (specs_route) est lue dans app.config["SWAGGER"].
+    app.config["SWAGGER"] = {"specs_route": "/apidocs"}
+    Swagger(app, template={
+        "info": {
+            "title": "CloudInventory API",
+            "description": (
+                "API REST pour la gestion d'inventaire cloud (Proxmox + IPAM)"
+            ),
+            "version": "2.0",
+        },
+        "securityDefinitions": {
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "JWT token. Exemple : **Bearer &lt;token&gt;**",
+            }
+        },
+    })
+
     login_manager.login_view = "auth.login"
     login_manager.login_message = "Veuillez vous connecter."
     login_manager.login_message_category = "warning"
 
     from app.auth import auth_bp
     from app.routes import main_bp
+    from app.api import api_bp
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(main_bp)
+    app.register_blueprint(api_bp)
     app.add_template_global(route_exists)
 
     @app.after_request
     def _security_headers(response):
         """En-têtes de sécurité sur toutes les réponses (CAHIER « Sécurité »)."""
-        response.headers["Content-Security-Policy"] = CONTENT_SECURITY_POLICY
+        csp = (
+            CONTENT_SECURITY_POLICY_APIDOCS
+            if request.path.startswith("/apidocs")
+            else CONTENT_SECURITY_POLICY
+        )
+        response.headers["Content-Security-Policy"] = csp
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
         response.headers["Referrer-Policy"] = "same-origin"
