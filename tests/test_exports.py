@@ -451,23 +451,50 @@ def test_cleanup_old_exports(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_export_smb_destination_with_mocked_client(monkeypatch, vm_list, ipam_list):
-    """RG24 : destination Samba avec client factice (monkeypatch smbprotocol)."""
-    # Configurer les secrets et le chemin SMB
+def test_export_smb_destination_with_mocked_client(monkeypatch, tmp_path, vm_list, ipam_list):
+    """RG24 : un chemin UNC (//serveur/partage) part par SMB (client factice) ; rien n'est écrit en local."""
+    import sys
+    import types
+    from datetime import datetime
+
+    partage = tmp_path / "partage"  # ce que contient le faux serveur
+    sessions = []
+
+    def _local(unc):
+        # \\serveur\exports\raw\f.json.gz -> partage/exports/raw/f.json.gz
+        return partage.joinpath(*unc.lstrip("\\").split("\\")[1:])
+
+    def _open_file(unc, mode="rb"):
+        _local(unc).parent.mkdir(parents=True, exist_ok=True)
+        return open(_local(unc), mode)
+
+    faux = types.ModuleType("smbclient")
+    faux.register_session = lambda serveur, **_kw: sessions.append(serveur)
+    faux.delete_session = lambda serveur: sessions.append(f"fin {serveur}")
+    faux.makedirs = lambda unc, exist_ok=False: _local(unc).mkdir(parents=True, exist_ok=exist_ok)
+    faux.path = types.SimpleNamespace(islink=lambda unc: False)
+    faux.open_file = _open_file
+    faux.scandir = lambda unc: os.scandir(_local(unc))
+    faux.remove = lambda unc: _local(unc).unlink()
+    monkeypatch.setitem(sys.modules, "smbclient", faux)
+
+    local = tmp_path / "local"
     monkeypatch.setenv("SECRET_KEY", "test-secret-key")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key")
     monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
-    monkeypatch.setenv("EXPORT_SMB_PATH", "smb://server/exports")
+    monkeypatch.setenv("EXPORT_SMB_PATH", "//serveur/exports")
     monkeypatch.setenv("EXPORT_SMB_USERNAME", "testuser")
     monkeypatch.setenv("EXPORT_SMB_PASSWORD", "testpass")
     monkeypatch.setenv("EXPORT_ENABLED", "true")
     monkeypatch.setenv("EXPORT_RAW_ENABLED", "true")
-    monkeypatch.setenv("EXPORT_LOCAL_PATH", "/tmp/test_exports")
+    monkeypatch.setenv("EXPORT_LOCAL_PATH", str(local))
     monkeypatch.setenv("EXPORT_RETENTION_CONSOLIDATED", "30")
     monkeypatch.setenv("EXPORT_RETENTION_RAW", "7")
 
     from app import create_app
     from app.config import Config
+    from app.extensions import db as extensions_db
+    from collector.exports import run_exports
 
     class TestConfig(Config):
         TESTING = True
@@ -475,33 +502,19 @@ def test_export_smb_destination_with_mocked_client(monkeypatch, vm_list, ipam_li
 
     app = create_app(TestConfig)
     with app.app_context():
-        from app.extensions import db as extensions_db
-        extensions_db.create_all()
-
-        # Créer un run SUCCESS en base
-        from datetime import datetime
         run = Run(status="SUCCESS", start_date=datetime(2026, 1, 1, 12, 0, 0))
         extensions_db.session.add(run)
         extensions_db.session.commit()
-        run_id = run.id
 
-        # Lancer les exports - devrait tenter l'upload SMB
-        from collector.exports import run_exports
-        # Avec un chemin SMB configuré, run_exports va dans le branch temp + _publish_smb
-        try:
-            run_exports(run_id, vm_list=vm_list, ipam_list=ipam_list)
-        except Exception:
-            # Une erreur est acceptable si le client smb n'est pas disponible,
-            # l'important est que le code n'échoue pas avant l'upload SMB
-            pass
+        run_exports(run.id, vm_list=vm_list, ipam_list=ipam_list)
 
-        # Vérifier que les fichiers ont été générés en local d'abord
-        export_dir = "/tmp/test_exports"
-        if os.path.isdir(export_dir):
-            assert os.path.isdir(os.path.join(export_dir, "consolidated"))
-            assert os.path.isdir(os.path.join(export_dir, "raw"))
+        depose = partage / "exports"
+        assert (depose / "report.md").is_file()
+        assert len(list((depose / "consolidated").glob("*.jsonl.gz"))) == 1
+        assert len(list((depose / "raw").glob("*.json.gz"))) == 2
+        assert sessions == ["serveur", "fin serveur"]
+        assert not local.exists()  # le chemin UNC est prioritaire : rien en local
+        assert not os.path.exists("smb:")  # aucun chemin réseau traité comme un dossier local
 
-        with app.app_context():
-            from app.extensions import db as extensions_db
-            extensions_db.session.remove()
-            extensions_db.drop_all()
+        extensions_db.session.remove()
+        extensions_db.drop_all()
