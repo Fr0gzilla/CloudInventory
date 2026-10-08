@@ -2,3 +2,7 @@ tests/test_auth.py:generic-password:114
 tests/test_auth.py:generic-password:160
 tests/test_auth.py:generic-password:175
 tests/test_auth.py:generic-password:189
+tests/test_auth.py:generic-password:117
+tests/test_auth.py:generic-password:163
+tests/test_auth.py:generic-password:178
+tests/test_auth.py:generic-password:192
