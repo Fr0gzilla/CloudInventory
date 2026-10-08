@@ -6,6 +6,7 @@ l'ordre d'exécution.
 """
 import pathlib
 import sys
+import tempfile
 from datetime import datetime
 
 import pytest
@@ -17,10 +18,11 @@ if str(_PROJECT_ROOT) not in sys.path:
 
 from app.models import Asset, IpamRecord, Run  # noqa: E402  (après sys.path)
 
-# Secrets de test — valeurs factices, seulement pour satisfaire Config.validate().
+# Secrets de test — valeurs factices >= 32 octets pour SECRET_KEY/JWT_SECRET_KEY,
+# ADMIN_PASSWORD inchangé pour compatibilité avec les tests existants.
 _TEST_ENV = {
-    "SECRET_KEY": "test-secret-key",
-    "JWT_SECRET_KEY": "test-jwt-secret-key",
+    "SECRET_KEY": "test-secret-key-32-bytes-minimum!!",
+    "JWT_SECRET_KEY": "test-jwt-secret-key-32-bytes-min!!",
     "ADMIN_PASSWORD": "test-admin-password",
     "DATABASE_URL": "sqlite:///:memory:",
     "APP_ENV": "test",
@@ -34,6 +36,12 @@ def app(monkeypatch):
     """Factory de test : secrets posés, base SQLite mémoire, tables créées."""
     for name, value in _TEST_ENV.items():
         monkeypatch.setenv(name, value)
+
+    # Stockage de limitation de taux isolé par test (fichier temporaire unique).
+    rate_limit_store = tempfile.NamedTemporaryFile(prefix="login-budgets-", suffix=".json", delete=False, mode="w", encoding="utf-8")
+    rate_limit_store.write("{}")
+    rate_limit_store.close()
+    monkeypatch.setenv("RATE_LIMIT_STORE_PATH", rate_limit_store.name)
 
     from app import create_app
     from app.config import Config
@@ -50,6 +58,11 @@ def app(monkeypatch):
         with application.app_context():
             db.session.remove()
             db.drop_all()
+        # Nettoyage du fichier de stockage de taux isolé.
+        try:
+            pathlib.Path(rate_limit_store.name).unlink(missing_ok=True)
+        except OSError:
+            pass
 
 
 @pytest.fixture()

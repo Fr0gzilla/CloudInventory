@@ -27,10 +27,13 @@ _CSRF_FIELD = re.compile(r'name="csrf_token"\s+value="([^"]+)"')
 
 
 class _FrozenClock:
-    """Horloge figée : fait avancer time.monotonic() sans dormir."""
+    """Horloge figée : fait avancer time.time() et time.monotonic() sans dormir."""
 
     def __init__(self, now):
         self.now = now
+
+    def time(self):
+        return self.now
 
     def monotonic(self):
         return self.now
@@ -189,7 +192,7 @@ def test_expired_lock_resets_the_attempt_window(app, monkeypatch):
         _post_login(client, csrf=token, password="mauvais")
     assert _post_login(client, csrf=token).status_code == 429
 
-    beyond_lockout = time.monotonic() + app.config["LOGIN_LOCKOUT_SECONDS"] + 1
+    beyond_lockout = time.time() + app.config["LOGIN_LOCKOUT_SECONDS"] + 1
     monkeypatch.setattr("app.auth.time", _FrozenClock(beyond_lockout))
     assert _post_login(client, csrf=token, password="mauvais").status_code == 200
 

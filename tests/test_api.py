@@ -198,18 +198,31 @@ def test_login_rejects_a_non_object_body(app):
 
 
 def test_login_rejects_non_string_credentials(app):
-    """C4 — champs non chaînes : 401 sans exception (§9.2)."""
+    """C4 — champs non chaînes : 400 (validation avant auth, §9.2)."""
     client = app.test_client()
 
     response = client.post("/api/login", json={"username": 1, "password": ["x"]})
 
-    assert response.status_code == 401
+    assert response.status_code == 400
 
 
 # --- C5 — Swagger ------------------------------------------------------------
 def test_apidocs_answers_200(app):
-    """C5 — Swagger UI servi sur /apidocs (§9.1)."""
+    """C5 — Swagger UI servi sur /apidocs (§9.1) — authentifié par session web."""
     client = app.test_client()
+    # Connexion web pour obtenir une session
+    csrf_response = client.get("/login")
+    assert csrf_response.status_code == 200
+    import re
+    csrf_match = re.search(r'name="csrf_token"\s+value="([^"]+)"', csrf_response.get_data(as_text=True))
+    assert csrf_match
+    csrf_token = csrf_match.group(1)
+    login_response = client.post("/login", data={
+        "username": _username(app),
+        "password": ADMIN_PASSWORD,
+        "csrf_token": csrf_token,
+    })
+    assert login_response.status_code == 302
 
     response = client.get("/apidocs")
 
@@ -218,10 +231,11 @@ def test_apidocs_answers_200(app):
 
 
 def test_apispec_documents_endpoints_and_bearer(app):
-    """C5 — spec JSON : titre, sécurité Bearer et endpoints du §9.3."""
+    """C5 — spec JSON : titre, sécurité Bearer et endpoints du §9.3 — authentifié par JWT."""
     client = app.test_client()
+    token = _token(client, app)
 
-    response = client.get("/apispec_1.json")
+    response = client.get("/apispec_1.json", headers=_auth(token))
 
     assert response.status_code == 200
     spec = response.get_json()

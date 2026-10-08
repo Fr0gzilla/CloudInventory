@@ -21,10 +21,10 @@ from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 @pytest.fixture()
 def app_with_exports(monkeypatch):
     """App Flask avec config d'exports activée pour les tests T012."""
-    # Secrets de base + config exports
+    # Secrets de base (>= 32 octets pour SECRET_KEY/JWT_SECRET_KEY) + config exports
     _tmpdir = tempfile.mkdtemp()
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
     monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setenv("EXPORT_ENABLED", "true")
@@ -394,8 +394,8 @@ def test_cleanup_old_exports(monkeypatch):
     from collector.exports import cleanup_old_exports
 
     _tmpdir = tempfile.mkdtemp()
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
     monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
     monkeypatch.setenv("EXPORT_ENABLED", "true")
     monkeypatch.setenv("EXPORT_LOCAL_PATH", _tmpdir)
@@ -479,8 +479,8 @@ def test_export_smb_destination_with_mocked_client(monkeypatch, tmp_path, vm_lis
     monkeypatch.setitem(sys.modules, "smbclient", faux)
 
     local = tmp_path / "local"
-    monkeypatch.setenv("SECRET_KEY", "test-secret-key")
-    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key")
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
     monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
     monkeypatch.setenv("EXPORT_SMB_PATH", "//serveur/exports")
     monkeypatch.setenv("EXPORT_SMB_USERNAME", "testuser")

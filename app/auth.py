@@ -4,8 +4,14 @@ Le mot de passe admin n'est jamais conservé en clair : la configuration finale
 ne porte que ``ADMIN_PASSWORD_HASH`` (haché à l'amorçage dans app/__init__.py).
 Le jeton CSRF est un secret aléatoire lié à la session, comparé en temps constant.
 """
+import fcntl
+import hashlib
 import hmac
+import json
+import math
+import os
 import secrets
+import tempfile
 import time
 from urllib.parse import urlparse
 
@@ -29,6 +35,105 @@ from werkzeug.security import check_password_hash
 from app import login_manager
 
 auth_bp = Blueprint("auth", __name__)
+
+
+class RateLimitExceeded(Exception):
+    def __init__(self, retry_after):
+        self.retry_after = max(1, math.ceil(retry_after))
+
+
+class RateLimitStorageUnavailable(Exception):
+    pass
+
+
+def validate_input_sizes(username, password):
+    if (not isinstance(username, str) or not isinstance(password, str)
+            or not username or not password
+            or len(username.encode("utf-8")) > 256
+            or len(password.encode("utf-8")) > 4096):
+        raise ValueError("Identifiants invalides.")
+
+
+def check_and_consume(ip, username):
+    config = current_app.config
+    path = config["RATE_LIMIT_STORE_PATH"]
+    now = time.time()
+    window = config["RATE_LIMIT_WINDOW_SECONDS"]
+    keys = (
+        ("ip:" + hashlib.sha256(ip.encode("utf-8")).hexdigest(), config["RATE_LIMIT_IP_MAX"]),
+        ("account:" + hashlib.sha256(username.encode("utf-8")).hexdigest(), config["RATE_LIMIT_ACCOUNT_MAX"]),
+        ("global", config["RATE_LIMIT_GLOBAL_MAX"]),
+    )
+    temporary = None
+    try:
+        descriptor = os.open(path + ".lock", os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(descriptor, "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            try:
+                with open(path, encoding="utf-8") as source:
+                    state = json.loads(source.read(2_000_001))
+            except FileNotFoundError:
+                state = {}
+            if not isinstance(state, dict) or len(state) > config["RATE_LIMIT_MAX_ENTRIES"]:
+                raise ValueError("Invalid rate limit store")
+            for key, value in state.items():
+                if (not isinstance(key, str) or len(key) > 72
+                        or not isinstance(value, list) or len(value) != 2
+                        or type(value[0]) not in (int, float) or not math.isfinite(value[0])
+                        or type(value[1]) is not int or value[1] < 1):
+                    raise ValueError("Invalid rate limit entry")
+            state = {key: value for key, value in state.items() if value[0] > now}
+            waits = [state[key][0] - now for key, limit in keys
+                     if key in state and state[key][1] >= limit]
+            if waits:
+                raise RateLimitExceeded(max(waits))
+            if len(state) + sum(key not in state for key, _ in keys) > config["RATE_LIMIT_MAX_ENTRIES"]:
+                raise RateLimitExceeded(min(value[0] for value in state.values()) - now)
+            for key, _ in keys:
+                expires, count = state.get(key, [now + window, 0])
+                state[key] = [expires, count + 1]
+            with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8", dir=os.path.dirname(path),
+                                             prefix=".login-budget-", delete=False) as target:
+                temporary = target.name
+                json.dump(state, target, separators=(",", ":"))
+                target.flush()
+                os.fsync(target.fileno())
+            os.replace(temporary, path)
+            temporary = None
+    except (OSError, ValueError, TypeError, RecursionError) as exc:
+        current_app.logger.exception("Login budget storage unavailable")
+        raise RateLimitStorageUnavailable() from exc
+    finally:
+        if temporary is not None:
+            try:
+                os.unlink(temporary)
+            except OSError:
+                current_app.logger.exception("Login budget temporary cleanup failed")
+
+
+@auth_bp.before_app_request
+def bound_login_body():
+    if request.endpoint in ("auth.login", "api.api_login") and request.method == "POST":
+        request.max_content_length = 8192
+        request.get_data(cache=True)
+
+
+@auth_bp.before_app_request
+def protect_api_docs():
+    if request.blueprint == "flasgger" or request.path.startswith(("/apidocs", "/apispec")):
+        # /apidocs : session web (flask-login)
+        # /apispec : JWT (flask-jwt-extended) pour l'API
+        if request.path.startswith("/apidocs"):
+            if not current_user.is_authenticated:
+                return redirect(url_for("auth.login", next=request.path))
+        else:  # /apispec
+            from flask_jwt_extended import verify_jwt_in_request
+            try:
+                verify_jwt_in_request()
+            except Exception:
+                return current_app.response_class(
+                    '{"error":"Authentification requise"}', status=401, mimetype="application/json"
+                )
 
 # Formulaire de connexion de repli, utilisé tant que templates/login.html
 # n'existe pas (T008 livrera le template et le gabarit de base).
@@ -125,11 +230,6 @@ def _default_target():
         return "/"
 
 
-def _attempts():
-    """Compteur d'essais par application (recréé à chaque app, donc par test)."""
-    return current_app.extensions.setdefault("login_attempts", {})
-
-
 def _render_login():
     """Rendu du formulaire : template T008 s'il existe, sinon gabarit intégré."""
     next_target = request.args.get("next", "")
@@ -156,32 +256,40 @@ def csrf_token():
 
 @auth_bp.route("/login", methods=["GET", "POST"])
 def login():
-    """Connexion : CSRF d'abord (400), puis limitation des essais (429)."""
+    """Connexion : CSRF d'abord (400), puis limitation des essais partagée (429)."""
     if request.method == "POST":
         if not _csrf_token_ok():
             return "Jeton CSRF invalide ou manquant.", 400
 
-        username = request.form.get("username", "").strip()
+        username = request.form.get("username", "")
         password = request.form.get("password", "")
         next_page = request.args.get("next") or request.form.get("next") or ""
         if not _is_safe_redirect(next_page):
             next_page = ""
 
-        store = _attempts()
-        key = f"{request.remote_addr or '?'}|{username.lower()}"
-        now = time.monotonic()
-        entry = store.setdefault(key, {"count": 0, "locked_until": 0.0})
-        if entry["locked_until"] > now:
-            remaining = int(entry["locked_until"] - now) + 1
+        try:
+            validate_input_sizes(username, password)
+        except ValueError:
+            return "Identifiants invalides.", 400
+        username = username.strip()
+        ip = request.remote_addr or "?"
+
+        # Vérification et consommation des budgets partagés (IP, compte, global)
+        try:
+            check_and_consume(ip, username)
+        except RateLimitExceeded as exc:
             response = current_app.response_class(
                 "Trop de tentatives échouées, réessayez plus tard.", status=429
             )
-            response.headers["Retry-After"] = str(remaining)
+            response.headers["Retry-After"] = str(exc.retry_after)
             return response
-        if entry["locked_until"]:
-            # Verrou expiré : nouvelle fenêtre d'essais.
-            entry["count"] = 0
-            entry["locked_until"] = 0.0
+        except RateLimitStorageUnavailable:
+            # Fail closed : stockage indisponible → refus temporaire
+            response = current_app.response_class(
+                "Service temporairement indisponible.", status=503
+            )
+            response.headers["Retry-After"] = "60"
+            return response
 
         admin_username = current_app.config.get("ADMIN_USERNAME", "admin")
         password_hash = current_app.config["ADMIN_PASSWORD_HASH"]
@@ -192,14 +300,10 @@ def login():
         password_ok = check_password_hash(password_hash, password)
 
         if username_ok and password_ok:
-            store.pop(key, None)
             session.clear()
             login_user(User(admin_username))
             return redirect(next_page or _default_target())
 
-        entry["count"] += 1
-        if entry["count"] >= current_app.config["LOGIN_MAX_ATTEMPTS"]:
-            entry["locked_until"] = now + current_app.config["LOGIN_LOCKOUT_SECONDS"]
         flash("Identifiants incorrects.", "danger")
 
     return _render_login()

@@ -11,11 +11,11 @@ import pytest
 
 from app import create_app
 
-# Valeurs factices — jamais de secret réel dans les tests (C4).
+# Valeurs factices >= 32 octets pour SECRET_KEY/JWT_SECRET_KEY — jamais de secret réel dans les tests (C4).
 _VALID = {
-    "SECRET_KEY": "dummy-secret-key-for-tests",
-    "JWT_SECRET_KEY": "dummy-jwt-key-for-tests",
-    "ADMIN_PASSWORD": "dummy-admin-password-for-tests",
+    "SECRET_KEY": "dummy-secret-key-for-tests-32b!!",
+    "JWT_SECRET_KEY": "dummy-jwt-key-for-tests-32bytes!!",
+    "ADMIN_PASSWORD": "dummy-admin-password",
     "DATABASE_URL": "sqlite:///:memory:",
 }
 _DEFAULT = "change-me"

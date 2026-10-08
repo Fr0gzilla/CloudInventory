@@ -26,6 +26,7 @@ from app.queries import (
     serialize_inventory_item,
 )
 from app.routes import _percent, _run_payload
+from app.auth import check_and_consume, RateLimitExceeded, RateLimitStorageUnavailable, validate_input_sizes
 
 logger = logging.getLogger("cloudinventory.api")
 
@@ -85,17 +86,46 @@ def api_login():
         description: Body JSON requis
       401:
         description: Identifiants incorrects
+      429:
+        description: Trop de tentatives, réessayez plus tard
+      503:
+        description: Service temporairement indisponible
     """
+    # Bornage du corps JSON AVANT parsing (protection DoS)
+    content_length = request.content_length or 0
+    if content_length > 8192:
+        return jsonify({"error": "Request body too large"}), 413
+
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return jsonify({"error": "Body JSON requis"}), 400
 
     username = data.get("username", "")
     password = data.get("password", "")
-    if not isinstance(username, str):
-        username = ""
-    if not isinstance(password, str):
-        password = ""
+
+    # Validation des tailles AVANT hash
+    try:
+        validate_input_sizes(username, password)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    username = username.strip()
+    ip = request.remote_addr or "?"
+
+    # Vérification et consommation des budgets partagés (IP, compte, global)
+    try:
+        check_and_consume(ip, username)
+    except RateLimitExceeded as exc:
+        response = jsonify({"error": "Trop de tentatives échouées, réessayez plus tard."})
+        response.status_code = 429
+        response.headers["Retry-After"] = str(exc.retry_after)
+        return response
+    except RateLimitStorageUnavailable:
+        # Fail closed : stockage indisponible → refus temporaire
+        response = jsonify({"error": "Service temporairement indisponible."})
+        response.status_code = 503
+        response.headers["Retry-After"] = "60"
+        return response
 
     admin_username = current_app.config.get("ADMIN_USERNAME", "admin")
     password_hash = current_app.config["ADMIN_PASSWORD_HASH"]

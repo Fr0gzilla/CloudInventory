@@ -60,6 +60,28 @@ def _admin_password_hash(raw):
 
 def _finalize_config(app, config_class):
     """Configuration finale : hash du mot de passe admin, cookies de session, limites."""
+    # Paramètres historiques de verrouillage (lus avant les budgets de taux pour servir de défauts)
+    login_max_attempts = _env_int("LOGIN_MAX_ATTEMPTS", 5)
+    login_lockout_seconds = _env_int("LOGIN_LOCKOUT_SECONDS", 300)
+
+    store = app.config.get("RATE_LIMIT_STORE_PATH") or os.getenv("RATE_LIMIT_STORE_PATH")
+    app.config["RATE_LIMIT_STORE_PATH"] = (
+        os.path.abspath(store) if store else os.path.join(app.instance_path, "login-budgets.json")
+    )
+    for name, default, maximum in (
+        ("RATE_LIMIT_IP_MAX", 10, 100000),
+        ("RATE_LIMIT_ACCOUNT_MAX", login_max_attempts, 100000),
+        ("RATE_LIMIT_GLOBAL_MAX", 100, 100000),
+        ("RATE_LIMIT_WINDOW_SECONDS", login_lockout_seconds, 86400),
+        ("RATE_LIMIT_MAX_ENTRIES", 10000, 10000),
+    ):
+        try:
+            value = int(app.config.get(name, os.getenv(name, str(default))))
+        except (ValueError, TypeError) as exc:
+            raise RuntimeError(f"{name} : entier requis") from exc
+        if not 1 <= value <= maximum or (name == "RATE_LIMIT_MAX_ENTRIES" and value < 3):
+            raise RuntimeError(f"{name} : valeur hors limites")
+        app.config[name] = value
     raw = app.config.pop("ADMIN_PASSWORD", None)
     if hasattr(config_class, "ADMIN_PASSWORD"):
         delattr(config_class, "ADMIN_PASSWORD")
@@ -72,10 +94,8 @@ def _finalize_config(app, config_class):
         os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
     )
     app.config.setdefault("ADMIN_USERNAME", os.getenv("ADMIN_USERNAME", "admin"))
-    app.config.setdefault("LOGIN_MAX_ATTEMPTS", _env_int("LOGIN_MAX_ATTEMPTS", 5))
-    app.config.setdefault(
-        "LOGIN_LOCKOUT_SECONDS", _env_int("LOGIN_LOCKOUT_SECONDS", 300)
-    )
+    app.config.setdefault("LOGIN_MAX_ATTEMPTS", login_max_attempts)
+    app.config.setdefault("LOGIN_LOCKOUT_SECONDS", login_lockout_seconds)
 
 
 def route_exists(target):

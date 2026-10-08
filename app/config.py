@@ -11,6 +11,9 @@ REJECTED_VALUES = {
     "replace-me",
 }
 
+# Longueur minimale des clés secrètes (CFG-01) : 32 octets = 256 bits
+MIN_SECRET_KEY_LENGTH = 32
+
 
 class Config:
     """Configuration centralisée, lue dans l'environnement (.env chargé par create_app)."""
@@ -25,18 +28,22 @@ class Config:
 
     @classmethod
     def validate(cls) -> None:
-        """Lève RuntimeError si un secret obligatoire est absent, vide ou une valeur d'exemple."""
+        """Lève RuntimeError si un secret obligatoire est absent, vide, une valeur d'exemple, ou trop court."""
         problems = []
         for name in cls.REQUIRED_SECRETS:
             value = os.getenv(name)
             if value is None or value.strip().lower() in REJECTED_VALUES:
                 problems.append(name)
                 continue
-            setattr(cls, name, value.strip())
+            stripped = value.strip()
+            if name in ("SECRET_KEY", "JWT_SECRET_KEY") and len(stripped.encode("utf-8")) < MIN_SECRET_KEY_LENGTH:
+                problems.append(f"{name} (minimum {MIN_SECRET_KEY_LENGTH} octets)")
+                continue
+            setattr(cls, name, stripped)
         if problems:
             raise RuntimeError(
-                "Configuration invalide : variables d'environnement manquantes ou "
-                "valuées par défaut — " + ", ".join(problems) +
+                "Configuration invalide : variables d'environnement manquantes, "
+                "valuées par défaut, ou trop courtes — " + ", ".join(problems) +
                 ". Renseignez-les (cf. .env.example) avant de démarrer."
             )
         cls.SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
