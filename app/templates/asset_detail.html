@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block title %}{{ asset.vm_name }} — CloudInventory{% endblock %}
+
+{% block content %}
+{% macro match_badge(status) -%}
+{%- if status == 'MATCHED_NAME' -%}<span class="badge bg-primary">MATCHED (nom)</span>
+{%- elif status == 'MATCHED_FQDN' -%}<span class="badge ci-badge-purple">MATCHED (FQDN)</span>
+{%- elif status == 'MATCHED_IP' -%}<span class="badge bg-info text-dark">MATCHED (IP)</span>
+{%- elif status == 'NO_MATCH' -%}<span class="badge bg-danger">NO MATCH</span>
+{%- else -%}<span class="badge bg-secondary">{{ status or '—' }}</span>{% endif -%}
+{%- endmacro %}
+
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <a href="{{ url_for('main.inventory') }}" class="btn btn-sm btn-outline-secondary"
+     title="Retour inventaire" aria-label="Retour à l'inventaire">
+    <i class="bi bi-arrow-left" aria-hidden="true"></i>
+  </a>
+  <h1 class="mb-0"><i class="bi bi-hdd-stack me-2" aria-hidden="true"></i>{{ asset.vm_name }}</h1>
+  {% if asset.status == 'running' %}<span class="badge bg-success fs-6">running</span>
+  {% else %}<span class="badge bg-secondary fs-6">{{ asset.status or '—' }}</span>{% endif %}
+  {{ match_badge(asset.match_status) }}
+</div>
+
+<section class="card mb-4" aria-labelledby="asset-info-title">
+  <h2 class="card-header" id="asset-info-title"><i class="bi bi-info-circle me-1" aria-hidden="true"></i>Informations générales</h2>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">VM ID</small>
+        <strong>{{ asset.vm_id }}</strong>
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">Type</small>
+        <span class="badge bg-info text-dark">{{ asset.type or '—' }}</span>
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">Noeud</small>
+        <strong>{{ asset.node or '—' }}</strong>
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">Source</small>
+        <strong>{{ asset.source or '—' }}</strong>
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">IP signalée</small>
+        <code>{{ asset.ip_reported or '—' }}</code>
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">FQDN</small>
+        <code>{{ asset.fqdn or '—' }}</code>
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">OS</small>
+        <strong>{{ asset.os or '—' }}</strong>
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">Role</small>
+        <strong>{{ asset.role or 'Indéterminé' }}</strong>
+      </div>
+      {% if asset.annotation %}
+      <div class="col-12">
+        <small class="text-muted d-block">Annotation</small>
+        <span>{{ asset.annotation }}</span>
+      </div>
+      {% endif %}
+      <div class="col-12">
+        <small class="text-muted d-block">Tags</small>
+        {% if asset.tags %}
+          {% for tag in asset.tags.split(',') %}
+          <span class="badge bg-dark bg-opacity-10 text-body me-1">{{ tag.strip() }}</span>
+          {% endfor %}
+        {% else %}
+          <span class="text-muted">—</span>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card mb-4" aria-labelledby="asset-metrics-title">
+  <h2 class="card-header" id="asset-metrics-title"><i class="bi bi-activity me-1" aria-hidden="true"></i>Métriques runtime</h2>
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">CPU</small>
+        <strong>{{ metrics.cpu_count or '—' }} vCPU</strong>
+        {% if metrics.cpu is not none %}
+        <div class="progress mt-1 ci-progress-sm" role="progressbar"
+             aria-valuenow="{{ metrics.cpu }}" aria-valuemin="0" aria-valuemax="100"
+             aria-label="Utilisation CPU">
+          <div class="progress-bar {% if metrics.cpu > 80 %}bg-danger{% elif metrics.cpu > 50 %}bg-warning{% else %}bg-success{% endif %}"
+               style="width: {{ metrics.cpu }}%"></div>
+        </div>
+        <small class="text-muted">{{ metrics.cpu }}%</small>
+        {% endif %}
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">RAM</small>
+        {% if metrics.ram_max_gb %}
+        <strong>{{ metrics.ram_used_gb or 0 }} / {{ metrics.ram_max_gb }} Go</strong>
+        <div class="progress mt-1 ci-progress-sm" role="progressbar"
+             aria-valuenow="{{ metrics.ram_pct }}" aria-valuemin="0" aria-valuemax="100"
+             aria-label="Utilisation RAM">
+          <div class="progress-bar {% if metrics.ram_pct > 85 %}bg-danger{% elif metrics.ram_pct > 60 %}bg-warning{% else %}bg-success{% endif %}"
+               style="width: {{ metrics.ram_pct }}%"></div>
+        </div>
+        <small class="text-muted">{{ metrics.ram_pct }}%</small>
+        {% else %}
+        <strong>—</strong>
+        {% endif %}
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">Disque</small>
+        {% if metrics.disk_max_gb %}
+        <strong>{{ metrics.disk_used_gb or 0 }} / {{ metrics.disk_max_gb }} Go</strong>
+        <div class="progress mt-1 ci-progress-sm" role="progressbar"
+             aria-valuenow="{{ metrics.disk_pct }}" aria-valuemin="0" aria-valuemax="100"
+             aria-label="Utilisation disque">
+          <div class="progress-bar {% if metrics.disk_pct > 90 %}bg-danger{% elif metrics.disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
+               style="width: {{ metrics.disk_pct }}%"></div>
+        </div>
+        <small class="text-muted">{{ metrics.disk_pct }}%</small>
+        {% else %}
+        <strong>—</strong>
+        {% endif %}
+      </div>
+      <div class="col-6 col-md-3">
+        <small class="text-muted d-block">Uptime</small>
+        {% if metrics.uptime %}
+        <strong>{{ metrics.uptime }}</strong>
+        {% elif asset.status == 'stopped' %}
+        <strong class="text-secondary">Arrêté</strong>
+        {% else %}
+        <strong>—</strong>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</section>
+
+<h2 class="mb-3"><i class="bi bi-clock-history me-2" aria-hidden="true"></i>Historique
+  <small class="text-muted fs-6">(30 derniers runs)</small>
+</h2>
+{% if history %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <caption class="visually-hidden">Historique des trente derniers runs de {{ asset.vm_name }}</caption>
+      <thead class="table-dark">
+        <tr>
+          <th scope="col">Run</th>
+          <th scope="col" class="d-none d-sm-table-cell">Date</th>
+          <th scope="col">IP</th>
+          <th scope="col" class="d-none d-md-table-cell">DNS</th>
+          <th scope="col" class="d-none d-lg-table-cell">Tenant / Site</th>
+          <th scope="col">Match</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ca, run, ipam in history %}
+        <tr{% if ca.match_status == 'NO_MATCH' %} class="table-danger"{% elif ca.match_status == 'MATCHED_IP' %} class="table-info"{% elif ca.match_status == 'MATCHED_FQDN' %} class="table-warning"{% elif ca.match_status == 'MATCHED_NAME' %} class="table-success"{% endif %}>
+          <td>
+            {% if route_exists('main.run_detail') %}
+            <a href="{{ url_for('main.run_detail', run_id=run.id) }}" class="text-decoration-none">#{{ run.id }}</a>
+            {% else %}#{{ run.id }}{% endif %}
+          </td>
+          <td class="d-none d-sm-table-cell">{{ run.start_date.strftime('%d/%m/%Y %H:%M') if run.start_date else '—' }}</td>
+          <td><code class="small">{{ ca.ip_final or '—' }}</code></td>
+          <td class="d-none d-md-table-cell">{{ ca.dns_final or '—' }}</td>
+          <td class="d-none d-lg-table-cell">
+            {% if ipam and ipam.tenant %}
+            <span class="badge bg-dark bg-opacity-10 text-body">{{ ipam.tenant }}</span>
+            {% if ipam.site %}<small class="text-muted">/ {{ ipam.site }}</small>{% endif %}
+            {% else %}—{% endif %}
+          </td>
+          <td>{{ match_badge(ca.match_status) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<p class="text-muted">Aucun historique.</p>
+{% endif %}
+
+<h2 class="mt-4 mb-3"><i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>Anomalies</h2>
+{% if anomalies %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <caption class="visually-hidden">Anomalies associées à {{ asset.vm_name }}</caption>
+      <thead class="table-dark">
+        <tr>
+          <th scope="col">Run</th>
+          <th scope="col" class="d-none d-sm-table-cell">Date</th>
+          <th scope="col">Type</th>
+          <th scope="col">Détails</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for anomaly, run in anomalies %}
+        <tr>
+          <td>
+            {% if route_exists('main.run_detail') %}
+            <a href="{{ url_for('main.run_detail', run_id=run.id) }}" class="text-decoration-none">#{{ run.id }}</a>
+            {% else %}#{{ run.id }}{% endif %}
+          </td>
+          <td class="d-none d-sm-table-cell">{{ anomaly.detected_at.strftime('%d/%m/%Y %H:%M') if anomaly.detected_at else '—' }}</td>
+          <td><span class="badge bg-warning text-dark">{{ anomaly.code }}</span></td>
+          <td class="small">{{ anomaly.description or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<p class="text-muted">Aucune anomalie.</p>
+{% endif %}
+{% endblock %}

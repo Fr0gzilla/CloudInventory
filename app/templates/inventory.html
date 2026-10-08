@@ -1,0 +1,236 @@
+{% extends "base.html" %}
+{% block title %}Inventaire — CloudInventory{% endblock %}
+
+{% block content %}
+{% macro match_badge(status) -%}
+{%- if status == 'MATCHED_NAME' -%}<span class="badge bg-primary">MATCHED (nom)</span>
+{%- elif status == 'MATCHED_FQDN' -%}<span class="badge ci-badge-purple">MATCHED (FQDN)</span>
+{%- elif status == 'MATCHED_IP' -%}<span class="badge bg-info text-dark">MATCHED (IP)</span>
+{%- elif status == 'NO_MATCH' -%}<span class="badge bg-danger">NO MATCH</span>
+{%- else -%}<span class="badge bg-secondary">{{ status or '—' }}</span>{% endif -%}
+{%- endmacro %}
+
+{% macro sort_header(col, label, extra_class='') -%}
+<th scope="col" class="{{ extra_class }}"
+    aria-sort="{{ 'ascending' if sort == col and order == 'asc' else 'descending' if sort == col else 'none' }}">
+  <a href="{{ sort_links[col] }}" class="text-white text-decoration-none d-inline-flex align-items-center gap-1 ci-sort-link">
+    {{ label }}
+    <i class="bi bi-caret-{{ 'up' if order == 'asc' else 'down' }}-fill small{% if sort != col %} opacity-25{% endif %}" aria-hidden="true"></i>
+    <span class="visually-hidden">
+      {{- 'Tri ' ~ ('croissant' if order == 'asc' else 'décroissant') if sort == col else 'Trier par ' ~ label -}}
+    </span>
+  </a>
+</th>
+{%- endmacro %}
+
+{% if run %}
+{# Repère de page : URLs lues par app.js, aucun script inline (CSP `script-src 'self'`). #}
+<section id="inventory" aria-labelledby="inventory-title"
+          data-search-url="{{ search_url }}"
+          data-reset-url="{{ reset_url }}">
+
+  <div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-2">
+    <h1 class="mb-0" id="inventory-title">
+      <i class="bi bi-server me-2" aria-hidden="true"></i>Inventaire
+      <small class="text-muted fs-6">(run #{{ run.id }})</small>
+    </h1>
+    <a href="{{ url_for('main.inventory_export') }}" class="btn btn-outline-success">
+      <i class="bi bi-download me-1" aria-hidden="true"></i>Export CSV
+    </a>
+  </div>
+
+  <div class="card mb-4">
+    <div class="card-body py-3">
+      <form method="get" action="{{ url_for('main.inventory') }}" id="filterForm"
+            class="row g-2 align-items-end" aria-label="Filtres de l'inventaire">
+        <div class="col-12 col-sm-6 col-lg-2">
+          <label for="liveSearch" class="form-label small text-muted mb-1">Recherche</label>
+          <input type="search" name="q" id="liveSearch" class="form-control form-control-sm"
+                 placeholder="Nom VM, IP, DNS..." value="{{ q }}" autocomplete="off">
+        </div>
+        <div class="col-6 col-lg-1">
+          <label for="f-status" class="form-label small text-muted mb-1">Etat</label>
+          <select id="f-status" name="status" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for s in filters.statuses %}
+            <option value="{{ s }}"{% if status == s %} selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-lg-1">
+          <label for="f-node" class="form-label small text-muted mb-1">Noeud</label>
+          <select id="f-node" name="node" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for n in filters.nodes %}
+            <option value="{{ n }}"{% if node == n %} selected{% endif %}>{{ n }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-lg-1">
+          <label for="f-type" class="form-label small text-muted mb-1">Type</label>
+          <select id="f-type" name="type" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for t in filters.types %}
+            <option value="{{ t }}"{% if vm_type == t %} selected{% endif %}>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label for="f-match" class="form-label small text-muted mb-1">Match</label>
+          <select id="f-match" name="match" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for m in filters.matches %}
+            <option value="{{ m }}"{% if match == m %} selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label for="f-tag" class="form-label small text-muted mb-1">Tag</label>
+          <select id="f-tag" name="tag" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for category, values in tag_filters.items() %}
+            <optgroup label="{{ category }}">
+              {% for value in values %}
+              <option value="{{ category }}:{{ value }}"{% if tag == category ~ ':' ~ value %} selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </optgroup>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="col-6 col-lg-2">
+          <label for="f-role" class="form-label small text-muted mb-1">Role</label>
+          <select id="f-role" name="role" class="form-select form-select-sm">
+            <option value="">Tous</option>
+            {% for r in filters.roles %}
+            <option value="{{ r }}"{% if role == r %} selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <input type="hidden" name="sort" value="{{ sort }}">
+        <input type="hidden" name="order" value="{{ order }}">
+        <div class="col-6 col-lg-1">
+          <button type="submit" class="btn btn-primary btn-sm w-100">
+            <i class="bi bi-funnel me-1 d-none d-lg-inline" aria-hidden="true"></i>Filtrer
+          </button>
+        </div>
+        {% if q or status or node or vm_type or match or tag or role %}
+        <div class="col-auto">
+          <a href="{{ clear_url }}" class="btn btn-outline-secondary btn-sm"
+             title="Effacer les filtres" aria-label="Effacer les filtres">
+            <i class="bi bi-x-lg" aria-hidden="true"></i>
+          </a>
+        </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+
+  <div id="inventory-error" class="alert alert-danger d-none" role="alert"></div>
+
+  {% if items %}
+  <div class="card mb-3">
+    <div class="table-responsive">
+      <table class="table table-hover table-sm mb-0">
+        <caption class="visually-hidden">Inventaire consolidé du run numéro {{ run.id }}</caption>
+        <thead class="table-dark">
+          <tr>
+            {{ sort_header('vm_name', 'VM') }}
+            <th scope="col" class="d-none d-md-table-cell">Noeud</th>
+            {{ sort_header('status', 'Statut') }}
+            <th scope="col" class="d-none d-lg-table-cell">Type</th>
+            {{ sort_header('ip', 'IP') }}
+            <th scope="col" class="d-none d-md-table-cell">DNS</th>
+            {{ sort_header('cpu', 'CPU (%)', 'd-none d-lg-table-cell') }}
+            {{ sort_header('ram', 'RAM (%)', 'd-none d-lg-table-cell') }}
+            <th scope="col" class="d-none d-xl-table-cell">Disque (%)</th>
+            <th scope="col" class="d-none d-xl-table-cell">Uptime</th>
+            {{ sort_header('match', 'Match') }}
+            <th scope="col" class="d-none d-xl-table-cell">Source</th>
+            <th scope="col" class="d-none d-xl-table-cell">Role</th>
+          </tr>
+        </thead>
+        <tbody id="inventoryBody">
+          {% for ca, asset, ipam in items %}
+          {% set ram_pct = ((asset.ram_used or 0) / asset.ram_max * 100)|round(1) if asset.ram_max else None %}
+          {% set disk_pct = ((asset.disk_used or 0) / asset.disk_max * 100)|round(1) if asset.disk_max else None %}
+          <tr{% if ca.match_status == 'NO_MATCH' %} class="table-danger"{% elif ca.match_status == 'MATCHED_IP' %} class="table-info"{% elif ca.match_status == 'MATCHED_FQDN' %} class="table-warning"{% elif ca.match_status == 'MATCHED_NAME' %} class="table-success"{% endif %}>
+            <td>
+              <a href="{{ url_for('main.asset_detail', asset_id=asset.id) }}" class="fw-semibold text-decoration-none">{{ asset.vm_name }}</a>
+            </td>
+            <td class="d-none d-md-table-cell"><small>{{ asset.node or '—' }}</small></td>
+            <td>
+              {% if asset.status == 'running' %}<span class="badge bg-success">running</span>
+              {% else %}<span class="badge bg-secondary">{{ asset.status or '—' }}</span>{% endif %}
+            </td>
+            <td class="d-none d-lg-table-cell"><span class="badge bg-info text-dark">{{ asset.type or '—' }}</span></td>
+            <td><code class="small">{{ ca.ip_final or asset.ip_reported or '—' }}</code></td>
+            <td class="d-none d-md-table-cell"><small>{{ ca.dns_final or (ipam.dns_name if ipam else None) or '—' }}</small></td>
+            <td class="d-none d-lg-table-cell">{{ ((asset.cpu_usage|round(1)) ~ '%') if asset.cpu_usage is not none else '—' }}</td>
+            <td class="d-none d-lg-table-cell">{{ (ram_pct ~ '%') if ram_pct is not none else '—' }}</td>
+            <td class="d-none d-xl-table-cell">{{ (disk_pct ~ '%') if disk_pct is not none else '—' }}</td>
+            <td class="d-none d-xl-table-cell">
+              {%- if asset.uptime and asset.uptime > 0 -%}
+              {{ asset.uptime // 86400 }}j {{ (asset.uptime % 86400) // 3600 }}h
+              {%- else -%}—{% endif -%}
+            </td>
+            <td>{{ match_badge(ca.match_status) }}</td>
+            <td class="d-none d-xl-table-cell"><small>{{ asset.source or '—' }}</small></td>
+            <td class="d-none d-xl-table-cell"><small>{{ ca.role or 'Indéterminé' }}</small></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <p id="inventory-count" class="text-muted small mb-2" aria-live="polite">
+    {{ pagination.total }} résultat(s) — page {{ pagination.page }}/{{ pagination.pages }}
+  </p>
+
+  {% if pagination.pages > 1 %}
+  <nav id="inventory-pagination" class="d-flex justify-content-end mt-2" aria-label="Pagination de l'inventaire">
+    <ul class="pagination pagination-sm mb-0">
+      <li class="page-item{% if not pagination.has_prev %} disabled{% endif %}">
+        {% if pagination.has_prev %}
+        <a class="page-link" href="{{ page_links[pagination.prev_num] }}" rel="prev" aria-label="Page précédente">&laquo;</a>
+        {% else %}
+        <span class="page-link" aria-hidden="true">&laquo;</span>
+        {% endif %}
+      </li>
+      {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+      <li class="page-item{% if p == pagination.page %} active{% endif %}">
+        {% if p == pagination.page %}
+        <span class="page-link" aria-current="page">{{ p }}</span>
+        {% else %}
+        <a class="page-link" href="{{ page_links[p] }}" aria-label="Page {{ p }}">{{ p }}</a>
+        {% endif %}
+      </li>
+      {% else %}
+      <li class="page-item disabled" aria-hidden="true"><span class="page-link">…</span></li>
+      {% endif %}
+      {% endfor %}
+      <li class="page-item{% if not pagination.has_next %} disabled{% endif %}">
+        {% if pagination.has_next %}
+        <a class="page-link" href="{{ page_links[pagination.next_num] }}" rel="next" aria-label="Page suivante">&raquo;</a>
+        {% else %}
+        <span class="page-link" aria-hidden="true">&raquo;</span>
+        {% endif %}
+      </li>
+    </ul>
+  </nav>
+  {% endif %}
+
+  {% else %}
+  <p class="text-muted">Aucun résultat pour ces filtres.</p>
+  {% endif %}
+</section>
+
+{% else %}
+<div class="alert alert-info">
+  <i class="bi bi-info-circle me-1" aria-hidden="true"></i>
+  Aucun run d'inventaire.
+  <a href="{{ url_for('main.dashboard') }}">Lancez un inventaire</a> pour peupler la page.
+</div>
+{% endif %}
+{% endblock %}

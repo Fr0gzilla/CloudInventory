@@ -62,6 +62,10 @@
     .ci-alert-anomalies { border-left: 4px solid #dc3545; }
     .ci-alert-anomalies .ci-anomaly-type { display: inline-block; margin: 2px 4px 2px 0; font-size: 0.78rem; }
 
+    /* Inventaire et détail asset (T009) */
+    .ci-progress-sm { height: 0.45rem; }
+    .ci-sort-link:hover { text-decoration: underline; }
+
     @media (max-width: 767.98px) {
       h1 { font-size: 1.4rem; }
       h2 { font-size: 1.15rem; }
@@ -90,7 +94,7 @@
           {% endif %}
           {% if route_exists('main.inventory') %}
           <li class="nav-item">
-            <a class="nav-link{% if request.endpoint == 'main.inventory' %} active{% endif %}" href="{{ url_for('main.inventory') }}">
+            <a class="nav-link{% if request.endpoint in ('main.inventory', 'main.asset_detail') %} active{% endif %}" href="{{ url_for('main.inventory') }}"{% if request.endpoint in ('main.inventory', 'main.asset_detail') %} aria-current="page"{% endif %}>
               <i class="bi bi-server me-1" aria-hidden="true"></i>Inventaire
             </a>
           </li>

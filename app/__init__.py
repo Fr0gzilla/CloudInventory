@@ -1,9 +1,12 @@
+import csv
 import hashlib
+import io
 import os
 
 from flask import (
     Blueprint,
     Flask,
+    Response,
     abort,
     current_app,
     flash,
@@ -80,8 +83,8 @@ def _finalize_config(app, config_class):
     )
 
 
-# Pages web (T008) : `main` porte le tableau de bord et le lancement de run,
-# `auth` (connexion, déconnexion) reste le seul autre blueprint.
+# Pages web (T008/T009) : `main` porte le tableau de bord, l'inventaire, le
+# détail d'un asset et le lancement de run, `auth` reste l'autre blueprint.
 main_bp = Blueprint("main", __name__)
 
 
@@ -179,6 +182,285 @@ def trigger_run():
             "danger",
         )
     return redirect(url_for("main.dashboard"))
+
+
+# ---------- Inventaire (T009) : filtres, tri, pagination, CSV, détail asset ----
+
+# Tri autorisé (cahier §8.3) : la colonne est lue dans la liste blanche de queries.
+_INVENTORY_SORTS = ("vm_name", "status", "ip", "cpu", "ram", "match")
+
+# Pagination : 25 éléments par page (cahier §15.1), surchargeable par PER_PAGE.
+_PER_PAGE = 25
+
+# Caractères amorçant une formule dans un tableur (OWASP « CSV injection »).
+_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value):
+    """Cellule CSV neutralisée : « ' » devant toute valeur commençant comme une formule."""
+    text = "" if value is None else str(value)
+    if text[:1] in _FORMULA_START or text.lstrip()[:1] in ("=", "+", "-", "@"):
+        return "'" + text
+    return text
+
+
+def _percent(used, total):
+    """Pourcentage d'usage d'une métrique, ou None si la mesure manque."""
+    if total and total > 0 and used is not None:
+        return round(used / total * 100, 1)
+    return None
+
+
+def _uptime_label(seconds):
+    """Durée d'activité lisible (« 3j 4h ») depuis des secondes, ou None."""
+    if seconds and seconds > 0:
+        return f"{seconds // 86400}j {(seconds % 86400) // 3600}h"
+    return None
+
+
+def _inventory_args():
+    """Filtres et tri lus dans la query string (noms alignés sur queries.build_inventory_query)."""
+    sort = request.args.get("sort", "vm_name")
+    return {
+        "q": request.args.get("q", "").strip(),
+        "status": request.args.get("status", ""),
+        "node": request.args.get("node", ""),
+        "vm_type": request.args.get("type", ""),
+        "match": request.args.get("match", ""),
+        "tag": request.args.get("tag", ""),
+        "role": request.args.get("role", ""),
+        "sort": sort if sort in _INVENTORY_SORTS else "vm_name",
+        "order": "desc" if request.args.get("order") == "desc" else "asc",
+    }
+
+
+@main_bp.route("/inventory")
+@login_required
+def inventory():
+    """Inventaire consolidé du dernier run (cahier §8.3) : filtres, tri, pagination."""
+    from app.models import Asset, ConsolidatedAsset, Run
+    from app.queries import build_inventory_query
+
+    args = _inventory_args()
+
+    def _url(page=1, sort=None, order=None, **overrides):
+        """Lien de la page inventaire conservant les filtres en cours (url_for, pas de concaténation)."""
+        params = {
+            ("type" if key == "vm_type" else key): value
+            for key, value in args.items()
+            if value and key not in ("sort", "order")
+        }
+        for key, value in overrides.items():
+            if value:
+                params[key] = value
+            else:
+                params.pop(key, None)
+        params["sort"] = sort or args["sort"]
+        params["order"] = order or args["order"]
+        params["page"] = page
+        return url_for("main.inventory", **params)
+
+    common = {
+        "search_url": url_for("main.ajax_inventory_search"),
+        "clear_url": url_for("main.inventory"),
+        "reset_url": _url(page=1, q=""),
+        **args,
+    }
+
+    last_run = db.session.query(Run).order_by(Run.id.desc()).first()
+    if not last_run:
+        return render_template(
+            "inventory.html",
+            run=None,
+            items=[],
+            pagination=None,
+            filters={},
+            tag_filters={},
+            sort_links={},
+            page_links={},
+            **common,
+        )
+
+    query = build_inventory_query(last_run.id, **args)
+    pagination = query.paginate(
+        page=request.args.get("page", 1, type=int) or 1,
+        per_page=current_app.config.get("PER_PAGE", _PER_PAGE),
+        error_out=False,
+    )
+
+    filters = {
+        "statuses": _distinct_values(Asset.status),
+        "nodes": _distinct_values(Asset.node),
+        "types": _distinct_values(Asset.type),
+        "matches": _distinct_values(ConsolidatedAsset.match_status),
+        "roles": sorted(_distinct_values(ConsolidatedAsset.role)),
+    }
+
+    tag_filters = {}
+    for (tags,) in (
+        db.session.query(Asset.tags).filter(Asset.tags.isnot(None)).distinct().all()
+    ):
+        for chunk in tags.split(","):
+            chunk = chunk.strip()
+            if ":" not in chunk:
+                continue
+            category, value = chunk.split(":", 1)
+            tag_filters.setdefault(category.strip(), set()).add(value.strip())
+    tag_filters = {k: sorted(v) for k, v in sorted(tag_filters.items())}
+
+    sort_links = {
+        col: _url(
+            page=1,
+            sort=col,
+            order="desc" if args["sort"] == col and args["order"] == "asc" else "asc",
+        )
+        for col in _INVENTORY_SORTS
+    }
+
+    wanted_pages = {
+        p
+        for p in pagination.iter_pages(
+            left_edge=1, right_edge=1, left_current=2, right_current=2
+        )
+        if p
+    }
+    if pagination.has_prev:
+        wanted_pages.add(pagination.prev_num)
+    if pagination.has_next:
+        wanted_pages.add(pagination.next_num)
+    page_links = {p: _url(page=p) for p in wanted_pages}
+
+    return render_template(
+        "inventory.html",
+        run=last_run,
+        items=pagination.items,
+        pagination=pagination,
+        filters=filters,
+        tag_filters=tag_filters,
+        sort_links=sort_links,
+        page_links=page_links,
+        **common,
+    )
+
+
+def _distinct_values(column):
+    """Valeurs distinctes non nules d'une colonne, pour les listes de filtres."""
+    return [
+        row[0]
+        for row in db.session.query(column)
+        .filter(column.isnot(None))
+        .distinct()
+        .all()
+    ]
+
+
+@main_bp.route("/ajax/inventory/search")
+@login_required
+def ajax_inventory_search():
+    """Recherche live de l'inventaire (cahier §8.3) : 100 lignes max en JSON."""
+    from app.models import Run
+    from app.queries import build_inventory_query, serialize_inventory_item
+
+    last_run = db.session.query(Run).order_by(Run.id.desc()).first()
+    if not last_run:
+        return jsonify({"items": [], "total": 0})
+
+    args = _inventory_args()
+    query = build_inventory_query(last_run.id, **args)
+    total = query.count()
+
+    items = []
+    for ca, asset, ipam in query.limit(100).all():
+        item = serialize_inventory_item(ca, asset, ipam)
+        item.update(
+            {
+                "detail_url": url_for("main.asset_detail", asset_id=asset.id),
+                "ip": ca.ip_final or asset.ip_reported or "",
+                "dns": ca.dns_final or item["dns"],
+                "cpu": asset.cpu_usage,
+                "ram_pct": _percent(asset.ram_used, asset.ram_max),
+                "disk_pct": _percent(asset.disk_used, asset.disk_max),
+                "uptime": _uptime_label(asset.uptime),
+            }
+        )
+        items.append(item)
+
+    return jsonify({"items": items, "total": total})
+
+
+@main_bp.route("/inventory/export")
+@login_required
+def inventory_export():
+    """Export CSV du dernier run (cahier §8.3) : cellules neutralisées contre les formules."""
+    from app.models import Run
+    from app.queries import export_inventory_csv
+
+    last_run = db.session.query(Run).order_by(Run.id.desc()).first()
+    if not last_run:
+        abort(404, description="Aucun run d'inventaire à exporter.")
+
+    reader = csv.reader(io.StringIO(export_inventory_csv(last_run.id)), delimiter=";")
+    output = io.StringIO()
+    writer = csv.writer(output, delimiter=";")
+    for row in reader:
+        writer.writerow([_csv_safe(cell) for cell in row])
+
+    return Response(
+        output.getvalue(),
+        mimetype="text/csv",
+        headers={
+            "Content-Disposition": (
+                f"attachment; filename=inventaire_run{last_run.id}.csv"
+            )
+        },
+    )
+
+
+@main_bp.route("/assets/<int:asset_id>")
+@login_required
+def asset_detail(asset_id):
+    """Fiche d'un asset (cahier §8.7) : infos, métriques, 30 derniers runs, anomalies."""
+    from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
+
+    asset = db.get_or_404(Asset, asset_id)
+
+    history = (
+        db.session.query(ConsolidatedAsset, Run, IpamRecord)
+        .join(Run, ConsolidatedAsset.run_id == Run.id)
+        .outerjoin(IpamRecord, ConsolidatedAsset.ipam_record_id == IpamRecord.id)
+        .filter(ConsolidatedAsset.asset_id == asset_id)
+        .order_by(Run.id.desc())
+        .limit(30)
+        .all()
+    )
+    anomalies = (
+        db.session.query(Anomaly, Run)
+        .join(Run, Anomaly.run_id == Run.id)
+        .filter(Anomaly.asset_id == asset_id)
+        .order_by(Anomaly.id.desc())
+        .all()
+    )
+
+    gb = 1073741824
+    metrics = {
+        "cpu_count": asset.cpu_count,
+        "cpu": asset.cpu_usage,
+        "ram_pct": _percent(asset.ram_used, asset.ram_max),
+        "ram_used_gb": round(asset.ram_used / gb, 1) if asset.ram_used else None,
+        "ram_max_gb": round(asset.ram_max / gb, 1) if asset.ram_max else None,
+        "disk_pct": _percent(asset.disk_used, asset.disk_max),
+        "disk_used_gb": round(asset.disk_used / gb, 1) if asset.disk_used else None,
+        "disk_max_gb": round(asset.disk_max / gb, 1) if asset.disk_max else None,
+        "uptime": _uptime_label(asset.uptime),
+    }
+
+    return render_template(
+        "asset_detail.html",
+        asset=asset,
+        metrics=metrics,
+        history=history,
+        anomalies=anomalies,
+    )
 
 
 def create_app(config_class=Config):
