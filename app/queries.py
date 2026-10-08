@@ -28,6 +28,17 @@ _SORT_COLUMNS = {
     "role": ConsolidatedAsset.role,
 }
 
+# Caractères amorçant une formule dans un tableur (OWASP « CSV injection »).
+_FORMULA_START = ("=", "+", "-", "@", "\t", "\r")
+
+
+def _csv_safe(value):
+    """Cellule CSV neutralisée : « ' » devant toute valeur commençant comme une formule."""
+    text = "" if value is None else str(value)
+    if text[:1] in _FORMULA_START or text.lstrip()[:1] in ("=", "+", "-", "@"):
+        return "'" + text
+    return text
+
 
 def _inventory_rows(run_id):
     """Jointure consolidé ↔ asset ↔ IPAM (outer join : IPAM facultatif) filtrée par run."""
@@ -74,17 +85,23 @@ def build_inventory_query(run_id, q="", status="", node="", vm_type="",
 
 
 def serialize_inventory_item(ca, asset, ipam):
-    """Serialise un item d'inventaire en dict JSON-compatible."""
+    """Serialise un item d'inventaire en dict JSON-compatible.
+
+    IP, DNS et statut proviennent exclusivement de l'instantané du run
+    (`consolidated_asset`, RG « instantané ») : aucun repli sur `asset` ni
+    sur l'IPAM, une valeur absente ou vide de l'instantané reste vide ; les
+    métriques restent lues sur `asset` par la route.
+    """
     return {
         "id": asset.id,
         "vm_id": asset.vm_id,
         "vm_name": asset.vm_name,
         "node": asset.node,
-        "status": asset.status,
+        "status": ca.vm_status or "",
         "type": asset.type,
         "tags": asset.tags or "",
-        "ip": asset.ip_reported or "",
-        "dns": ipam.dns_name if ipam else "",
+        "ip": ca.ip_final or "",
+        "dns": ca.dns_final or "",
         "fqdn": asset.fqdn or "",
         "match_status": ca.match_status,
         "role": ca.role or "Indéterminé",
@@ -149,7 +166,13 @@ def get_run_comparison_data(run_id):
 
 
 def export_inventory_csv(run_id):
-    """Contenu CSV (séparateur `;`) de l'inventaire d'un run (web + API)."""
+    """Contenu CSV (séparateur `;`) de l'inventaire d'un run (web + API).
+
+    IP, DNS et état proviennent exclusivement de l'instantané du run
+    (ip_final, dns_final, vm_status), sans repli sur `asset` ni sur l'IPAM ;
+    chaque cellule est neutralisée contre l'injection de formules à la
+    source (OWASP), sans relecture par la route.
+    """
     rows = _inventory_rows(run_id).all()
 
     output = io.StringIO()
@@ -160,11 +183,21 @@ def export_inventory_csv(run_id):
     ])
     for ca, asset, ipam in rows:
         writer.writerow([
-            asset.vm_name, asset.node, asset.status, asset.type,
-            asset.ip_reported or "", ipam.dns_name if ipam else "",
-            asset.fqdn or "", ca.role or "",
-            ipam.tenant if ipam else "", ipam.site if ipam else "",
-            ca.match_status, asset.source or "",
+            _csv_safe(cell)
+            for cell in [
+                asset.vm_name,
+                asset.node,
+                ca.vm_status or "",
+                asset.type,
+                ca.ip_final or "",
+                ca.dns_final or "",
+                asset.fqdn or "",
+                ca.role or "",
+                ipam.tenant if ipam else "",
+                ipam.site if ipam else "",
+                ca.match_status,
+                asset.source or "",
+            ]
         ])
 
     return output.getvalue()

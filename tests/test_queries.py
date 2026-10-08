@@ -35,8 +35,14 @@ def _add_run(db_session, status="SUCCESS", **counts):
 def _add_item(db_session, run, vm_name, *, vm_type="qemu", vm_status="running",
               node="pve1", tags=None, ip_reported=None, fqdn=None,
               match_status="MATCHED_NAME", role=None, anomaly_codes=None,
-              source="VIRT", ipam=None, cpu_usage=None, ram_used=None):
-    """Asset + ConsolidatedAsset (+ IpamRecord facultatif) pour un run."""
+              source="VIRT", ipam=None, cpu_usage=None, ram_used=None,
+              ip_final=None, dns_final=None, snapshot_status=None):
+    """Asset + ConsolidatedAsset (+ IpamRecord facultatif) pour un run.
+
+    `ip_final`, `dns_final` et `snapshot_status` alimentent explicitement
+    l'instantané du run (`consolidated_asset`) ; laissés à None, les colonnes
+    de l'instantané restent vides alors que `asset` et l'IPAM ont des valeurs.
+    """
     session = db_session.session
     asset = Asset(
         vm_id=vm_name, vm_name=vm_name, node=node, type=vm_type,
@@ -57,6 +63,7 @@ def _add_item(db_session, run, vm_name, *, vm_type="qemu", vm_status="running",
         run_id=run.id,
         asset_id=asset.id, ipam_record_id=record.id if record else None,
         match_status=match_status, role=role, anomaly_codes=anomaly_codes,
+        ip_final=ip_final, dns_final=dns_final, vm_status=snapshot_status,
     )
     session.add(ca)
     session.commit()
@@ -64,7 +71,12 @@ def _add_item(db_session, run, vm_name, *, vm_type="qemu", vm_status="running",
 
 
 def _seed(db_session):
-    """Deux runs indépendants : A (3 items, dont 1 sans IPAM) et B (1 item)."""
+    """Deux runs indépendants : A (3 items, dont 1 sans IPAM) et B (1 item).
+
+    L'instantané de chaque item (ip_final, dns_final, vm_status) est alimenté
+    explicitement : `asset` et l'IPAM portent les mêmes valeurs, la
+    sérialisation et le CSV lisent donc l'instantané.
+    """
     run_a = _add_run(
         db_session,
         matched_name_count=1, matched_fqdn_count=1,
@@ -76,16 +88,21 @@ def _seed(db_session):
         fqdn="web-a500.example.lan", role="Serveur",
         ipam={"ip": "10.0.0.10", "dns_name": "web-a500.internal",
               "tenant": "prod", "site": "dc1"},
+        ip_final="10.0.0.10", dns_final="web-a500.internal",
+        snapshot_status="running",
     )
     item2 = _add_item(
         db_session, run_a, "db-b300", node="pve2", vm_type="lxc",
         vm_status="stopped", tags="db", match_status="NO_MATCH",
         ipam={"ip": "10.0.0.20", "dns_name": "db-b300.internal",
               "tenant": "prod", "site": "dc2"},
+        ip_final="10.0.0.20", dns_final="db-b300.internal",
+        snapshot_status="stopped",
     )
     item3 = _add_item(
         db_session, run_a, "cache-n100", node="pve1", vm_type="qemu",
         vm_status="running", match_status="MATCHED_IP", role="Cache",
+        snapshot_status="running",
     )
 
     run_b = _add_run(db_session, matched_name_count=1, no_match_count=0)
@@ -95,6 +112,8 @@ def _seed(db_session):
         role="Serveur",
         ipam={"ip": "10.0.0.70", "dns_name": "other-c700.internal",
               "tenant": "rec", "site": "dc1"},
+        ip_final="10.0.0.70", dns_final="other-c700.internal",
+        snapshot_status="running",
     )
     return run_a, run_b, (item1, item2, item3, item4)
 
@@ -416,3 +435,107 @@ def test_export_csv_of_a_run_without_rows_is_header_only(db):
         io.StringIO(queries.export_inventory_csv(run_with_rows.id)),
         delimiter=";",
     ))) == 4
+
+
+# --- T031 — instantané d'un run ancien, CSV protégé à la source ---------------
+
+
+def test_old_run_inventory_keeps_the_vm_state_of_that_moment(db):
+    """T031 — un run ancien montre l'IP, le DNS et l'état de la VM d'alors.
+
+    Deux runs, la VM est modifiée entre les deux : `asset` et l'IPAM ne gardent
+    que la dernière valeur, l'instantané vit dans `consolidated_asset`
+    (ip_final, dns_final, vm_status) — sérialisation ET export CSV.
+    Une valeur absente de l'instantané reste vide : aucun repli sur `asset`
+    ni sur l'IPAM, qui portent pourtant des valeurs.
+    """
+    run_old = _add_run(db)
+    ca_old, asset, record = _add_item(
+        db, run_old, "vm-snap-01", vm_status="running",
+        ip_reported="10.0.0.5",
+        ipam={"ip": "10.0.0.5", "dns_name": "vm-snap-01.old.lan"},
+    )
+    ca_old.ip_final = "10.0.0.5"
+    ca_old.dns_final = "vm-snap-01.old.lan"
+    ca_old.vm_status = "running"
+
+    # Instantané volontairement vide (NULL) alors que l'asset et l'IPAM
+    # portent des valeurs : la sérialisation et le CSV doivent rester vides.
+    ca_blank, asset_blank, record_blank = _add_item(
+        db, run_old, "vm-void-02", vm_status="running",
+        ip_reported="10.0.0.9", fqdn="vm-void-02.example.lan",
+        ipam={"ip": "10.0.0.9", "dns_name": "vm-void-02.ipam.lan"},
+    )
+
+    run_new = _add_run(db, matched_name_count=1)
+    asset.ip_reported = "10.0.0.6"
+    asset.status = "stopped"
+    asset.consolidated_run_id = run_new.id
+    record.dns_name = "vm-snap-01.new.lan"
+    ca_new = ConsolidatedAsset(
+        run_id=run_new.id, asset_id=asset.id, ipam_record_id=record.id,
+        match_status="MATCHED_NAME", ip_final="10.0.0.6",
+        dns_final="vm-snap-01.new.lan", vm_status="stopped",
+    )
+    db.session.add(ca_new)
+    db.session.commit()
+
+    old_item = queries.serialize_inventory_item(ca_old, asset, record)
+    new_item = queries.serialize_inventory_item(ca_new, asset, record)
+    blank_item = queries.serialize_inventory_item(
+        ca_blank, asset_blank, record_blank
+    )
+
+    assert (old_item["ip"], old_item["dns"], old_item["status"]) == (
+        "10.0.0.5", "vm-snap-01.old.lan", "running",
+    )
+    assert (new_item["ip"], new_item["dns"], new_item["status"]) == (
+        "10.0.0.6", "vm-snap-01.new.lan", "stopped",
+    )
+    # Instantané vide → champs vides, malgré asset.status / ip_reported / IPAM.
+    assert (blank_item["ip"], blank_item["dns"], blank_item["status"]) == (
+        "", "", "",
+    )
+
+    old_rows = list(csv.reader(
+        io.StringIO(queries.export_inventory_csv(run_old.id)), delimiter=";"
+    ))
+    old_row = next(row for row in old_rows if row[0] == "vm-snap-01")
+    blank_row = next(row for row in old_rows if row[0] == "vm-void-02")
+    assert old_row[4:6] == ["10.0.0.5", "vm-snap-01.old.lan"]
+    assert old_row[2] == "running"
+    assert blank_row[2] == "" and blank_row[4:6] == ["", ""]
+
+
+def test_export_csv_neutralizes_formula_cells_at_source(db):
+    """T031 — l'échappement des formules est fait par `queries.export_inventory_csv`.
+
+    La page web et l'API lisent ce CSV : aucune relecture par la route ne doit
+    être nécessaire pour neutraliser une cellule amorçant une formule (OWASP,
+    injection CSV) ; les cellules ordinaires restent intactes.
+    """
+    run = _add_run(db)
+    ca, _asset, _ipam = _add_item(
+        db, run, "=1+1", node="pve1", vm_status="running",
+        ip_reported="+10.0.0.7", fqdn="@SUM(A1)", role="-2+2",
+        ipam={"ip": "10.0.0.7", "dns_name": "=cmd|'/C calc'!A0",
+              "tenant": "+prod", "site": "dc1"},
+    )
+    # Instantané du run alimenté explicitement : les cellules État, IP et DNS
+    # du CSV sortent de `consolidated_asset` (elles doivent être protégées).
+    ca.vm_status = "running"
+    ca.ip_final = "+10.0.0.7"
+    ca.dns_final = "=cmd|'/C calc'!A0"
+    db.session.commit()
+
+    rows = list(csv.reader(
+        io.StringIO(queries.export_inventory_csv(run.id)), delimiter=";"
+    ))
+
+    assert rows[0] == CSV_HEADER
+    row = rows[1]
+    assert row[0] == "'=1+1"
+    assert row[2] == "running"
+    assert row[4:7] == ["'+10.0.0.7", "'=cmd|'/C calc'!A0", "'@SUM(A1)"]
+    assert row[7:9] == ["'-2+2", "'+prod"]
+    assert row[1] == "pve1" and row[9] == "dc1"
