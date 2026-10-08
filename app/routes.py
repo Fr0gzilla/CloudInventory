@@ -324,6 +324,50 @@ def inventory_export():
     )
 
 
+# ---------- Runs (T030) : liste et détail ----------
+@main_bp.route("/runs")
+@login_required
+def runs_list():
+    """Liste paginée de tous les runs."""
+    from app.models import Run
+
+    page = request.args.get("page", 1, type=int)
+    pagination = Run.query.order_by(Run.id.desc()).paginate(
+        page=page, per_page=current_app.config.get("PER_PAGE", _PER_PAGE), error_out=False
+    )
+    return render_template(
+        "runs.html", runs=pagination.items, pagination=pagination
+    )
+
+
+@main_bp.route("/runs/<int:run_id>")
+@login_required
+def run_detail(run_id):
+    """Détail d'un run : instantané consolidé (ip_final, dns_final, match_status, vm_status)."""
+    from app.models import Run, ConsolidatedAsset, Asset, IpamRecord, Anomaly
+
+    run = db.session.query(Run).get_or_404(run_id)
+
+    inventory = (
+        db.session.query(ConsolidatedAsset, Asset, IpamRecord)
+        .join(Asset, ConsolidatedAsset.asset_id == Asset.id)
+        .outerjoin(IpamRecord, ConsolidatedAsset.ipam_record_id == IpamRecord.id)
+        .filter(ConsolidatedAsset.run_id == run_id)
+        .all()
+    )
+
+    anomalies = (
+        db.session.query(Anomaly, Run)
+        .join(Run, Anomaly.run_id == Run.id)
+        .filter(Anomaly.run_id == run_id)
+        .all()
+    )
+
+    return render_template(
+        "run_detail.html", run=run, inventory=inventory, anomalies=anomalies
+    )
+
+
 @main_bp.route("/assets/<int:asset_id>")
 @login_required
 def asset_detail(asset_id):

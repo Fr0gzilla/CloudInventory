@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Run #{{ run.id }} — CloudInventory{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+  <a href="{{ url_for('main.runs_list') }}" class="btn btn-sm btn-outline-secondary" title="Retour runs">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <h1 class="mb-0">Run #{{ run.id }}</h1>
+  {% if run.status == 'SUCCESS' %}<span class="badge badge-success fs-6">SUCCESS</span>
+  {% elif run.status == 'FAIL' %}<span class="badge badge-fail fs-6">FAIL</span>
+  {% else %}<span class="badge badge-running fs-6">RUNNING</span>{% endif %}
+</div>
+
+<!-- Resume -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="row g-3">
+      <div class="col-sm-6">
+        <small class="text-muted">Début</small><br>
+        <strong>{{ run.start_date.strftime('%d/%m/%Y %H:%M:%S') if run.start_date else '—' }}</strong>
+      </div>
+      <div class="col-sm-6">
+        <small class="text-muted">Fin</small><br>
+        <strong>{{ run.end_date.strftime('%d/%m/%Y %H:%M:%S') if run.end_date else '—' }}</strong>
+      </div>
+    </div>
+    <div class="row g-3 mt-2">
+      <div class="col-3">
+        <small class="text-muted d-block">VMs</strong>
+        <strong class="fs-5">{{ run.matched_name_count or 0 }}</strong>
+      </div>
+      <div class="col-3">
+        <small class="text-muted d-block">IPs</strong>
+        <strong class="fs-5">{{ run.no_match_count or 0 }}</strong>
+      </div>
+      <div class="col">
+        <small class="text-muted d-block">Matched (nom)</strong>
+        <strong class="fs-5 text-success">{{ run.matched_name_count or 0 }}</strong>
+      </div>
+      <div class="col">
+        <small class="text-muted d-block">Matched (FQDN)</strong>
+        <strong class="fs-5 ci-purple">{{ run.matched_fqdn_count or 0 }}</strong>
+      </div>
+      <div class="col">
+        <small class="text-muted d-block">Matched (IP)</strong>
+        <strong class="fs-5 ci-cyan">{{ run.matched_ip_count or 0 }}</strong>
+      </div>
+      <div class="col">
+        <small class="text-muted d-block">No match</strong>
+        <strong class="fs-5 text-danger">{{ run.no_match_count or 0 }}</strong>
+      </div>
+    </div>
+    {% if run.error_message %}
+    <div class="alert alert-danger mt-3 mb-0">{{ run.error_message }}</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Inventaire consolide -> issu de consolidated_asset UNIQUEMENT -->
+<h2 class="mt-4 mb-3"><i class="bi bi-server me-2"></i>Inventaire consolide</h2>
+{% if inventory %}
+<div class="card mb-4">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>VM</th>
+          <th>Status</th>
+          <th>IP</th>
+          <th class="d-none d-lg-table-cell">DNS</th>
+          <th>Match</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ca, asset, ipam in inventory %}
+        <tr class="{% if ca.match_status == 'NO_MATCH' %}table-danger{% elif ca.match_status == 'MATCHED_IP' %}table-info{% elif ca.match_status == 'MATCHED_FQDN' %}table-warning{% elif ca.match_status == 'MATCHED_NAME' %}table-success{% endif %}">
+          <td><a href="{{ url_for('main.asset_detail', asset_id=asset.id) }}" class="fw-semibold text-decoration-none">{{ asset.vm_name }}</a></td>
+          <td>
+            {% if asset.status == 'running' %}<span class="badge bg-success">running</span>
+            {% else %}<span class="badge bg-secondary">{{ asset.status or '—' }}</span>{% endif %}
+          </td>
+          <td><code class="small">{{ ca.ip_final or '—' }}</code></td>
+          <td class="d-none d-lg-table-cell">{{ ca.dns_final or '—' }}</td>
+          <td>
+            {% if ca.match_status == 'MATCHED_NAME' %}<span class="badge badge-matched">MATCHED (nom)</span>
+            {% elif ca.match_status == 'MATCHED_FQDN' %}<span class="badge ci-badge-purple">MATCHED (FQDN)</span>
+            {% elif ca.match_status == 'MATCHED_IP' %}<span class="badge bg-info text-dark">MATCHED (IP)</span>
+            {% elif ca.match_status == 'NO_MATCH' %}<span class="badge badge-nomatch">NO MATCH</span>
+            {% else %}<span class="badge bg-secondary">{{ ca.match_status }}</span>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<p class="text-muted">Aucune donnée consolidée.</p>
+{% endif %}
+
+<!-- Anomalies -->
+<h2 class="mt-4 mb-3"><i class="bi bi-exclamation-triangle me-2"></i>Anomalies</h2>
+{% if anomalies %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>VM</th>
+          <th>Type</th>
+          <th>Détails</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for anomaly, run in anomalies %}
+        <tr>
+          <td><a href="{{ url_for('main.asset_detail', asset_id=anomaly.asset_id) }}" class="text-decoration-none">{{ anomaly.asset.vm_name if anomaly.asset else '—' }}</a></td>
+          <td>
+            {% if anomaly.code == 'NO_MATCH' %}<span class="badge bg-danger">{{ anomaly.code }}</span>
+            {% elif anomaly.code == 'STATUS_MISMATCH' %}<span class="badge bg-warning text-dark">{{ anomaly.code }}</span>
+            {% else %}<span class="badge bg-secondary">{{ anomaly.code }}</span>{% endif %}
+          </td>
+          <td class="small">{{ anomaly.description or '—' }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% else %}
+<p class="text-muted">Aucune anomalie.</p>
+{% endif %}
+{% endblock %}

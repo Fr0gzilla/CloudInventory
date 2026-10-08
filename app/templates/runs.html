@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block title %}Runs — CloudInventory{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-sm-row justify-content-between align-items-start align-items-sm-center mb-4 gap-2">
+  <h1 class="mb-0"><i class="bi bi-play-circle me-2"></i>Historique des runs</h1>
+</div>
+
+{% if runs %}
+<div class="card">
+  <div class="table-responsive">
+    <table class="table table-hover table-sm mb-0">
+      <thead class="table-dark">
+        <tr>
+          <th>#</th>
+          <th>Date</th>
+          <th>Status</th>
+          <th class="d-none d-sm-table-cell">VMs</th>
+          <th class="d-none d-sm-table-cell">IPs</th>
+          <th class="d-none d-md-table-cell">Matched (nom)</th>
+          <th class="d-none d-md-table-cell">No match</th>
+          <th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for run in runs %}
+        <tr class="{% if run.status == 'FAIL' %}table-danger{% endif %}">
+          <td class="fw-semibold">{{ run.id }}</td>
+          <td>{{ run.start_date.strftime('%d/%m/%Y %H:%M:%S') if run.start_date else '—' }}</td>
+          <td>
+            {% if run.status == 'SUCCESS' %}<span class="badge badge-success">SUCCESS</span>
+            {% elif run.status == 'FAIL' %}<span class="badge badge-fail">FAIL</span>
+            {% else %}<span class="badge badge-running">RUNNING</span>{% endif %}
+          </td>
+          <td class="d-none d-sm-table-cell">{{ run.matched_name_count or 0 }}</td>
+          <td class="d-none d-sm-table-cell">{{ run.no_match_count or 0 }}</td>
+          <td class="d-none d-md-table-cell"><span class="text-success fw-bold">{{ run.matched_name_count or 0 }}</span></td>
+          <td class="d-none d-md-table-cell"><span class="{% if (run.no_match_count or 0) > 0 %}text-danger fw-bold{% endif %}">{{ run.no_match_count or 0 }}</span></td>
+          <td class="text-end">
+            <a href="{{ url_for('main.run_detail', run_id=run.id) }}" class="btn btn-sm btn-outline-primary">
+              <i class="bi bi-eye d-md-none"></i><span class="d-none d-md-inline">Détail</span>
+            </a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Pagination -->
+{% if pagination and pagination.pages > 1 %}
+<nav class="d-flex justify-content-between align-items-center mt-3">
+  <small class="text-muted">{{ pagination.total }} run(s) — page {{ pagination.page }}/{{ pagination.pages }}</small>
+  <ul class="pagination pagination-sm mb-0">
+    <li class="page-item {% if not pagination.has_prev %}disabled{% endif %}">
+      <a class="page-link" href="?page={{ pagination.prev_num }}">&laquo;</a>
+    </li>
+    {% for p in pagination.iter_pages(left_edge=1, right_edge=1, left_current=2, right_current=2) %}
+      {% if p %}
+      <li class="page-item {% if p == pagination.page %}active{% endif %}">
+        <a class="page-link" href="?page={{ p }}">{{ p }}</a>
+      </li>
+      {% else %}
+      <li class="page-item disabled"><span class="page-link">…</span></li>
+      {% endif %}
+    {% endfor %}
+    <li class="page-item {% if not pagination.has_next %}disabled{% endif %}">
+      <a class="page-link" href="?page={{ pagination.next_num }}">&raquo;</a>
+    </li>
+  </ul>
+</nav>
+{% endif %}
+
+{% else %}
+<div class="alert alert-info"><i class="bi bi-info-circle me-1"></i>Aucun run.</div>
+{% endif %}
+{% endblock %}

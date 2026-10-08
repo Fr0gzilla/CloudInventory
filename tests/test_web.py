@@ -1,6 +1,8 @@
 """T008/T009 — Pages web : accès protégé, statistiques, lancements, inventaire,
 export CSV et détail asset.
 
+T030 — Pages web 2b/2 : liste des runs et détail d'un run
+
 C1 accès anonyme refusé (dashboard et endpoint AJAX, RG26) · C2 tableau de bord
 rendu pour une session ouverte, gabarit + ressources locales · C3 statistiques
 en JSON sur `/ajax/stats` (cahier §8.1) · C4 lancement AJAX (`/ajax/run`) et
@@ -742,3 +744,169 @@ def test_inventory_without_run_shows_an_empty_state(app):
 
     assert "Aucun run d'inventaire" in body
     assert 'id="inventory"' not in body
+
+
+# --- T030 — Pages runs et détail historique ------------------------------------
+
+def test_runs_list_anonymous_redirects_to_login(app):
+    """GET /runs sans session : redirection vers /login (RG26)."""
+    client = app.test_client()
+
+    response = client.get("/runs")
+
+    assert response.status_code == 302
+    assert urlparse(response.headers["Location"]).path == "/login"
+
+
+def test_runs_list_authenticated_displays_runs(app, db):
+    """GET /runs avec session : liste paginée de runs."""
+    from datetime import datetime
+    from app.models import Run
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Run 1 avec SUCCESS
+    run1 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run1)
+    db.session.commit()
+
+    # Run 2 avec FAIL
+    run2 = Run(status="FAIL", start_date=NOW, error_message="erreur de collecte")
+    db.session.add(run2)
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    body = _body(client, "/runs")
+
+    assert "SUCCESS" in body
+    assert "FAIL" in body
+    assert "1" in body  # run IDs are displayed
+
+
+def test_run_detail_anonymous_redirects_to_login(app):
+    """GET /runs/<id> sans session : redirection vers /login (RG26)."""
+    client = app.test_client()
+
+    response = client.get("/runs/1")
+
+    assert response.status_code == 302
+    assert urlparse(response.headers["Location"]).path == "/login"
+
+
+def test_run_detail_unknown_id_404(app):
+    """GET /runs/<id> avec ID inexistant : 404."""
+    client = app.test_client()
+    _login(client)
+
+    response = client.get("/runs/4242")
+
+    assert response.status_code == 404
+
+
+def test_run_detail_displays_snapshot_fields(app, db):
+    """GET /runs/<id> : les quatre champs historiques (ip_final, dns_final,
+    match_status, vm_status) proviennent de consolidated_asset."""
+    from datetime import datetime
+    from app.models import Run, ConsolidatedAsset, Asset
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Run 1 avec instantané rempli
+    run1 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run1)
+    db.session.commit()
+
+    asset1 = Asset(
+        vm_id="test-vm-snap", vm_name="vm-001", node="pve1", type="qemu",
+        status="running", match_status="MATCHED_NAME", source="VIRT",
+        consolidated_run_id=run1.id,
+    )
+    db.session.add(asset1)
+    db.session.commit()
+
+    ca1 = ConsolidatedAsset(
+        run_id=run1.id, asset_id=asset1.id,
+        ip_final="10.0.0.1", dns_final="vm-001.internal",
+        match_status="MATCHED_NAME", vm_status="running",
+    )
+    db.session.add(ca1)
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    body = _body(client, f"/runs/{run1.id}")
+
+    # Les quatre champs historiques doivent être présents dans le détail
+    assert "10.0.0.1" in body  # ip_final depuis consolidated_asset
+    assert "vm-001.internal" in body  # dns_final depuis consolidated_asset
+
+
+def test_run_detail_different_vm_between_two_runs(app, db):
+    """Deux runs avec VM modifiée entre les deux : le détail affiche l'instantané
+    du run concerné, pas la valeur actuelle de asset (RG « instantané »)."""
+    from datetime import datetime
+    from app.models import Run, ConsolidatedAsset, Asset
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Run ancien avec VM en running, IP 10.0.0.5
+    run_old = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run_old)
+    db.session.commit()
+
+    asset_old = Asset(
+        vm_id="test-vm-old-01", vm_name="vm-old-01", node="pve1", type="qemu",
+        status="running", match_status="MATCHED_NAME", source="VIRT",
+        consolidated_run_id=run_old.id,
+    )
+    db.session.add(asset_old)
+    db.session.commit()
+
+    ca_old = ConsolidatedAsset(
+        run_id=run_old.id, asset_id=asset_old.id,
+        ip_final="10.0.0.5", dns_final="vm-old-01.old.lan",
+        match_status="MATCHED_NAME", vm_status="running",
+    )
+    db.session.add(ca_old)
+    db.session.commit()
+
+    # Run nouveau : la VM a été modifiée (nouvelle IP, nouveau status)
+    # asset vm-old-01 voit ses valeurs à jour, mais l'instantané doit garder
+    # les valeurs de l'ancien run
+    run_new = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run_new)
+    db.session.commit()
+
+    # Modification de l'asset : nouvelle IP et status arrêtés
+    asset_old.ip_reported = "10.0.0.99"
+    asset_old.status = "stopped"
+    # La liaison vers le nouveau run
+    asset_old.consolidated_run_id = run_new.id
+    db.session.add(asset_old)
+    db.session.flush()
+
+    ca_new = ConsolidatedAsset(
+        run_id=run_new.id, asset_id=asset_old.id,
+        ip_final="10.0.0.99", dns_final="vm-old-01.new.lan",
+        match_status="MATCHED_NAME", vm_status="stopped",
+    )
+    db.session.add(ca_new)
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    # Détail du run ancien : doit afficher l'instantané ancien
+    body_old = _body(client, f"/runs/{run_old.id}")
+    assert "10.0.0.5" in body_old  # ip_final de l'instantané ancien
+    assert "vm-old-01.old.lan" in body_old  # dns_final de l'instantané ancien
+    assert "running" in body_old  # vm_status de l'instantané ancien
+
+    # Détail du run nouveau : doit afficher l'instantané nouveau
+    body_new = _body(client, f"/runs/{run_new.id}")
+    assert "10.0.0.99" in body_new  # ip_final de l'instantané nouveau (pas la valeur old)
+    assert "vm-old-01.new.lan" in body_new  # dns_final de l'instantané nouveau
+    assert "stopped" in body_new  # vm_status de l'instantané nouveau (pas running)
