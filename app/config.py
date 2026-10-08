@@ -40,6 +40,8 @@ class Config:
                 ". Renseignez-les (cf. .env.example) avant de démarrer."
             )
         cls.SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+        for name, value in cls.export_config().items():
+            setattr(cls, name, value)
         from app.notifications import register_notifications
 
         register_notifications()
@@ -53,3 +55,17 @@ class Config:
     def use_mock_ipam(cls) -> bool:
         """Bascule source simulée/réelle de l'IPAM (USE_MOCK_IPAM, défaut true)."""
         return os.getenv("USE_MOCK_IPAM", "true").lower() == "true"
+
+    @classmethod
+    def export_config(cls) -> dict:
+        """Lit les paramètres d'export à chaque création d'application."""
+        return {
+            "EXPORT_ENABLED": os.getenv("EXPORT_ENABLED", "false").lower() == "true",
+            "EXPORT_LOCAL_PATH": os.getenv("EXPORT_LOCAL_PATH", "exports"),
+            "EXPORT_SMB_PATH": os.getenv("EXPORT_SMB_PATH", ""),
+            "EXPORT_SMB_USERNAME": os.getenv("EXPORT_SMB_USERNAME", ""),
+            "EXPORT_SMB_PASSWORD": os.getenv("EXPORT_SMB_PASSWORD", ""),
+            "EXPORT_RETENTION_CONSOLIDATED": os.getenv("EXPORT_RETENTION_CONSOLIDATED", "30"),
+            "EXPORT_RETENTION_RAW": os.getenv("EXPORT_RETENTION_RAW", "7"),
+            "EXPORT_RAW_ENABLED": os.getenv("EXPORT_RAW_ENABLED", "false").lower() == "true",
+        }

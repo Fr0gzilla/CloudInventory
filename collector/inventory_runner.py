@@ -76,6 +76,7 @@ def run_inventory(collect_vms=None, collect_ipam=None, now=None):
     try:
         vms = collect_vms()     # 2. collecte virtualisation (RG31, RG32)
         ipam = collect_ipam()   # 3. collecte IPAM (RG33, RG34)
+        raw_ipam = ipam
         # Un couple (ip, dns_name) répété par la source ne fait qu'un enregistrement (RG18) :
         # matching et doublons portent sur ce qui est enregistré.
         ipam = list({(rec["ip"], rec["dns_name"]): rec for rec in ipam}.values())
@@ -115,6 +116,14 @@ def run_inventory(collect_vms=None, collect_ipam=None, now=None):
         notify_run(run)
     except Exception:
         logger.warning("Échec des notifications du run #%d ; SUCCESS conservé", run_id)
+
+    try:
+        from collector.exports import run_exports
+
+        run_exports(run_id, vm_list=vms, ipam_list=raw_ipam)
+    except Exception:
+        db.session.rollback()
+        logger.warning("Échec des exports du run #%d ; SUCCESS conservé", run_id)
     return run
 
 
