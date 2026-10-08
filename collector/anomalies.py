@@ -10,8 +10,8 @@ Aperçu des 6 anomalies et leurs RG :
   RG05/RG08  → NO_MATCH
   RG06/RG10  → HOSTNAME_MISMATCH
   RG07/RG11  → STATUS_MISMATCH
-  RG12       → DUPLICATE_DNS
-  RG13       → DUPLICATE_IP
+  RG12       → DUPLICATE_DNS (find_duplicate_dns rend les groupes)
+  RG13       → DUPLICATE_IP  (find_duplicate_ip rend les groupes)
   RG04/RG09  → MATCHED_IP
 """
 
@@ -91,6 +91,46 @@ def detect_status_mismatch(vm_status, ipam_status):
     return vm_status == "stopped" and ipam_status == "active"
 
 
+def find_duplicate_dns(ipam_records):
+    """RG12 — Les groupes de doublons DNS.
+
+    Le nom DNS est normalisé comme dans l'index DNS du matching (RG14,
+    ``normalize_hostname``) : un nom en double est un nom que le matching ne
+    sait pas départager.
+
+    Args:
+        ipam_records: liste de dicts enregistrements IPAM.
+
+    Returns:
+        dict ``{nom normalisé → [records]}``, deux records au moins par
+        groupe, dans l'ordre de la liste ; vide sans doublon.
+    """
+    groups = {}
+    for rec in ipam_records:
+        key = normalize_hostname(rec.get("dns_name"))
+        if key:
+            groups.setdefault(key, []).append(rec)
+    return {key: group for key, group in groups.items() if len(group) > 1}
+
+
+def find_duplicate_ip(ipam_records):
+    """RG13 — Les groupes de doublons IP.
+
+    Args:
+        ipam_records: liste de dicts enregistrements IPAM.
+
+    Returns:
+        dict ``{adresse IP → [records]}``, deux records au moins par groupe,
+        dans l'ordre de la liste ; vide sans doublon.
+    """
+    groups = {}
+    for rec in ipam_records:
+        ip = rec.get("ip")
+        if ip:
+            groups.setdefault(ip, []).append(rec)
+    return {ip: group for ip, group in groups.items() if len(group) > 1}
+
+
 def detect_duplicate_dns(ipam_records):
     """RG12 — Détecter DUPLICATE_DNS.
 
@@ -103,15 +143,7 @@ def detect_duplicate_dns(ipam_records):
     Returns:
         True si un nom DNS normalisé apparaît plus d'une fois.
     """
-    from collections import Counter
-
-    dns_names = [
-        rec.get("dns_name", "").strip().lower()
-        for rec in ipam_records
-        if rec.get("dns_name")
-    ]
-    counts = Counter(dns_names)
-    return any(count > 1 for count in counts.values())
+    return bool(find_duplicate_dns(ipam_records))
 
 
 def detect_duplicate_ip(ipam_records):
@@ -126,11 +158,7 @@ def detect_duplicate_ip(ipam_records):
     Returns:
         True si une adresse IP apparaît plus d'une fois.
     """
-    from collections import Counter
-
-    ips = [rec.get("ip", "") for rec in ipam_records if rec.get("ip")]
-    counts = Counter(ips)
-    return any(count > 1 for count in counts.values())
+    return bool(find_duplicate_ip(ipam_records))
 
 
 def detect_matched_ip(vm_ip_reported, ipam_records):

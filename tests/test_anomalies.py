@@ -259,3 +259,35 @@ def test_detect_no_match_with_mock_data():
             ip_index[ip] = rec
     result = anom.detect_no_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index)
     assert result is True, f"VM 997 should be NO_MATCH, got {result}"
+
+def test_find_duplicate_dns_groupes_normalises():
+    """RG12 + RG14 : noms comparés normalisés (casse, espaces, domaine), comme dans l'index du matching."""
+    ipam_records = [
+        {"dns_name": "Web-A500.prod.local", "ip": "10.0.1.10"},
+        {"dns_name": "web-a500 ", "ip": "10.0.1.20"},
+        {"dns_name": "db-b500", "ip": "10.0.2.10"},
+    ]
+    groups = anom.find_duplicate_dns(ipam_records)
+    assert list(groups) == ["web-a500"]
+    assert [rec["ip"] for rec in groups["web-a500"]] == ["10.0.1.10", "10.0.1.20"]
+    assert anom.detect_duplicate_dns(ipam_records) is True
+
+
+def test_find_duplicate_ip_groupes():
+    """RG13 : les enregistrements d'une même IP sont rendus ensemble, dans l'ordre de la liste."""
+    ipam_records = [
+        {"ip": "10.0.4.16", "dns_name": "gitea-repo"},
+        {"ip": "10.0.5.10", "dns_name": "dev-frontend"},
+        {"ip": "10.0.4.16", "dns_name": "gitea-mirror"},
+    ]
+    groups = anom.find_duplicate_ip(ipam_records)
+    assert {ip: [rec["dns_name"] for rec in group] for ip, group in groups.items()} == {
+        "10.0.4.16": ["gitea-repo", "gitea-mirror"],
+    }
+
+
+def test_find_duplicates_sur_les_mocks():
+    """§ 13.2 : un doublon DNS (monitoring) et un doublon IP (10.0.4.16) dans le mock NetBox."""
+    ipam_records = fetch_mock_ipam()
+    assert list(anom.find_duplicate_dns(ipam_records)) == ["monitoring"]
+    assert list(anom.find_duplicate_ip(ipam_records)) == ["10.0.4.16"]
