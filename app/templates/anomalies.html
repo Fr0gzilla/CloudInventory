@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Anomalies — CloudInventory{% endblock %}
+
+{% block content %}
+<div class="d-flex flex-column flex-sm-row gap-3 mb-4 align-items-center">
+  <h1><i class="bi bi-exclamation-triangle me-2" aria-hidden="true"></i>Anomalies</h1>
+
+  <form method="get" action="{{ url_for('main.anomalies_list') }}" class="row g-3">
+    <div class="col-12 col-sm-4">
+      <select name="type" class="form-select">
+        <option value="">Tous types</option>
+        <option value="NO_MATCH" {% if filter_type == 'NO_MATCH' %}selected{% endif %}>NO_MATCH</option>
+        <option value="HOSTNAME_MISMATCH" {% if filter_type == 'HOSTNAME_MISMATCH' %}selected{% endif %}>HOSTNAME_MISMATCH</option>
+        <option value="STATUS_MISMATCH" {% if filter_type == 'STATUS_MISMATCH' %}selected{% endif %}>STATUS_MISMATCH</option>
+        <option value="DUPLICATE_DNS" {% if filter_type == 'DUPLICATE_DNS' %}selected{% endif %}>DUPLICATE_DNS</option>
+        <option value="DUPLICATE_IP" {% if filter_type == 'DUPLICATE_IP' %}selected{% endif %}>DUPLICATE_IP</option>
+        <option value="MATCHED_IP" {% if filter_type == 'MATCHED_IP' %}selected{% endif %}>MATCHED_IP</option>
+      </select>
+    </div>
+    <div class="col-12 col-sm-3">
+      <select name="run" class="form-select">
+        <option value="">Tous runs</option>
+        {% for run in runs %}
+        <option value="{{ run.id }}" {% if filter_run == run.id|string %}selected{% endif %}>Run {{ run.id }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-12 col-sm-3">
+      <button type="submit" class="btn btn-sm btn-primary">Filtrer</button>
+    </div>
+  </form>
+</div>
+
+{% if anomalies %}
+<div class="card mb-4">
+  <div class="card-header">
+    <h2 class="h6"><i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>
+      {{ total|length }} anomalie{{ 's' if total|length > 1 else '' }}</h2>
+  </div>
+
+  <div class="card-body">
+    <div class="table-responsive">
+      <table class="table table-borderless table-sm mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Run</th>
+            <th>VM</th>
+            <th>Code</th>
+            <th>Détails</th>
+            <th>Détectée le</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for anomaly, run in anomalies %}
+          <tr class="{% if anomaly.code == 'NO_MATCH' %}table-danger{% elif anomaly.code == 'HOSTNAME_MISMATCH' %}table-warning{% elif anomaly.code == 'STATUS_MISMATCH' %}table-info{% elif anomaly.code in ('DUPLICATE_DNS', 'DUPLICATE_IP') %}table-light{% else %}table-secondary{% endif %}">
+            <td>{{ run.id if run else '—' }}</td>
+            <td>{{ anomaly.asset.vm_name if anomaly.asset else '—' }}</td>
+            <td>
+              {% if anomaly.code == 'NO_MATCH' %}<span class="badge bg-danger">{{ anomaly.code }}</span>
+              {% elif anomaly.code == 'HOSTNAME_MISMATCH' %}<span class="badge bg-warning text-dark">{{ anomaly.code }}</span>
+              {% elif anomaly.code == 'STATUS_MISMATCH' %}<span class="badge bg-info text-dark">{{ anomaly.code }}</span>
+              {% elif anomaly.code == 'DUPLICATE_DNS' %}<span class="badge bg-light text-primary">{{ anomaly.code }}</span>
+              {% elif anomaly.code == 'DUPLICATE_IP' %}<span class="badge bg-light text-primary">{{ anomaly.code }}</span>
+              {% elif anomaly.code == 'MATCHED_IP' %}<span class="badge bg-success">{{ anomaly.code }}</span>
+              {% else %}<span class="badge bg-secondary">{{ anomaly.code }}</span>{% endif %}
+            </td>
+            <td class="small">{{ anomaly.description or '—' }}</td>
+            <td>{{ anomaly.detected_at.strftime('%d/%m/%Y %H:%M') if anomaly.detected_at else '—' }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% else %}
+<p class="text-muted">Aucune anomalie trouvées.</p>
+{% endif %}
+{% endblock %}

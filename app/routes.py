@@ -324,6 +324,54 @@ def inventory_export():
     )
 
 
+from app.queries import compare_runs, get_anomalies_list
+from app.models import Run
+
+
+# ---------- Comparaison de runs ----------
+@main_bp.route("/compare", methods=["GET"])
+@login_required
+def compare_page():
+    """Page de comparaison de deux runs (cahier §8.6)."""
+    runs = db.session.query(Run).order_by(Run.id.desc()).all()
+    comparison = None
+    run1_id = request.args.get("run1", type=int)
+    run2_id = request.args.get("run2", type=int)
+
+    if run1_id and run2_id:
+        comparison = compare_runs(run1_id, run2_id)
+
+    return render_template(
+        "compare.html",
+        runs1=runs,
+        runs2=runs,
+        comparison=comparison,
+    )
+
+
+# ---------- Anomalies ----------
+@main_bp.route("/anomalies", methods=["GET"])
+@login_required
+def anomalies_list():
+    """Liste des anomalies (cahier §8.6)."""
+    filter_type = request.args.get("type", "")
+    run_id = request.args.get("run", type=int)
+
+    if run_id:
+        anomalies = get_anomalies_list(run_id=run_id, anomaly_type=filter_type)
+    else:
+        anomalies = get_anomalies_list(anomaly_type=filter_type)
+
+    runs = db.session.query(Run).order_by(Run.id.desc()).all()
+    return render_template(
+        "anomalies.html",
+        anomalies=anomalies,
+        runs=runs,
+        filter_type=filter_type,
+        filter_run=run_id,
+    )
+
+
 # ---------- Runs (T030) : liste et détail ----------
 @main_bp.route("/runs")
 @login_required

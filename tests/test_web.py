@@ -746,6 +746,296 @@ def test_inventory_without_run_shows_an_empty_state(app):
     assert 'id="inventory"' not in body
 
 
+# --- T033 — Pages comparaison et anomalies ------------------------------------
+
+def test_compare_page_anonymous_redirects_to_login(app):
+    """GET /compare sans session : redirection vers /login (RG26)."""
+    client = app.test_client()
+
+    response = client.get("/compare")
+
+    assert response.status_code == 302
+    assert urlparse(response.headers["Location"]).path == "/login"
+
+
+def test_compare_page_renders_with_two_runs(app, db):
+    """Page comparaison : rendu avec deux runs et données de comparaison."""
+    from datetime import datetime
+    from app.models import Run, ConsolidatedAsset, Asset
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Run 1 avec des VMs
+    run1 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run1)
+    db.session.commit()
+
+    asset1 = Asset(
+        vm_id="vm-001", vm_name="vm-001", node="pve1", type="qemu",
+        status="running", match_status="MATCHED_NAME", source="VIRT",
+        consolidated_run_id=run1.id,
+    )
+    db.session.add(asset1)
+    db.session.commit()
+
+    ca1 = ConsolidatedAsset(
+        run_id=run1.id, asset_id=asset1.id,
+        ip_final="10.0.0.1", dns_final="vm-001.internal",
+        match_status="MATCHED_NAME", vm_status="running",
+    )
+    db.session.add(ca1)
+    db.session.commit()
+
+    # Run 2 avec des VMs différentes
+    run2 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run2)
+    db.session.commit()
+
+    asset2 = Asset(
+        vm_id="vm-002", vm_name="vm-002", node="pve1", type="qemu",
+        status="running", match_status="NO_MATCH", source="VIRT",
+        consolidated_run_id=run2.id,
+    )
+    db.session.add(asset2)
+    db.session.commit()
+
+    ca2 = ConsolidatedAsset(
+        run_id=run2.id, asset_id=asset2.id,
+        ip_final="10.0.0.2", dns_final="vm-002.internal",
+        match_status="NO_MATCH", vm_status="running",
+    )
+    db.session.add(ca2)
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    body = _body(client, f"/compare?run1={run1.id}&run2={run2.id}")
+
+    assert f"Comparaison des runs {run1.id} et {run2.id}" in body
+    # VMs apparaissent dans les listes ajout/suppression
+    assert "vm-001" in body  # dans "Suppressions"
+    assert "vm-002" in body  # dans "Ajouts"
+
+
+def test_compare_page_shows_added_removed_changed(app, db):
+    """Page comparaison : affiche les VMs ajoutées, supprimées et modifiées."""
+    from datetime import datetime
+    from app.models import Run, ConsolidatedAsset, Asset
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Run 1 avec une VM
+    run1 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run1)
+    db.session.commit()
+
+    asset1 = Asset(
+        vm_id="vm-001", vm_name="vm-001", node="pve1", type="qemu",
+        status="running", match_status="MATCHED_NAME", source="VIRT",
+        consolidated_run_id=run1.id,
+    )
+    db.session.add(asset1)
+    db.session.commit()
+
+    ca1 = ConsolidatedAsset(
+        run_id=run1.id, asset_id=asset1.id,
+        ip_final="10.0.0.1", dns_final="vm-001.internal",
+        match_status="MATCHED_NAME", vm_status="running",
+    )
+    db.session.add(ca1)
+    db.session.commit()
+
+    # Run 2 avec une VM en plus et une en moins
+    run2 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run2)
+    db.session.commit()
+
+    asset2 = Asset(
+        vm_id="vm-002", vm_name="vm-002", node="pve1", type="qemu",
+        status="running", match_status="MATCHED_NAME", source="VIRT",
+        consolidated_run_id=run2.id,
+    )
+    db.session.add(asset2)
+    db.session.commit()
+
+    ca2 = ConsolidatedAsset(
+        run_id=run2.id, asset_id=asset2.id,
+        ip_final="10.0.0.2", dns_final="vm-002.internal",
+        match_status="MATCHED_NAME", vm_status="running",
+    )
+    db.session.add(ca2)
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    body = _body(client, f"/compare?run1={run1.id}&run2={run2.id}")
+
+    # vm-001 a été supprimée du run2 (apparait dans "Suppressions")
+    assert "vm-001" in body
+    # vm-002 a été ajoutée au run2 (apparait dans "Ajouts")
+    assert "vm-002" in body
+
+
+def test_compare_page_different_vm_between_runs(app, db):
+    """Page comparaison : deux runs avec VM modifiée entre les deux.
+
+    L'instantané du run concerné s'affiche, pas la valeur actuelle de l'asset.
+    Ce test vérifie le comportement de comparaison avec des VMs différentes.
+    """
+    from datetime import datetime
+    from app.models import Run, ConsolidatedAsset, Asset
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Run ancien avec VM vm-old-01
+    run_old = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run_old)
+    db.session.commit()
+
+    asset_old = Asset(
+        vm_id="test-vm-old-01", vm_name="vm-old-01", node="pve1", type="qemu",
+        status="running", match_status="MATCHED_NAME", source="VIRT",
+        consolidated_run_id=run_old.id,
+    )
+    db.session.add(asset_old)
+    db.session.commit()
+
+    ca_old = ConsolidatedAsset(
+        run_id=run_old.id, asset_id=asset_old.id,
+        ip_final="10.0.0.5", dns_final="vm-old-01.old.lan",
+        match_status="MATCHED_NAME", vm_status="running",
+    )
+    db.session.add(ca_old)
+    db.session.commit()
+
+    # Run nouveau : la VM a été modifiée (nouvelle IP, nouveau status)
+    run_new = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run_new)
+    db.session.commit()
+
+    # Modification de l'asset : nouvelle IP et status arrêtés
+    asset_old.ip_reported = "10.0.0.99"
+    asset_old.status = "stopped"
+    asset_old.consolidated_run_id = run_new.id
+    db.session.add(asset_old)
+    db.session.flush()
+
+    ca_new = ConsolidatedAsset(
+        run_id=run_new.id, asset_id=asset_old.id,
+        ip_final="10.0.0.99", dns_final="vm-old-01.new.lan",
+        match_status="MATCHED_NAME", vm_status="stopped",
+    )
+    db.session.add(ca_new)
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    # Comparaison : run ancien vs run nouveau
+    body = _body(client, f"/compare?run1={run_old.id}&run2={run_new.id}")
+
+    # Les instantanés doivent être affichés
+    assert "10.0.0.5" in body  # ip_final de l'instantané ancien
+    assert "vm-old-01.old.lan" in body  # dns_final de l'instantané ancien
+    assert "10.0.0.99" in body  # ip_final de l'instantané nouveau
+    assert "vm-old-01.new.lan" in body  # dns_final de l'instantané nouveau
+
+
+def test_anomalies_page_anonymous_redirects_to_login(app):
+    """GET /anomalies sans session : redirection vers /login (RG26)."""
+    client = app.test_client()
+
+    response = client.get("/anomalies")
+
+    assert response.status_code == 302
+    assert urlparse(response.headers["Location"]).path == "/login"
+
+
+def test_anomalies_page_renders_with_anomalies(app, db):
+    """Page anomalies : rendu avec des anomalies détectées."""
+    from datetime import datetime
+    from app.models import Run, Anomaly
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Run avec des anomalies
+    run = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run)
+    db.session.commit()
+
+    # Ajoute quelques anomalies
+    db.session.add(Anomaly(
+        run_id=run.id, code="DUPLICATE_DNS",
+        description="DNS en double pour cette VM",
+        detected_at=NOW,
+    ))
+    db.session.add(Anomaly(
+        run_id=run.id, code="NO_MATCH",
+        detected_at=NOW,
+    ))
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    body = _body(client, "/anomalies")
+
+    assert "DUPLICATE_DNS" in body
+    assert "NO_MATCH" in body
+
+
+def test_anomalies_page_with_run_filter(app, db):
+    """Page anomalies : filtre par run ID."""
+    from datetime import datetime
+    from app.models import Run, Anomaly
+
+    NOW = datetime(2026, 1, 1, 12, 0, 0)
+
+    # Deux runs
+    run1 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run1)
+    db.session.commit()
+
+    run2 = Run(status="SUCCESS", start_date=NOW)
+    db.session.add(run2)
+    db.session.commit()
+
+    # Anomalies sur run1
+    db.session.add(Anomaly(
+        run_id=run1.id, code="DUPLICATE_DNS",
+        description="DNS en double",
+        detected_at=NOW,
+    ))
+    db.session.add(Anomaly(
+        run_id=run1.id, code="STATUS_MISMATCH",
+        detected_at=NOW,
+    ))
+    db.session.commit()
+
+    # Anomalies sur run2
+    db.session.add(Anomaly(
+        run_id=run2.id, code="NO_MATCH",
+        detected_at=NOW,
+    ))
+    db.session.commit()
+
+    client = app.test_client()
+    _login(client)
+
+    # Le filtre propose tous les codes : seules les pastilles du tableau (<span>) disent ce qui est affiché
+    body = _body(client, f"/anomalies?run={run1.id}")
+    assert ">DUPLICATE_DNS</span>" in body
+    assert ">STATUS_MISMATCH</span>" in body
+    assert ">NO_MATCH</span>" not in body
+
+    body2 = _body(client, f"/anomalies?run={run2.id}")
+    assert ">NO_MATCH</span>" in body2
+    assert ">DUPLICATE_DNS</span>" not in body2
+    assert ">STATUS_MISMATCH</span>" not in body2
+
+
 # --- T030 — Pages runs et détail historique ------------------------------------
 
 def test_runs_list_anonymous_redirects_to_login(app):

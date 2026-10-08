@@ -20,6 +20,7 @@ from app.queries import (
     _inventory_rows,
     build_inventory_query,
     export_inventory_csv,
+    compare_runs,
     get_run_comparison_data,
     get_stats_data,
     serialize_inventory_item,
@@ -266,46 +267,7 @@ def api_run_compare():
     db.get_or_404(Run, run1_id)
     db.get_or_404(Run, run2_id)
 
-    data1 = get_run_comparison_data(run1_id)
-    data2 = get_run_comparison_data(run2_id)
-
-    names1 = set(data1.keys())
-    names2 = set(data2.keys())
-
-    added = [
-        {"vm_name": name, "status": data2[name][0].vm_status}
-        for name in sorted(names2 - names1)
-    ]
-    removed = [
-        {"vm_name": name, "status": data1[name][0].vm_status}
-        for name in sorted(names1 - names2)
-    ]
-
-    changed = []
-    for name in sorted(names1 & names2):
-        ca1, _, _ = data1[name]
-        ca2, _, _ = data2[name]
-        diffs = []
-        if ca1.ip_final != ca2.ip_final:
-            diffs.append({"field": "IP", "before": ca1.ip_final, "after": ca2.ip_final})
-        if ca1.dns_final != ca2.dns_final:
-            diffs.append({"field": "DNS", "before": ca1.dns_final, "after": ca2.dns_final})
-        if ca1.match_status != ca2.match_status:
-            diffs.append(
-                {"field": "Match", "before": ca1.match_status, "after": ca2.match_status}
-            )
-        if ca1.vm_status != ca2.vm_status:
-            diffs.append({"field": "Status", "before": ca1.vm_status, "after": ca2.vm_status})
-        if diffs:
-            changed.append({"vm_name": name, "changes": diffs})
-
-    return jsonify({
-        "run1": run1_id,
-        "run2": run2_id,
-        "added": added,
-        "removed": removed,
-        "changed": changed,
-    })
+    return jsonify(compare_runs(run1_id, run2_id))
 
 
 @api_bp.route("/runs/purge", methods=["POST"])

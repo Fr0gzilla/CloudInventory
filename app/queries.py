@@ -165,6 +165,74 @@ def get_run_comparison_data(run_id):
     return {asset.vm_name: (ca, asset, ipam) for ca, asset, ipam in rows}
 
 
+def compare_runs(run1_id, run2_id):
+    """Comparaison de deux runs : ajouts, suppressions, modifications.
+
+    Lit exclusivement l'instantané ``consolidated_asset`` (ip_final, dns_final,
+    match_status, vm_status), jamais la ligne ``asset``.
+
+    Returns:
+        dict avec clefs ``added``, ``removed``, ``changed`` conformes au contrat
+        de l'API T010 §9 (voir ``api_run_compare``).
+    """
+    data1 = get_run_comparison_data(run1_id)
+    data2 = get_run_comparison_data(run2_id)
+
+    names1 = set(data1.keys())
+    names2 = set(data2.keys())
+
+    added = [
+        {"vm_name": name, "status": data2[name][0].vm_status}
+        for name in sorted(names2 - names1)
+    ]
+    removed = [
+        {"vm_name": name, "status": data1[name][0].vm_status}
+        for name in sorted(names1 - names2)
+    ]
+
+    changed = []
+    for name in sorted(names1 & names2):
+        ca1, _, _ = data1[name]
+        ca2, _, _ = data2[name]
+        diffs = []
+        if ca1.ip_final != ca2.ip_final:
+            diffs.append({"field": "IP", "before": ca1.ip_final, "after": ca2.ip_final})
+        if ca1.dns_final != ca2.dns_final:
+            diffs.append({"field": "DNS", "before": ca1.dns_final, "after": ca2.dns_final})
+        if ca1.match_status != ca2.match_status:
+            diffs.append(
+                {"field": "Match", "before": ca1.match_status, "after": ca2.match_status}
+            )
+        if ca1.vm_status != ca2.vm_status:
+            diffs.append({"field": "Status", "before": ca1.vm_status, "after": ca2.vm_status})
+        if diffs:
+            changed.append({"vm_name": name, "changes": diffs})
+
+    return {
+        "run1": run1_id,
+        "run2": run2_id,
+        "added": added,
+        "removed": removed,
+        "changed": changed,
+    }
+
+
+def get_anomalies_list(anomaly_type="", run_id=None):
+    """Liste des anomalies avec filtrage optionnel par type et run.
+
+    Returns:
+        list de tuples (anomaly, run) triées par detected_at décroissant.
+    """
+    query = db.session.query(Anomaly, Run).join(Anomaly.run).order_by(Anomaly.detected_at.desc())
+
+    if anomaly_type:
+        query = query.filter(Anomaly.code == anomaly_type)
+    if run_id:
+        query = query.filter(Anomaly.run_id == run_id)
+
+    return query.all()
+
+
 def export_inventory_csv(run_id):
     """Contenu CSV (séparateur `;`) de l'inventaire d'un run (web + API).
 
