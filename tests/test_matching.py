@@ -145,6 +145,46 @@ def test_priority_order_name_over_fqdn_over_ip():
     assert status == "MATCHED_FQDN"
 
 
+def test_monitoring_dns_tiebreak_by_ip():
+    """T032 : monitoring VM ip_reported=10.0.4.10 doit préférer l'enregistrement dont l'IP matche."""
+    vm_name = "monitoring"
+    vm_fqdn = "monitoring.supervision.local"
+    vm_ip_reported = "10.0.4.10"
+    ipam_records = [
+        {"ip": "10.0.4.10", "dns_name": "monitoring", "status": "active", "tenant": "Supervision", "site": "DC1", "meta_zone": "ZCS"},
+        {"ip": "10.0.8.50", "dns_name": "monitoring", "status": "active", "tenant": "Supervision", "site": "DC2", "meta_zone": "ZCS"},
+    ]
+    dns_index = match.build_dns_index(ipam_records)
+    ip_index = match.build_ip_index(ipam_records)
+    status, raw = match.resolve_match(
+        vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index, ipam_records,
+    )
+    assert status == "MATCHED_NAME", f"Expected MATCHED_NAME, got {status}"
+    assert raw.get("ip") == "10.0.4.10", f"Expected ip 10.0.4.10, got {raw.get('ip')}"
+    assert raw.get("dns_name") == "monitoring"
+    assert raw.get("site") == "DC1", f"Expected site DC1, got {raw.get('site')}"
+
+
+def test_monitoring_dns_fallback_no_ip_match():
+    """T032 : doublon DNS sans IP correspondante garde le comportement d'avant (dernier)."""
+    vm_name = "monitoring"
+    vm_fqdn = "monitoring.supervision.local"
+    vm_ip_reported = "10.0.0.99"  # IP qui n'appartient à aucun enregistrement en doublon
+    ipam_records = [
+        {"ip": "10.0.4.10", "dns_name": "monitoring", "status": "active", "tenant": "Supervision", "site": "DC1", "meta_zone": "ZCS"},
+        {"ip": "10.0.8.50", "dns_name": "monitoring", "status": "active", "tenant": "Supervision", "site": "DC2", "meta_zone": "ZCS"},
+    ]
+    dns_index = match.build_dns_index(ipam_records)
+    ip_index = match.build_ip_index(ipam_records)
+    status, raw = match.resolve_match(
+        vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index, ipam_records,
+    )
+    # Sans IP correspondante parmi les doublons, on garde le dernier enregistrement (comportement d'avant)
+    assert status == "MATCHED_NAME", f"Expected MATCHED_NAME, got {status}"
+    assert raw.get("ip") == "10.0.8.50", f"Expected last record ip 10.0.8.50, got {raw.get('ip')}"
+    assert raw.get("dns_name") == "monitoring"
+
+
 def test_normalize_used_by_match():
     """Vérifier que resolve_match utilise bien normalize_hostname/normalize_fqdn."""
     import inspect

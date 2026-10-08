@@ -49,14 +49,14 @@ def build_ip_index(ipam_records):
     return index
 
 
-def resolve_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index):
+def resolve_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index, ipam_records=None):
     """Détermine le niveau de matching 4 niveaux pour une VM.
 
     Stratégie (RG01 → RG05) :
       1. MATCHED_NAME : hostname normalisé en clé DNS
       2. MATCHED_FQDN : premier segment du FQDN normalisé en clé DNS
       3. MATCHED_IP   : IP reportée en clé IP
-      4. NO_MATCH     : rien trouvé
+      4. NO_MATCH     : aucune des stratégies précédentes n'a matché
 
     Args:
         vm_name: nom de la VM (vm_name de l'asset).
@@ -64,6 +64,10 @@ def resolve_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index):
         vm_ip_reported: IP rapportée par la VM (ip_reported de l'asset), peut être ``None``.
         dns_index: dict ``{hostname_normalisé → record_ipam}`` issu de ``build_dns_index``.
         ip_index: dict ``{adresse_ip → record_ipam}`` issu de ``build_ip_index``.
+        ipam_records: liste optionnelle de dicts enregistrements IPAM ; si fournie,
+            parmi les doublons DNS pour le nom matcheé, on préfère celui dont
+            l'IP correspond à ``vm_ip_reported » (si aucun ne matche, comportement
+            historique conservé).
 
     Returns:
         tuple ``(match_status, record_ipam)`` où::
@@ -74,7 +78,15 @@ def resolve_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index):
     # Stratégie 1 : MATCHED_NAME (RG02)
     vm_key = normalize_hostname(vm_name)
     if vm_key in dns_index:
-        return "MATCHED_NAME", dns_index[vm_key]
+        raw = dns_index[vm_key]
+        # Si des enregistrements d'entrée sont fournis, chercher parmi les doublons
+        # DNS celui dont l'IP matche l'IP rapportée par la VM (priorité IP parmi doublons).
+        if ipam_records is not None and vm_ip_reported:
+            for rec in ipam_records:
+                if normalize_hostname(rec.get("dns_name")) == vm_key and rec.get("ip") == vm_ip_reported:
+                    raw = rec
+                    break
+        return "MATCHED_NAME", raw
 
     # Stratégie 2 : MATCHED_FQDN (RG03)
     fqdn_key = normalize_fqdn(vm_fqdn)
@@ -113,6 +125,7 @@ def compute_levels(vm_list, ipam_records):
             vm.get("ip_reported"),
             dns_index,
             ip_index,
+            ipam_records,
         )
         result[vm_id] = (status, record)
     return result

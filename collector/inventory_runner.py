@@ -184,7 +184,9 @@ def _consolidate(run_id, assets, ipam, records, detected_at):
     rows = {}
     for asset in assets:
         # RG01 → RG05 : nom, FQDN, IP, puis NO_MATCH
-        status, raw = resolve_match(asset.vm_name, asset.fqdn, asset.ip_reported, dns_index, ip_index)
+        status, raw = resolve_match(
+            asset.vm_name, asset.fqdn, asset.ip_reported, dns_index, ip_index, ipam
+        )
         record = records[(raw["ip"], raw["dns_name"])] if raw else None
         role = deduce_role(asset.vm_name, asset.tags)  # RG15, RG16
         counts[status] += 1

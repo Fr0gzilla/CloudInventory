@@ -126,6 +126,27 @@ def test_doublon_sans_asset_rattache_a_l_enregistrement(db):
     assert run.status == "SUCCESS"
 
 
+def test_monitoring_dns_tiebreak_ip_final(db):
+    """T032 : monitoring VM rapprochée par son IP 10.0.4.10 → ip_final=10.0.4.10, site DC1.
+    Le doublon DNS (10.0.4.10/DC1 et 10.0.8.50/DC2) est conservé (DUPLICATE_DNS levée),
+    mais le matching privilégie l'enregistrement dont l'IP matche l'IP rapportée par la VM."""
+    run = _run()
+
+    rows = _rows(run)
+    monitoring = rows["monitoring"]
+    # Doit être matcheé par nom (MATCHED_NAME) avec l'enregistrement 10.0.4.10/DC1
+    assert monitoring.match_status == "MATCHED_NAME"
+    assert monitoring.ip_final == "10.0.4.10", f"Expected ip_final 10.0.4.10, got {monitoring.ip_final}"
+    assert monitoring.dns_final == "monitoring", f"Expected dns_final monitoring, got {monitoring.dns_final}"
+    # Le doublon DNS reste levé
+    assert "DUPLICATE_DNS" in json.loads(monitoring.anomaly_codes)
+    # Comptes global inchangés
+    assert run.matched_name_count == 40
+    assert run.matched_fqdn_count == 1
+    assert run.matched_ip_count == 1
+    assert run.no_match_count == 3
+
+
 def test_couple_repete_par_la_source(db):
     """RG18 : un couple (ip, dns_name) répété par la source fait un seul enregistrement, sans doublon signalé."""
     ipam = [{"ip": "10.0.1.10", "dns_name": "web-a500", "status": "active"}] * 2
