@@ -332,6 +332,70 @@ def test_tampered_session_cookie_is_not_accepted(app):
     assert _location_path(response) == "/login"
 
 
+# --- C9 bis — correctifs sécurité T036 ----------------------------------------
+
+def test_session_cookie_secure_in_production(monkeypatch):
+    """En production (APP_ENV=production), le cookie de session porte l'attribut Secure."""
+    # Secrets de test (mêmes valeurs que tests/conftest.py:_TEST_ENV)
+    test_env = {
+        "SECRET_KEY": "test-secret-key-32-bytes-minimum!!",
+        "JWT_SECRET_KEY": "test-jwt-secret-key-32-bytes-min!!",
+        "ADMIN_PASSWORD": "test-admin-password",
+        "DATABASE_URL": "sqlite:///:memory:",
+    }
+    for name, value in test_env.items():
+        monkeypatch.setenv(name, value)
+    monkeypatch.setenv("APP_ENV", "production")
+
+    from app import create_app
+    from app.config import Config
+    from app.extensions import db
+
+    class TestConfig(Config):
+        TESTING = True
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
+    application = create_app(TestConfig)
+    client = application.test_client()
+
+    response = client.get("/login")
+    cookie = _session_cookie(response, application.config["SESSION_COOKIE_NAME"])
+
+    assert cookie is not None, "aucun cookie de session posé sur GET /login"
+    assert "Secure" in cookie, f"cookie Secure absent en production : {cookie}"
+
+    with application.app_context():
+        db.session.remove()
+        db.drop_all()
+
+
+def test_csp_style_src_self(app):
+    """Sur une page non-apidocs, la CSP contient "style-src 'self'" sans 'unsafe-inline'."""
+    client = app.test_client()
+
+    response = client.get("/login")
+
+    assert response.status_code == 200
+    csp = response.headers.get("Content-Security-Policy")
+    assert csp, "CSP absente"
+    assert "style-src 'self'" in csp, f"style-src 'self' manquant dans CSP : {csp}"
+    assert "unsafe-inline" not in csp, f"'unsafe-inline' ne doit pas être dans la CSP hors apidocs : {csp}"
+
+
+def test_hsts_header_without_include_subdomains(app):
+    """Sur une réponse HTTPS, l'en-tête HSTS vaut 'max-age=31536000' sans includeSubDomains."""
+    client = app.test_client()
+
+    # Simuler une requête HTTPS via environ_overrides
+    response = client.get("/login", environ_overrides={"wsgi.url_scheme": "https"})
+
+    assert response.status_code == 200
+    hsts = response.headers.get("Strict-Transport-Security")
+    assert hsts, "HSTS absent sur réponse HTTPS"
+    assert hsts == "max-age=31536000", f"HSTS inattendu : {hsts}"
+    assert "includeSubDomains" not in hsts, f"includeSubDomains ne doit pas être présent : {hsts}"
+
+
 # --- C10 — mot de passe haché uniquement -------------------------------------
 def test_admin_password_is_stored_only_as_hash(app):
     """Après amorçage, la configuration ne conserve que le hash du mot de

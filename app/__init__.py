@@ -18,7 +18,7 @@ jwt = JWTManager()
 # En-tête CSP : ressources et scripts uniquement depuis l'origine — les
 # templates (T008+) doivent charger leurs scripts via des fichiers, pas inline.
 CONTENT_SECURITY_POLICY = (
-    "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+    "default-src 'self'; img-src 'self' data:; style-src 'self'; "
     "script-src 'self'; frame-ancestors 'none'; base-uri 'self'; "
     "form-action 'self'; object-src 'none'"
 )
@@ -90,9 +90,9 @@ def _finalize_config(app, config_class):
 
     app.config["SESSION_COOKIE_HTTPONLY"] = True
     app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
-    app.config["SESSION_COOKIE_SECURE"] = app.config["SESSION_COOKIE_SECURE"] or (
-        os.getenv("SESSION_COOKIE_SECURE", "false").lower() == "true"
-    )
+    app_env = os.getenv("APP_ENV", "production").lower()
+    insecure_envs = {"test", "development", "local", "false"}
+    app.config["SESSION_COOKIE_SECURE"] = app_env not in insecure_envs
     app.config.setdefault("ADMIN_USERNAME", os.getenv("ADMIN_USERNAME", "admin"))
     app.config.setdefault("LOGIN_MAX_ATTEMPTS", login_max_attempts)
     app.config.setdefault("LOGIN_LOCKOUT_SECONDS", login_lockout_seconds)
@@ -171,9 +171,7 @@ def create_app(config_class=Config):
             "camera=(), microphone=(), geolocation=()"
         )
         if request.is_secure:
-            response.headers["Strict-Transport-Security"] = (
-                "max-age=31536000; includeSubDomains"
-            )
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         return response
 
     with app.app_context():
