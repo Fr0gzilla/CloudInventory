@@ -109,6 +109,12 @@ def run_inventory(collect_vms=None, collect_ipam=None, now=None):
         "Run #%d terminé — %d par nom, %d par FQDN, %d par IP, %d sans correspondance",
         run_id, run.matched_name_count, run.matched_fqdn_count, run.matched_ip_count, run.no_match_count,
     )
+    try:
+        from app.notifications import notify_run
+
+        notify_run(run)
+    except Exception:
+        logger.warning("Échec des notifications du run #%d ; SUCCESS conservé", run_id)
     return run
 
 

@@ -106,10 +106,13 @@
             </a>
           </li>
           {% endif %}
-          {% if route_exists('main.anomalies_list') %}
+          {% if route_exists('main.inventory') %}
           <li class="nav-item">
-            <a class="nav-link{% if request.endpoint == 'main.anomalies_list' %} active{% endif %}" href="{{ url_for('main.anomalies_list') }}">
+            <a class="nav-link" href="{{ url_for('main.inventory') }}" title="Consulter les anomalies dans l’inventaire">
               <i class="bi bi-exclamation-triangle me-1" aria-hidden="true"></i>Anomalies
+              {% if navbar_anomaly_count is defined and navbar_anomaly_count > 0 %}
+              <span class="badge rounded-pill bg-danger ms-1">{{ navbar_anomaly_count }}<span class="visually-hidden"> anomalie{{ 's' if navbar_anomaly_count > 1 else '' }}</span></span>
+              {% endif %}
             </a>
           </li>
           {% endif %}
@@ -144,6 +147,36 @@
       </div>
       {% endfor %}
     {% endwith %}
+
+    {% if request.endpoint != 'main.dashboard' and navbar_anomaly_count is defined and navbar_anomaly_count > 0 and navbar_last_run_id %}
+    <div class="alert alert-warning ci-alert-anomalies alert-dismissible fade show mb-4" role="alert">
+      <div class="d-flex align-items-start gap-3">
+        <i class="bi bi-exclamation-triangle-fill fs-4 text-danger" aria-hidden="true"></i>
+        <div>
+          <p class="mb-2">
+            <strong>{{ navbar_anomaly_count }} anomalie{{ 's' if navbar_anomaly_count > 1 else '' }}</strong>
+            détectée{{ 's' if navbar_anomaly_count > 1 else '' }} sur le run #{{ navbar_last_run_id }}
+          </p>
+          <div>
+            {% for code, count in navbar_anomaly_details.items() %}
+            <span class="badge ci-anomaly-type
+              {% if code == 'NO_MATCH' %}bg-danger
+              {% elif code == 'STATUS_MISMATCH' %}bg-warning text-dark
+              {% elif code == 'HOSTNAME_MISMATCH' %}ci-badge-orange text-dark
+              {% elif code in ('DUPLICATE_DNS', 'DUPLICATE_IP') %}ci-badge-purple
+              {% else %}bg-secondary{% endif %}">{{ code }} : {{ count }}</span>
+            {% endfor %}
+          </div>
+          {% if route_exists('main.inventory') %}
+          <a href="{{ url_for('main.inventory') }}" class="btn btn-sm btn-outline-danger mt-2">
+            <i class="bi bi-search me-1" aria-hidden="true"></i>Consulter l’inventaire
+          </a>
+          {% endif %}
+        </div>
+      </div>
+      <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+    </div>
+    {% endif %}
 
     {% block content %}{% endblock %}
   </main>

@@ -40,6 +40,9 @@ class Config:
                 ". Renseignez-les (cf. .env.example) avant de démarrer."
             )
         cls.SQLALCHEMY_DATABASE_URI = os.getenv("DATABASE_URL", DEFAULT_DATABASE_URL)
+        from app.notifications import register_notifications
+
+        register_notifications()
 
     @classmethod
     def use_mock_virt(cls) -> bool:
