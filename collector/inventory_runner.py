@@ -17,8 +17,9 @@ avec son message (RG20) ; rien d'autre n'est écrit.
 """
 import json
 import logging
+import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 import collector
 from app.extensions import db
@@ -31,6 +32,7 @@ from collector.anomalies import (
 )
 from collector.matching import build_dns_index, build_ip_index, resolve_match
 from collector.role import deduce_role
+from collector.netbox_client import RUN_BUDGET, RUN_DEADLINE, remaining_timeout
 
 logger = logging.getLogger("cloudinventory.runner")
 
@@ -65,17 +67,32 @@ def run_inventory(collect_vms=None, collect_ipam=None, now=None):
     collect_vms = collect_vms or collector.collect_vms
     collect_ipam = collect_ipam or collector.collect_ipam
     now = now or _utcnow
+    deadline = time.monotonic() + RUN_BUDGET
+    started_at = now()
+    db.session.execute(
+        db.update(Run).where(
+            Run.status == "RUNNING",
+            Run.start_date < started_at - timedelta(seconds=RUN_BUDGET),
+        ).values(
+            status="FAIL", end_date=started_at,
+            error_message="Collecte interrompue ou budget dépassé",
+        )
+    )
 
     # 1. Initialisation (RG17) : validée seule, la trace du run survit au rollback d'un échec.
-    run = Run(status="RUNNING", start_date=now())
+    run = Run(status="RUNNING", start_date=started_at)
     db.session.add(run)
     db.session.commit()
     run_id = run.id
     logger.info("Run #%d démarré", run_id)
 
+    deadline_token = RUN_DEADLINE.set(deadline)
     try:
+        remaining_timeout(RUN_BUDGET)
         vms = collect_vms()     # 2. collecte virtualisation (RG31, RG32)
+        remaining_timeout(RUN_BUDGET)
         ipam = collect_ipam()   # 3. collecte IPAM (RG33, RG34)
+        remaining_timeout(RUN_BUDGET)
         raw_ipam = ipam
         # Un couple (ip, dns_name) répété par la source ne fait qu'un enregistrement (RG18) :
         # matching et doublons portent sur ce qui est enregistré.
@@ -90,6 +107,10 @@ def run_inventory(collect_vms=None, collect_ipam=None, now=None):
             row.anomaly_codes = json.dumps(codes)
 
         # 7. Finalisation (RG19)
+        remaining_timeout(RUN_BUDGET)
+        db.session.refresh(run, ["status"])
+        if run.status != "RUNNING":
+            raise TimeoutError("Collecte interrompue ou budget dépassé")
         run.matched_name_count = counts["MATCHED_NAME"]
         run.matched_fqdn_count = counts["MATCHED_FQDN"]
         run.matched_ip_count = counts["MATCHED_IP"]
@@ -105,6 +126,8 @@ def run_inventory(collect_vms=None, collect_ipam=None, now=None):
         run.error_message = _error_message(exc)
         db.session.commit()
         return run
+    finally:
+        RUN_DEADLINE.reset(deadline_token)
 
     logger.info(
         "Run #%d terminé — %d par nom, %d par FQDN, %d par IP, %d sans correspondance",

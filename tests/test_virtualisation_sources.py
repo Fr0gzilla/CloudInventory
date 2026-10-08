@@ -57,12 +57,14 @@ def no_network(monkeypatch):
         raise AssertionError("appel réseau interdit dans les tests")
 
     monkeypatch.setattr(urllib.request, "urlopen", _forbidden)
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", _forbidden)
 
 
 @pytest.fixture()
 def proxmox_env(monkeypatch):
     """Cible et jetons factices, USE_MOCK_VIRT retiré (état propre par test)."""
     monkeypatch.delenv("USE_MOCK_VIRT", raising=False)
+    monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("PROXMOX_URL", "https://pve.test:8006/")
     monkeypatch.setenv("PROXMOX_TOKEN_ID", _TOKEN_ID)
     monkeypatch.setenv("PROXMOX_TOKEN_SECRET", _TOKEN_SECRET)

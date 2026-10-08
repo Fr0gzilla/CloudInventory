@@ -320,6 +320,7 @@ def _publish_smb(export_dir, remote, retention, config):
         parts[0], username=config.get("smb_username") or None,
         password=config.get("smb_password") or None,
         connection_timeout=10,
+        encrypt=True,
     )
     try:
         smbclient.makedirs(remote, exist_ok=True)

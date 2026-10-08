@@ -23,6 +23,7 @@ _TEST_ENV = {
     "JWT_SECRET_KEY": "test-jwt-secret-key",
     "ADMIN_PASSWORD": "test-admin-password",
     "DATABASE_URL": "sqlite:///:memory:",
+    "APP_ENV": "test",
 }
 
 NOW = datetime(2026, 1, 1, 12, 0, 0)

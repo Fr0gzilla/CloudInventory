@@ -15,8 +15,14 @@ PROXMOX_TOKEN_SECRET, PROXMOX_VERIFY_SSL) — aucun secret en dur.
 import json
 import os
 import ssl
+import time
 import urllib.error
 import urllib.request
+
+from collector.netbox_client import (
+    RUN_BUDGET, RUN_DEADLINE, MAX_BYTES_PER_PAGE, _NoRedirect,
+    https_origin, remaining_timeout, verify_tls_setting,
+)
 
 DEFAULT_TIMEOUT = 15  # secondes, par appel HTTP
 
@@ -26,8 +32,18 @@ class ProxmoxClientError(RuntimeError):
 
 
 def _ssl_context(verify_ssl):
-    """Contexte SSL : vérification pilotée par PROXMOX_VERIFY_SSL (défaut false)."""
+    """Contexte SSL : vérification pilotée par PROXMOX_VERIFY_SSL (défaut true)
+    et PROXMOX_CA_BUNDLE optionnel à charger."""
     context = ssl.create_default_context()
+    # Charger un bundle CA personnalisé si configuré
+    ca_bundle = os.getenv("PROXMOX_CA_BUNDLE")
+    if ca_bundle:
+        try:
+            context.load_verify_locations(cafile=ca_bundle)
+        except (ssl.SSLError, OSError) as exc:
+            raise ProxmoxClientError(
+                "Proxmox: impossible de charger le bundle CA"
+            ) from exc
     if not verify_ssl:
         context.check_hostname = False
         context.verify_mode = ssl.CERT_NONE
@@ -37,10 +53,14 @@ def _ssl_context(verify_ssl):
 def _default_transport(url, headers, timeout, verify_ssl):
     """Appel HTTP réel (urllib) — remplacé par un objet de remplacement en test."""
     request = urllib.request.Request(url, headers=headers, method="GET")
-    with urllib.request.urlopen(
-        request, timeout=timeout, context=_ssl_context(verify_ssl)
-    ) as response:
-        return json.loads(response.read())
+    opener = urllib.request.build_opener(
+        _NoRedirect(), urllib.request.HTTPSHandler(context=_ssl_context(verify_ssl))
+    )
+    with opener.open(request, timeout=timeout) as response:
+        body = response.read(MAX_BYTES_PER_PAGE + 1)
+        if len(body) > MAX_BYTES_PER_PAGE:
+            raise ProxmoxClientError("Proxmox: plafond d'octets par réponse dépassé")
+        return json.loads(body)
 
 
 def _settings():
@@ -52,20 +72,28 @@ def _settings():
             "Proxmox: PROXMOX_TOKEN_ID et PROXMOX_TOKEN_SECRET doivent être "
             "renseignés pour une collecte réelle (USE_MOCK_VIRT=false)"
         )
+    base_url = (os.getenv("PROXMOX_URL") or "https://pve.local:8006").rstrip("/")
+    try:
+        https_origin(base_url)
+        verify_ssl = verify_tls_setting("PROXMOX_VERIFY_SSL")
+    except ValueError as exc:
+        raise ProxmoxClientError(str(exc)) from exc
     return {
-        "base_url": os.getenv("PROXMOX_URL", "https://pve.local:8006").rstrip("/"),
+        "base_url": base_url,
         "headers": {
             "Authorization": f"PVEAPIToken={token_id}={token_secret}",
             "Accept": "application/json",
         },
-        "verify_ssl": os.getenv("PROXMOX_VERIFY_SSL", "false").lower() == "true",
+        "verify_ssl": verify_ssl,
     }
 
 
 def _get_data(transport, url, settings, timeout=DEFAULT_TIMEOUT):
     """Appel Proxmox via le transport, erreur convertie en ProxmoxClientError."""
     try:
+        timeout = remaining_timeout(timeout, settings.get("deadline"))
         payload = transport(url, settings["headers"], timeout, settings["verify_ssl"])
+        remaining_timeout(timeout, settings.get("deadline"))
     except ProxmoxClientError:
         raise
     except urllib.error.HTTPError as exc:
@@ -166,6 +194,8 @@ def fetch_proxmox_vms(transport=None):
             ram_used, disk_max, disk_used, uptime — mêmes clés que le mock.
     """
     settings = _settings()
+    deadline = RUN_DEADLINE.get()
+    settings["deadline"] = deadline if deadline is not None else time.monotonic() + RUN_BUDGET
     if transport is None:
         transport = _default_transport
     base_url = settings["base_url"]

@@ -58,12 +58,14 @@ def no_network(monkeypatch):
         raise AssertionError("appel réseau interdit dans les tests")
 
     monkeypatch.setattr(urllib.request, "urlopen", _forbidden)
+    monkeypatch.setattr(urllib.request.OpenerDirector, "open", _forbidden)
 
 
 @pytest.fixture()
 def netbox_env(monkeypatch):
     """Cible et jeton factices, USE_MOCK_IPAM retiré (état propre par test)."""
     monkeypatch.delenv("USE_MOCK_IPAM", raising=False)
+    monkeypatch.setenv("APP_ENV", "test")
     monkeypatch.setenv("NETBOX_URL", f"{_BASE}/")
     monkeypatch.setenv("NETBOX_TOKEN", _TOKEN)
     monkeypatch.setenv("NETBOX_VERIFY_SSL", "false")
@@ -308,7 +310,7 @@ def test_timeout_raises_an_explicit_error_with_configured_delay(netbox_env):
     message = str(excinfo.value)
     assert "délai dépassé" in message
     assert f"{DEFAULT_TIMEOUT} s" in message
-    assert _ENTRY_URL in message
+    assert "NETBOX_URL" in message
 
 
 def test_http_error_raises_an_explicit_error(netbox_env):
@@ -318,6 +320,45 @@ def test_http_error_raises_an_explicit_error(netbox_env):
     message = str(excinfo.value)
     assert "HTTP 403" in message
     assert "NETBOX_URL" in message
+
+
+def test_http_error_does_not_leak_pagination_url_with_secret(netbox_env):
+    """Régression : l'URL de pagination peut contenir un secret (ex. token en query),
+    le diagnostic doit citer NETBOX_URL et le code HTTP, pas l'URL brute."""
+    pagination_url = f"{_ENTRY_URL}?limit=100&token=secret-value"
+    error = urllib.error.HTTPError(pagination_url, 403, "Forbidden", None, None)
+    with pytest.raises(NetBoxClientError) as excinfo:
+        fetch_ipam_records(transport=RaisingTransport(error))
+    message = str(excinfo.value)
+    assert "HTTP 403" in message
+    assert "NETBOX_URL" in message
+    assert "secret-value" not in message
+    assert "token=" not in message
+    assert pagination_url not in message
+
+
+def test_timeout_does_not_leak_pagination_url_with_secret(netbox_env):
+    """Régression : timeout sur URL de pagination avec paramètre sensible —
+    le diagnostic doit citer NETBOX_URL et le délai, pas l'URL brute."""
+    pagination_url = f"{_ENTRY_URL}?limit=100&api_key=sensitive-key"
+    # Premier appel : retourne une page avec un lien 'next' vers l'URL sensible
+    # Deuxième appel (pagination) : lève TimeoutError
+    def raising_transport(url, headers, timeout, verify_ssl):
+        if url == _ENTRY_URL:
+            return {"count": 1, "next": pagination_url, "results": [{"address": "10.0.0.1/24"}]}
+        if url == pagination_url:
+            raise TimeoutError()
+        raise AssertionError(f"URL inattendue : {url}")
+
+    with pytest.raises(NetBoxClientError) as excinfo:
+        fetch_ipam_records(transport=raising_transport)
+    message = str(excinfo.value)
+    assert "délai dépassé" in message
+    assert f"{DEFAULT_TIMEOUT} s" in message
+    assert "NETBOX_URL" in message
+    assert "sensitive-key" not in message
+    assert "api_key=" not in message
+    assert pagination_url not in message
 
 
 def test_connection_error_raises_an_explicit_error(netbox_env):
