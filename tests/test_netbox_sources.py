@@ -9,7 +9,7 @@ Critères :
 - C5 timeout explicite par appel
 - C6 erreurs explicites (HTTP, connexion, JSON, payload, jeton absent)
 - C7 aucun secret exposé dans les messages d'erreur
-- C8 couverture des 6 anomalies (CAHIER_DES_CHARGES.md:304) avec les deux mocks
+- C8 couverture des 6 anomalies (cahier des charges §304) avec les deux mocks
 - C9 couverture des 4 niveaux de match (docs/modele/regles.md:5) avec les deux mocks
 
 Aucun réseau : `urllib.request.urlopen` est neutralisé par une fixture autouse
@@ -416,7 +416,7 @@ def test_fetch_without_transport_is_blocked_by_the_network_guard(netbox_env):
 
 
 # ══════════════════════════════════════════════════════════════════
-# C8 — couverture des 6 anomalies (CAHIER_DES_CHARGES.md:304)
+# C8 — couverture des 6 anomalies (cahier des charges §304)
 # ══════════════════════════════════════════════════════════════════
 
 def test_mock_dataset_covers_duplicate_dns_anomaly():

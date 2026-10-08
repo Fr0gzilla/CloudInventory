@@ -3,7 +3,7 @@
 Interface identique à ``collector.mock_netbox.fetch_mock_ipam()`` : aucun
 argument obligatoire et mêmes clés de dict (ip, dns_name, status, tenant,
 site, meta_zone), pour que la source réelle et la source simulée soient
-interchangeables (CAHIER_DES_CHARGES.md:36).
+interchangeables (cahier des charges §36).
 
 Le réseau est isolé dans ``transport`` : signature
 ``transport(url, headers, timeout, verify_ssl) -> dict`` (corps JSON complet).

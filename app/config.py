@@ -2,7 +2,7 @@ import os
 
 DEFAULT_DATABASE_URL = "sqlite:///cloudinventory.db"
 
-# Valeurs d'exemple refusées (cf. CAHIER_DES_CHARGES.md : refus si absent ou valeur d'exemple)
+# Valeurs d'exemple refusées (cf. cahier des charges : refus si absent ou valeur d'exemple)
 REJECTED_VALUES = {
     "",
     "change-me",

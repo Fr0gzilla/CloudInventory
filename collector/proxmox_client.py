@@ -3,7 +3,7 @@
 Interface identique à ``collector.mock_virtualisation.fetch_mock_vms()`` :
 aucun argument obligatoire et mêmes clés de dict (os, fqdn et annotation
 compris), pour que la source réelle et la source simulée soient
-interchangeables (CAHIER_DES_CHARGES.md:36).
+interchangeables (cahier des charges §36).
 
 Le réseau est isolé dans ``transport`` : signature
 ``transport(url, headers, timeout, verify_ssl) -> dict`` (corps JSON complet).

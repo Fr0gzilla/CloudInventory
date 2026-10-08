@@ -6,7 +6,7 @@ LOGIN_MAX_ATTEMPTS puis expiration de la fenêtre · C6 route protégée ·
 C7 déconnexion · C8 paramètre `next` externe refusé · C9 cookie de session
 et en-têtes de sécurité · C10 mot de passe admin uniquement haché.
 
-Attendus lus dans CAHIER_DES_CHARGES.md §10.1/§10.3, docs/modele/sequences.md
+Attendus lus dans cahier des charges §10.1/§10.3, docs/modele/sequences.md
 (schéma a) et docs/modele/regles.md (RG25, RG26) — jamais dans le code.
 `regles.md` ne porte aucune RG de limitation des essais (sequences.md:66) :
 C5 est jugé sur CAHIER « Sécurité » + sequences.md.

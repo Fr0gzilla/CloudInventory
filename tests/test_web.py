@@ -25,7 +25,7 @@ neutralisées · C26 export sans run en 404 · C27 fiche asset (métriques,
 historique, anomalies) · C28 fiche inconnue en 404 · C29 états vides de la fiche
 · C30 inventaire sans run.
 
-Attendus lus dans CAHIER_DES_CHARGES.md §8.1/§8.2 et docs/modele/regles.md
+Attendus lus dans cahier des charges §8.1/§8.2 et docs/modele/regles.md
 (RG26) — jamais dans le code. Les lancements utilisent les sources simulées
 (USE_MOCK_VIRT / USE_MOCK_IPAM) : aucun réseau n'est sollicité.
 """
