@@ -5,7 +5,6 @@ RG24 : exports déclenchés en fin de run après SUCCESS validé.
 import gzip
 import json
 import os
-import tempfile
 from datetime import datetime, timezone, timedelta
 
 import pytest
@@ -19,16 +18,18 @@ from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 
 
 @pytest.fixture()
-def app_with_exports(monkeypatch):
-    """App Flask avec config d'exports activée pour les tests T012."""
+def app_with_exports(monkeypatch, tmp_path):
+    """App Flask avec config d'exports activée pour les tests T012.
+
+    Le dossier d'export est ``tmp_path`` : aucun test n'écrit dans le dépôt.
+    """
     # Secrets de base (>= 32 octets pour SECRET_KEY/JWT_SECRET_KEY) + config exports
-    _tmpdir = tempfile.mkdtemp()
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
     monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
     monkeypatch.setenv("DATABASE_URL", "sqlite:///:memory:")
     monkeypatch.setenv("EXPORT_ENABLED", "true")
-    monkeypatch.setenv("EXPORT_LOCAL_PATH", _tmpdir)
+    monkeypatch.setenv("EXPORT_LOCAL_PATH", str(tmp_path))
     monkeypatch.setenv("EXPORT_SMB_PATH", "")
     monkeypatch.setenv("EXPORT_RAW_ENABLED", "false")
 
@@ -386,14 +387,14 @@ def ipam_list():
 # ---------------------------------------------------------------------------
 
 
-def test_cleanup_old_exports(monkeypatch):
+def test_cleanup_old_exports(monkeypatch, tmp_path):
     """RG24 : nettoyage des exports anciens selon la rétention configurée."""
     import os
     from datetime import datetime, timezone, timedelta
 
     from collector.exports import cleanup_old_exports
 
-    _tmpdir = tempfile.mkdtemp()
+    _tmpdir = str(tmp_path)
     monkeypatch.setenv("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
     monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
     monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
@@ -515,6 +516,64 @@ def test_export_smb_destination_with_mocked_client(monkeypatch, tmp_path, vm_lis
         assert sessions == ["serveur", "fin serveur"]
         assert not local.exists()  # le chemin UNC est prioritaire : rien en local
         assert not os.path.exists("smb:")  # aucun chemin réseau traité comme un dossier local
+
+        extensions_db.session.remove()
+        extensions_db.drop_all()
+
+
+# ---------------------------------------------------------------------------
+# Tests : une URI n'est jamais un chemin local (T012)
+# ---------------------------------------------------------------------------
+
+
+def test_export_smb_uri_rejetee_repli_local_tmp_path(tmp_path, monkeypatch,
+                                                      vm_list, ipam_list):
+    """T012 : EXPORT_SMB_PATH sous forme d'URI (smb://) n'est jamais traité comme un
+    chemin local — repli sur EXPORT_LOCAL_PATH, tous les fichiers dans ``tmp_path``,
+    aucun appel SMB tenté et rien d'écrit dans le dépôt."""
+    import sys
+
+    class _SmbInterdit:
+        """Toute utilisation de smbclient pendant ce test est une erreur."""
+
+        def __getattr__(self, name):
+            raise AssertionError(f"appel SMB inattendu : {name}")
+
+    monkeypatch.setitem(sys.modules, "smbclient", _SmbInterdit())
+
+    local = tmp_path / "local"
+    monkeypatch.setenv("SECRET_KEY", "test-secret-key-32-bytes-minimum!!")
+    monkeypatch.setenv("JWT_SECRET_KEY", "test-jwt-secret-key-32-bytes-min!!")
+    monkeypatch.setenv("ADMIN_PASSWORD", "test-admin-password")
+    monkeypatch.setenv("EXPORT_ENABLED", "true")
+    monkeypatch.setenv("EXPORT_RAW_ENABLED", "false")
+    monkeypatch.setenv("EXPORT_LOCAL_PATH", str(local))
+    monkeypatch.setenv("EXPORT_SMB_PATH", "smb://nas/partage")
+
+    from app import create_app
+    from app.config import Config
+    from app.extensions import db as extensions_db
+    from collector.exports import run_exports
+
+    class TestConfig(Config):
+        TESTING = True
+        SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
+
+    app = create_app(TestConfig)
+    with app.app_context():
+        run = Run(status="SUCCESS", start_date=datetime(2026, 1, 1, 12, 0, 0))
+        extensions_db.session.add(run)
+        extensions_db.session.commit()
+
+        run_exports(run.id, vm_list=vm_list, ipam_list=ipam_list)
+
+        # Repli documenté : la destination reste le dossier local du test
+        assert app.config["EXPORT_LOCAL_PATH"] == str(local)
+        assert (local / "report.md").is_file()
+        assert len(list((local / "consolidated").glob("*.jsonl.gz"))) == 1
+        # Ni dossier « smb: » ni dossier « exports/ » créé à la racine du dépôt
+        assert not os.path.exists("smb:")
+        assert not os.path.exists("exports")
 
         extensions_db.session.remove()
         extensions_db.drop_all()

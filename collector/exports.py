@@ -79,9 +79,26 @@ def _get_export_config():
     }
 
 
+_REMOTE_URI = re.compile(r"^[a-z][a-z0-9+.\-]*://", re.IGNORECASE)
+
+
+def _is_remote_uri(value):
+    """True si la valeur est une URI (ex. ``smb://serveur/partage``) et non un chemin local."""
+    return bool(_REMOTE_URI.match(value.strip()))
+
+
 def _get_export_dir(config):
-    """Détermine et crée le répertoire d'export (Samba ou local)."""
+    """Détermine et crée le répertoire d'export (Samba ou local).
+
+    Une valeur sous forme d'URI n'est jamais utilisée comme chemin local :
+    on replie sur le dossier d'export local prévu (T012).
+    """
     smb = config["smb_path"]
+    if smb and _is_remote_uri(smb):
+        logger.warning(
+            "EXPORT_SMB_PATH %s est une URI ; repli sur le dossier d'export local", smb
+        )
+        smb = ""
     if smb:
         path = Path(smb)
     else:

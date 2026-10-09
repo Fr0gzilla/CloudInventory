@@ -6,4 +6,5 @@ venv/
 *.db
 .coverage
 exports/
+/smb:/
 instance/

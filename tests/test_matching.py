@@ -191,3 +191,58 @@ def test_normalize_used_by_match():
     source = inspect.getsource(match.resolve_match)
     assert "normalize_hostname" in source
     assert "normalize_fqdn" in source
+
+
+def test_matched_fqdn_tiebreak_by_ip():
+    """T032 : un doublon DNS rattrapé par le premier segment du FQDN est départagé par l'IP rapportée."""
+    vm_name = "renamed-box"
+    vm_fqdn = "decom-server.legacy.local"
+    vm_ip_reported = "10.0.0.1"  # IP du PREMIER doublon, que l'index DNS ne retient pas
+    ipam_records = [
+        {"ip": "10.0.0.1", "dns_name": "decom-server", "status": "reserved", "site": "DC1"},
+        {"ip": "10.0.0.2", "dns_name": "decom-server", "status": "active", "site": "DC2"},
+    ]
+    dns_index = match.build_dns_index(ipam_records)
+    ip_index = match.build_ip_index(ipam_records)
+    status, raw = match.resolve_match(
+        vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index, ipam_records,
+    )
+    assert status == "MATCHED_FQDN", f"Expected MATCHED_FQDN, got {status}"
+    # Sans le départage par IP (T032), l'index DNS renverrait 10.0.0.2 (dernier doublon).
+    assert raw.get("ip") == "10.0.0.1", f"Expected ip 10.0.0.1, got {raw.get('ip')}"
+    assert raw.get("site") == "DC1"
+
+
+def test_matched_fqdn_tiebreak_without_matching_ip_keeps_index_record():
+    """T032 : parmi les doublons du FQDN, aucune IP ne correspond → record de l'index conservé."""
+    vm_name = "renamed-box"
+    vm_fqdn = "decom-server.legacy.local"
+    vm_ip_reported = "10.9.9.9"  # IP qui n'appartient à aucun des doublons
+    ipam_records = [
+        {"ip": "10.0.0.1", "dns_name": "decom-server", "status": "reserved", "site": "DC1"},
+        {"ip": "10.0.0.2", "dns_name": "decom-server", "status": "active", "site": "DC2"},
+    ]
+    dns_index = match.build_dns_index(ipam_records)
+    ip_index = match.build_ip_index(ipam_records)
+    status, raw = match.resolve_match(
+        vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index, ipam_records,
+    )
+    assert status == "MATCHED_FQDN", f"Expected MATCHED_FQDN, got {status}"
+    # build_dns_index garde le dernier enregistrement du nom : comportement historique.
+    assert raw.get("ip") == "10.0.0.2", f"Expected index record ip 10.0.0.2, got {raw.get('ip')}"
+
+
+def test_matched_fqdn_without_ipam_records_list():
+    """T032 : la liste des enregistrements est optionnelle → record de l'index, sans erreur."""
+    vm_name = "renamed-box"
+    vm_fqdn = "decom-server.legacy.local"
+    vm_ip_reported = "10.0.0.2"
+    ipam_records = [
+        {"ip": "10.0.0.1", "dns_name": "decom-server", "status": "reserved", "site": "DC1"},
+        {"ip": "10.0.0.2", "dns_name": "decom-server", "status": "active", "site": "DC2"},
+    ]
+    dns_index = match.build_dns_index(ipam_records)
+    ip_index = match.build_ip_index(ipam_records)
+    status, raw = match.resolve_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index)
+    assert status == "MATCHED_FQDN"
+    assert raw.get("dns_name") == "decom-server"

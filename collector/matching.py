@@ -65,7 +65,8 @@ def resolve_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index, ipam_re
         dns_index: dict ``{hostname_normalisé → record_ipam}`` issu de ``build_dns_index``.
         ip_index: dict ``{adresse_ip → record_ipam}`` issu de ``build_ip_index``.
         ipam_records: liste optionnelle de dicts enregistrements IPAM ; si fournie,
-            parmi les doublons DNS pour le nom matcheé, on préfère celui dont
+            parmi les doublons DNS pour le nom ou le premier segment du FQDN
+            matché, on préfère celui dont
             l'IP correspond à ``vm_ip_reported » (si aucun ne matche, comportement
             historique conservé).
 
@@ -91,7 +92,15 @@ def resolve_match(vm_name, vm_fqdn, vm_ip_reported, dns_index, ip_index, ipam_re
     # Stratégie 2 : MATCHED_FQDN (RG03)
     fqdn_key = normalize_fqdn(vm_fqdn)
     if fqdn_key and fqdn_key in dns_index:
-        return "MATCHED_FQDN", dns_index[fqdn_key]
+        raw = dns_index[fqdn_key]
+        # Même départage que MATCHED_NAME : parmi les doublons DNS matchant le
+        # premier segment du FQDN, on préfère celui dont l'IP correspond (T032).
+        if ipam_records is not None and vm_ip_reported:
+            for rec in ipam_records:
+                if normalize_hostname(rec.get("dns_name")) == fqdn_key and rec.get("ip") == vm_ip_reported:
+                    raw = rec
+                    break
+        return "MATCHED_FQDN", raw
 
     # Stratégie 3 : MATCHED_IP (RG04)
     if vm_ip_reported and vm_ip_reported in ip_index:

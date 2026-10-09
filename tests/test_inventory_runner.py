@@ -220,3 +220,26 @@ def test_sources_par_defaut_selon_la_configuration(db, monkeypatch):
 
     assert run.status == "SUCCESS"
     assert (Asset.query.count(), IpamRecord.query.count()) == (45, 44)
+
+
+def test_departage_par_ip_pour_matched_fqdn(db):
+    """T032 : rapprochement par le premier segment du FQDN d'un nom en double, départagé par l'IP de la VM."""
+    vms = [{
+        "vm_id": "990", "vm_name": "renamed-box", "node": "pve1", "type": "qemu", "status": "running",
+        "fqdn": "decom-server.legacy.local", "ip_reported": "10.0.0.1", "tags": "env:prod",
+    }]
+    ipam = [
+        {"ip": "10.0.0.1", "dns_name": "decom-server", "status": "active",
+         "tenant": "Production", "site": "DC1", "meta_zone": "ZM"},
+        {"ip": "10.0.0.2", "dns_name": "decom-server", "status": "active",
+         "tenant": "Production", "site": "DC2", "meta_zone": "ZM"},
+    ]
+
+    run = _run(vms=vms, ipam=ipam)
+
+    row = _rows(run)["renamed-box"]
+    assert run.status == "SUCCESS"
+    assert row.match_status == "MATCHED_FQDN"
+    # 10.0.0.1 est le premier doublon : sans le départage T032, l'index DNS garde 10.0.0.2.
+    assert (row.ip_final, row.dns_final) == ("10.0.0.1", "decom-server")
+    assert (run.matched_name_count, run.matched_fqdn_count) == (0, 1)
