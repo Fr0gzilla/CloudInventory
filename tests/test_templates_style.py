@@ -73,3 +73,25 @@ def test_app_css_is_served_as_text_css(app):
     assert response.status_code == 200
     assert response.mimetype == "text/css"
     assert client.get("/static/css/inexistante.css").status_code == 404
+
+
+def test_regles_de_page_de_connexion_limitees_a_sa_page():
+    """La mise en page de la connexion (body en flex centré) ne touche que /login : dans la feuille commune, une règle
+    sur `body` seul s'appliquerait à toutes les pages (vu le 9 oct. : barre et contenu côte à côte)."""
+    from pathlib import Path
+    racine = Path(__file__).resolve().parent.parent
+    css = (racine / "app" / "static" / "css" / "app.css").read_text(encoding="utf-8")
+    sans_commentaires = re.sub(r"/\*.*?\*/", "", css, flags=re.S)
+    for selecteur, corps in re.findall(r"([^{}]+)\{([^{}]*)\}", sans_commentaires):
+        if selecteur.strip() == "body":
+            assert "display" not in corps and "min-height" not in corps, corps
+    assert "body.page-login" in css
+    assert '<body class="page-login">' in (racine / "app" / "templates" / "login.html").read_text(encoding="utf-8")
+
+
+def test_page_du_tableau_de_bord_sans_classe_de_connexion(app):
+    client = app.test_client()
+    _login(client)
+    page = client.get("/").get_data(as_text=True)
+    assert "page-login" not in page
+

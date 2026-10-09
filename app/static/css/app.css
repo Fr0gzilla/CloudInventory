@@ -173,8 +173,10 @@ body { font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif; }
 .ci-w-99 { width: 99%; }
 .ci-w-100 { width: 100%; }
 
-/* ——— Page de connexion (login.html) ——— */
-body {
+/* ——— Page de connexion (login.html) ———
+   Ses règles de mise en page visent body.page-login, jamais body : venues d'un bloc <style> propre à cette page,
+   elles s'appliquaient à toutes les pages une fois dans cette feuille commune (barre et contenu côte à côte). */
+body.page-login {
   font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
   background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
   min-height: 100vh;
