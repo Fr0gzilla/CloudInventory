@@ -383,11 +383,11 @@ documentée (cahier des charges § 2.3).</li>
 des charges et de la documentation du projet, avec fidélité obligatoire
 (cahier des charges § Mission, point 4).</li>
 <li><strong>Q6. Quelles contraintes l’emportent en cas de conflit
-?</strong> Les contraintes d'exécution priment : Python 3.11/3.12,
+?</strong> Les contraintes d’exécution priment : Python 3.11/3.12,
 <code>make install</code> / <code>make verify</code> /
 <code>make smoke</code>, sources simulées seules, aucun secret,
 bibliothèques d’interface copiées localement sans CDN, Docker non root
-(cahier des charges § Contraintes d'exécution).</li>
+(cahier des charges § Contraintes d’exécution).</li>
 </ul>
 <blockquote>
 <p><strong>À retenir</strong> — À chaque réponse, citer la provenance :
@@ -907,12 +907,12 @@ Proxmox VE + API NetBox) ; les sources sont interchangeables par
 variables d’environnement (OT4) ; les jeux simulés sont décrits en §
 13.1 (virtualisation) et § 13.2 (IPAM) (cahier des charges § 4.1, §
 3.2).</li>
-<li><strong>EXIGENCE (contrainte d'exécution)</strong> — Seules les sources
-simulées sont exécutées (<code>USE_MOCK_VIRT=true</code>,
+<li><strong>EXIGENCE (contrainte d’exécution)</strong> — Seules les
+sources simulées sont exécutées (<code>USE_MOCK_VIRT=true</code>,
 <code>USE_MOCK_IPAM=true</code>) ; les clients Proxmox et NetBox réels
 sont écrits avec la même interface, mais aucun test ne les appelle :
 aucun appel réseau sortant dans les tests ni au démarrage (rubrique «
-Contraintes d'exécution » du cahier des charges).</li>
+Contraintes d’exécution » du cahier des charges).</li>
 <li><strong>EXIGENCE</strong> — Le pipeline d’un run comporte sept
 étapes : initialisation <code>Run</code> RUNNING, collecte
 virtualisation, collecte IPAM, upsert <code>Asset</code> par
@@ -994,13 +994,14 @@ class="header-section-number">4.1.2</span> Définitions</h3>
 <p><strong>Périmètre du cahier</strong> : collecte à partir de sources
 simulées (mock Proxmox + mock NetBox) ou réelles (API Proxmox VE + API
 NetBox), avec sources interchangeables par variables d’environnement
-(OT4) (cahier des charges § 4.1, § 3.2). <strong>Contrainte d'exécution</strong>
-: seules les sources simulées sont exécutées
+(OT4) (cahier des charges § 4.1, § 3.2). <strong>Contrainte
+d’exécution</strong> : seules les sources simulées sont exécutées
 (<code>USE_MOCK_VIRT=true</code>, <code>USE_MOCK_IPAM=true</code>) ; les
 clients réels sont écrits avec la même interface, mais aucun test ne les
 appelle : aucun appel réseau sortant dans les tests ni au démarrage
-(rubrique « Contraintes d'exécution » du cahier des charges). <strong>Bascule
-simulé / réel</strong> : <code>Config.use_mock_virt()</code> et
+(rubrique « Contraintes d’exécution » du cahier des charges).
+<strong>Bascule simulé / réel</strong> :
+<code>Config.use_mock_virt()</code> et
 <code>Config.use_mock_ipam()</code> lisent <code>USE_MOCK_VIRT</code> et
 <code>USE_MOCK_IPAM</code>, tous deux <code>true</code> par défaut
 (<code>app/config.py:57-64</code>). <strong>Injection de
@@ -1091,7 +1092,7 @@ DNS et IP) ; 7. finalisation SUCCESS avec compteurs.</p>
 class="header-section-number">4.1.4</span> Étiquettes</h3>
 <p><strong>EXIGENCE</strong> : collecte simulée ou réelle
 interchangeable par variables d’environnement (OT4) (cahier des charges
-§ 4.1, § 3.2), jeux décrits en § 13.1 et § 13.2, contrainte d'exécution,
+§ 4.1, § 3.2), jeux décrits en § 13.1 et § 13.2, contrainte d’exécution,
 pipeline en sept étapes et gestion d’erreur du § 8.2, orchestrateur du §
 5.2. <strong>IMPLÉMENTATION</strong> : paquet <code>collector/</code>
 complet (deux jeux, deux clients, orchestrateur, consolidation), bascule
@@ -1155,7 +1156,7 @@ class="header-section-number">4.1.6</span> Carte mentale</h3>
     Périmètre v2.0
       Simulé ou réel
       Interchangeable OT4
-    Contrainte d'exécution
+    Contrainte d&#39;exécution
       Mocks seuls exécutés
       Aucun appel réseau
     Deux collecteurs
@@ -1177,10 +1178,10 @@ class="header-section-number">4.1.6</span> Carte mentale</h3>
 class="header-section-number">4.1.7</span> Pièges d’examen</h3>
 <ol type="1">
 <li>Confondre exigence du cahier et appels réels des tests : la
-contrainte d'exécution interdit tout appel réseau sortant dans les tests ni au
-démarrage (rubrique « Contraintes d'exécution » du cahier des charges), alors
-que les fonctions réelles sont appelées avec un transport de
-remplacement, sans réseau
+contrainte d’exécution interdit tout appel réseau sortant dans les tests
+ni au démarrage (rubrique « Contraintes d’exécution » du cahier des
+charges), alors que les fonctions réelles sont appelées avec un
+transport de remplacement, sans réseau
 (<code>tests/test_virtualisation_sources.py:267</code>,
 <code>tests/test_netbox_sources.py:289</code>).</li>
 <li>Confondre collecte et exécution de run : <code>collect_vms()</code>
@@ -1207,10 +1208,10 @@ les doublons volontaires.</li>
 </ol>
 <blockquote>
 <p><strong>À retenir</strong> — Le périmètre prévoit simulé et réel, la
-contrainte d'exécution n’exécute que les mocks. Les deux collecteurs remontent
-des formats identiques simulé comme réel, onze clés de plus côté VM.
-<code>run_inventory()</code> enchaîne sept étapes et rend SUCCESS ou
-FAIL sans lever.</p>
+contrainte d’exécution n’exécute que les mocks. Les deux collecteurs
+remontent des formats identiques simulé comme réel, onze clés de plus
+côté VM. <code>run_inventory()</code> enchaîne sept étapes et rend
+SUCCESS ou FAIL sans lever.</p>
 </blockquote>
 <h2 data-number="4.2" id="questions-réponses-3"><span
 class="header-section-number">4.2</span> Questions-réponses</h2>
@@ -1222,8 +1223,9 @@ class="header-section-number">4.2</span> Questions-réponses</h2>
 des charges § 4.1).</li>
 <li><strong>Q2. Les tests font-ils des appels réseau ?</strong> Non :
 aucun appel réseau sortant dans les tests ni au démarrage (rubrique «
-Contraintes d'exécution » du cahier des charges) ; le réseau y est même rendu
-impossible (<code>tests/test_virtualisation_sources.py:52-60</code>,
+Contraintes d’exécution » du cahier des charges) ; le réseau y est même
+rendu impossible
+(<code>tests/test_virtualisation_sources.py:52-60</code>,
 <code>tests/test_collector_security.py:34</code>).</li>
 <li><strong>Q3. Combien de VM et d’enregistrements IPAM le jeu simulé
 contient-il ?</strong> 45 VM/CT sur les cinq nœuds, types qemu et lxc
@@ -1288,9 +1290,10 @@ source VIRT (cahier des charges § 7.1 ;
 <code>docs/modele/regles.md</code> RG01→RG05).</li>
 <li><strong>IMPLÉMENTATION</strong> — <code>resolve_match</code>
 s’arrête au premier niveau trouvé ; les index DNS et IP se construisent
-une fois par run et, parmi les doublons DNS, le record dont l’IP égale
+une fois par run et, parmi les doublons DNS — pour le nom comme pour le
+premier segment du FQDN —, le record dont l’IP égale
 <code>ip_reported</code> est retenu
-(<code>collector/matching.py:78-101,84-88</code>,
+(<code>collector/matching.py:79-110,85-89</code>,
 <code>collector/inventory_runner.py:204-212</code>,
 <code>tests/test_matching.py:148</code>).</li>
 <li><strong>EXIGENCE</strong> — La normalisation convertit en
@@ -1395,12 +1398,12 @@ consolidée avec <code>run_id</code>
 class="header-section-number">5.1.4</span> Glossaire</h3>
 <ul>
 <li><strong>FQDN</strong> : premier segment du champ <code>fqdn</code>
-comparé au DNS Name (<code>collector/matching.py:91-94</code>).
+comparé au DNS Name (<code>collector/matching.py:92-95</code>).
 <strong>IPAM</strong> : enregistrements <code>{ip, dns_name, ...}</code>
 indexés par DNS puis par IP (<code>collector/matching.py:16-49</code>).
 <strong>VM</strong> : dicts
 <code>{vm_name, fqdn, ip_reported, ...}</code> remontés par la
-virtualisation (<code>collector/matching.py:107</code>).
+virtualisation (<code>collector/matching.py:116</code>).
 <strong>DNS</strong> : <code>dns_name</code> normalisé, clé de l’index
 (<code>collector/matching.py:26-30</code>). <strong>NetBox</strong> :
 source de vérité réseau dont le hostname diverge → HOSTNAME_MISMATCH
@@ -1469,7 +1472,7 @@ class="header-section-number">5.2</span> Questions-réponses</h2>
 ordre ?</strong> MATCHED_NAME, MATCHED_FQDN, MATCHED_IP puis NO_MATCH,
 par ordre de priorité décroissante ; <code>resolve_match</code> s’arrête
 au premier niveau trouvé (<strong>IMPLÉMENTATION</strong>, cahier des
-charges § 7.1 ; <code>collector/matching.py:78-101</code>).</li>
+charges § 7.1 ; <code>collector/matching.py:79-110</code>).</li>
 <li><strong>Q2. Comment normalise-t-on un hostname ?</strong> Conversion
 en minuscules, suppression des espaces, suppression du suffixe de
 domaine : <code>web-a500.prod.local</code> → <code>web-a500</code>
@@ -1874,7 +1877,7 @@ IMPLÉMENTATION : <code>/login</code>, <code>/</code>,
 (<code>app/auth.py:257</code> ; <code>app/routes.py:40-421</code> ;
 <code>app/__init__.py:143</code>). Observation : le menu Anomalies
 renvoie à l’inventaire, et aucun lien n’ouvre <code>/compare</code>
-(<code>app/templates/base.html:111</code> ;
+(<code>app/templates/base.html:46</code> ;
 <code>app/templates/</code>).</li>
 <li><strong>Q2. Quels endpoints l’API expose-t-elle ?</strong>
 IMPLÉMENTATION : onze routes sous <code>/api</code>, dont
@@ -1976,9 +1979,12 @@ session, <code>/apispec</code> le JWT (<code>app/auth.py:121-136</code>
 <code>nosniff</code>, <code>X-Frame-Options: DENY</code>,
 <code>Referrer-Policy</code>, <code>Permissions-Policy</code>, HSTS si
 HTTPS (<code>app/__init__.py:20-31,175-192</code> ;
-<code>tests/test_auth.py:290</code>) ; cellule CSV amorçant une formule
-reçoit une apostrophe en tête (<code>app/queries.py:31-40</code>) sur
-l’export web et l’export API (<code>tests/test_web.py:666</code>).</li>
+<code>tests/test_auth.py:290</code>) ; derrière un proxy TLS, HSTS posé
+par le terminateur ou <code>ProxyFix</code> réglé sur le nombre exact de
+proxys, jamais de confiance aveugle en <code>X-Forwarded-Proto</code>
+(<code>README.md:19-30</code>) ; cellule CSV amorçant une formule reçoit
+une apostrophe en tête (<code>app/queries.py:31-40</code>) sur l’export
+web et l’export API (<code>tests/test_web.py:666</code>).</li>
 <li><strong>IMPLÉMENTATION + LACUNE</strong> — Déploiement : utilisateur
 non root, port publié sur <code>127.0.0.1</code>, <code>cap_drop</code>
 et <code>no-new-privileges</code> (<code>Dockerfile:5-6,27</code> ;
@@ -1988,7 +1994,8 @@ chiffré exigé
 <code>'unsafe-inline'</code> dans la CSP de <code>/apidocs</code>
 (<code>app/__init__.py:29-31</code>), <code>ADMIN_PASSWORD</code> sans
 longueur minimale (<code>app/config.py:39</code>), aucun paramètre de
-durée de jeton lu dans <code>app/</code>.</li>
+durée de jeton lu dans <code>app/</code> : Flask-JWT-Extended applique
+alors sa valeur par défaut, 15 minutes pour un jeton d’accès.</li>
 </ul>
 <h3 data-number="8.1.2" id="définitions-6"><span
 class="header-section-number">8.1.2</span> Définitions</h3>
@@ -2140,16 +2147,17 @@ exports, page <code>/inventory/export</code> et route
 <code>tests/test_web.py:666</code>). Limites prouvées : la
 neutralisation ne touche que ce générateur CSV, les autres exports
 écrivent JSONL, JSON ou Markdown
-(<code>collector/exports.py:95,256,154</code>) ;
+(<code>collector/exports.py:112,273,171</code>) ;
 <code>script-src 'unsafe-inline'</code> subsiste dans la CSP de
 <code>/apidocs</code> (<code>app/__init__.py:29-31</code>) ;
 <code>ADMIN_PASSWORD</code> n’a aucune longueur minimale, à la
 différence des deux clés exigées à 32 octets
 (<code>app/config.py:15,39</code>) ; <code>app/</code> ne lit aucun
 paramètre de durée de jeton, si bien que la durée appliquée reste celle
-par défaut de Flask-JWT-Extended, valeur de bibliothèque que le dépôt ne
-permet pas de déduire (<code>app/__init__.py</code>,
-<code>app/config.py</code>, <code>requirements.txt</code>).</li>
+par défaut de Flask-JWT-Extended : 15 minutes pour un jeton d’accès
+(valeur de la bibliothèque, aucun réglage dans le dépôt)
+(<code>app/__init__.py</code>, <code>app/config.py</code>,
+<code>requirements.txt</code>).</li>
 </ul>
 <blockquote>
 <p><strong>À retenir</strong> — Distinguez l’exigence § 10.3 (variables
@@ -2170,33 +2178,37 @@ class="header-section-number">9.1.1</span> Points clés — Tests</h3>
 SQLite en mémoire, 2 fichiers (<code>test_app.py</code>,
 <code>test_api.py</code>) et 58 tests (34 web + 24 API) (cahier des
 charges § 14.1).</li>
-<li><strong>IMPLÉMENTATION</strong> — La suite compte 437 fonctions de
-test réparties dans 24 fichiers <code>tests/test_*.py</code> ;
-<code>tests/conftest.py</code> fournit les fixtures app/db (SQLite
-<code>:memory:</code> par test) (<code>tests/</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — La suite compte 457 fonctions de
+test (548 cas avec les paramétrages) réparties dans 27 fichiers
+<code>tests/test_*.py</code> ; <code>tests/conftest.py</code> fournit
+les fixtures app/db (SQLite <code>:memory:</code> par test)
+(<code>tests/</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — <code>make test</code> exécute
 <code>venv/bin/python -m pytest -v --ignore=reference</code> et tolère
 le code 5 (aucun test collecté) (<code>Makefile:13-14</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — <code>make smoke</code> appelle
-<code>scripts/smoke.sh</code> : parcours GET/POST sur
-<code>/login</code>, <code>/run</code>, <code>/api/login</code>,
-<code>/api/stats</code> après démarrage de l’app
-(<code>Makefile:16-17</code>, <code>README.md:55-57</code>).</li>
+<code>scripts/smoke.sh</code>, qui refuse de tourner sans profil :
+<code>SMOKE_PROFILE=test</code> démarre une application isolée (base
+temporaire, sources simulées, mot de passe généré),
+<code>SMOKE_PROFILE=docker</code> vise le conteneur lancé par compose,
+sur <code>127.0.0.1</code> ou <code>localhost</code> seulement, avec le
+mot de passe lu dans <code>.env</code> ; même parcours GET/POST sur
+<code>/healthz</code>, <code>/login</code>, <code>/run</code>,
+<code>/api/login</code>, <code>/api/stats</code>, sans secret dans les
+arguments de <code>curl</code> (<code>Makefile:16-17</code>,
+<code>scripts/smoke.sh:5-45</code>, <code>README.md:61-69</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — Les collecteurs et clients réels
 sont testés sans réseau (transport injecté) ; NetBox et virtualisation
 couverts (<code>tests/test_netbox_sources.py</code>,
 <code>tests/test_virtualisation_sources.py</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — Exports et notifications ont leurs
-propres tests : <code>tests/test_exports.py</code> (10),
+propres tests : <code>tests/test_exports.py</code> (11),
 <code>tests/test_notifications.py</code> (16)
 (<code>tests/</code>).</li>
 <li><strong>LACUNE</strong> — <code>verify</code> est déclaré
 <code>.PHONY</code> mais sans recette : <code>make verify</code> échoue
 ; AGENTS.md indique <code>make test</code> à sa place
 (<code>Makefile:5</code>, <code>README.md</code>).</li>
-<li><strong>LACUNE</strong> — <code>README.md:62</code> annonce « 17
-tests » : chiffre périmé face aux 437 fonctions réelles
-(<code>README.md:62</code>, <code>tests/</code>).</li>
 </ul>
 <h3 data-number="9.1.2" id="points-clés--déploiement-docker"><span
 class="header-section-number">9.1.2</span> Points clés — Déploiement
@@ -2253,23 +2265,23 @@ optionnels (rétention 7 j) (<code>collector/exports.py:1-9</code>).</li>
 runner après <code>notify_run</code>, uniquement si le run a
 <code>status == SUCCESS</code>
 (<code>collector/inventory_runner.py:143-149</code>,
-<code>collector/exports.py:355-366</code>).</li>
+<code>collector/exports.py:372-383</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — Activation par variables :
 <code>EXPORT_ENABLED</code> (défaut <code>false</code>),
 <code>EXPORT_LOCAL_PATH</code> (défaut <code>exports</code>),
 <code>EXPORT_SMB_PATH</code>, <code>EXPORT_RAW_ENABLED</code>
 (<code>collector/exports.py:66-79</code>,
-<code>README.md:44-51</code>).</li>
+<code>README.md:50-57</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — Écriture atomique via
 <code>tempfile.mkstemp</code> + <code>os.replace</code> ; sous-dossiers
 et fichiers symboliques interdits ; noms de fichiers validés par
 expressions régulières (<code>collector/exports.py:32-63</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — Publication SMB : chemin UNC
 validé, session chiffrée, copie puis nettoyage des rétentions à distance
-(<code>collector/exports.py:312-352</code>).</li>
+(<code>collector/exports.py:329-369</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — Échec confiné : une exception
 d’export est journalisée en warning, le run SUCCESS est conservé
-(<code>collector/exports.py:380-382</code>).</li>
+(<code>collector/exports.py:397-399</code>).</li>
 </ul>
 <h3 data-number="9.1.4" id="points-clés--notifications"><span
 class="header-section-number">9.1.4</span> Points clés —
@@ -2286,7 +2298,7 @@ anomalies, asset et IPAM du run, puis appelle email et webhook
 <code>SMTP_ENABLED=true</code> et <code>SMTP_TO</code> non vide requis ;
 HTML échappé via <code>html.escape</code> ; TLS par défaut ; erreurs
 confinées au canal (<code>app/notifications.py:95-114</code>,
-<code>README.md:36-42</code>).</li>
+<code>README.md:42-48</code>).</li>
 <li><strong>IMPLÉMENTATION</strong> — Webhook : POST JSON
 (<code>text</code>, <code>run_id</code>, <code>status</code>,
 <code>anomaly_count</code>), URL validée en http/https, délai 10 s, code
@@ -2322,7 +2334,7 @@ actuel</h3>
 <tr class="even">
 <td>Organisation</td>
 <td>2 fichiers, 58 tests (§ 14.1)</td>
-<td>24 fichiers, 437 fonctions (<code>tests/</code>)</td>
+<td>27 fichiers, 457 fonctions (<code>tests/</code>)</td>
 </tr>
 <tr class="odd">
 <td>Exécution</td>
@@ -2332,7 +2344,8 @@ tolérance code 5 (<code>Makefile:13-14</code>)</td>
 </tr>
 <tr class="even">
 <td>Vérification</td>
-<td><code>verify</code> puis <code>smoke</code> (Contraintes d’exécution)</td>
+<td><code>verify</code> puis <code>smoke</code> (Contraintes
+d’exécution)</td>
 <td><code>smoke</code> via <code>scripts/smoke.sh</code> ;
 <code>verify</code> sans recette (<code>Makefile:5,16-17</code>)</td>
 </tr>
@@ -2380,7 +2393,7 @@ JSON par VM, rétention 30 jours
 (<code>collector/exports.py:4</code>).</li>
 <li><strong>SMB</strong> : partage réseau alternatif au dossier local,
 session chiffrée, chemin UNC validé
-(<code>collector/exports.py:312-352</code>).</li>
+(<code>collector/exports.py:329-369</code>).</li>
 <li><strong>SMTP</strong> : canal email facultatif activé par
 <code>SMTP_ENABLED</code>, TLS par défaut
 (<code>app/notifications.py:95-114</code>).</li>
@@ -2398,7 +2411,7 @@ class="header-section-number">9.1.7</span> Carte mentale</h3>
 <pre class="mermaid"><code>mindmap
   root((Tests déploiement exports notifications))
     Tests
-      437 fonctions
+      457 fonctions
       make test
       make smoke
     Docker
@@ -2458,8 +2471,8 @@ résultat ?</strong> <strong>IMPLÉMENTATION</strong> —
 Vérifiez le nombre de tests collectés, pas seulement le code retour de
 Make (<code>Makefile:12-14</code>).</li>
 <li><strong>Q2. Combien de tests présentez-vous au jury ?</strong>
-<strong>IMPLÉMENTATION</strong> — La suite actuelle compte 437 fonctions
-de test dans 24 fichiers, plus <code>conftest.py</code> pour les
+<strong>IMPLÉMENTATION</strong> — La suite actuelle compte 457 fonctions
+de test dans 27 fichiers, plus <code>conftest.py</code> pour les
 fixtures. Le cahier § 14.1 en attendait 58 dans 2 fichiers : l’écart est
 en surcouverture (<code>tests/</code>, cahier des charges § 14.1). Aucun
 résultat d’exécution n’est affirmé ici.</li>
@@ -2482,7 +2495,7 @@ VM, rétention 30 j), un <code>report.md</code> écrasé à chaque run, et
 si <code>EXPORT_RAW_ENABLED</code> deux JSON.gz bruts (rétention 7 j).
 La publication SMB chiffrée remplace le dossier local si
 <code>EXPORT_SMB_PATH</code> est renseigné
-(<code>collector/exports.py:1-9,355-390</code>).</li>
+(<code>collector/exports.py:1-9,372-407</code>).</li>
 <li><strong>Q6. Quand et comment les notifications partent-elles
 ?</strong> <strong>IMPLÉMENTATION</strong> — Après le commit d’un run
 SUCCESS, le runner appelle <code>notify_run</code> puis
@@ -2495,7 +2508,7 @@ reçoit un POST JSON si <code>WEBHOOK_URL</code> et anomalies non nulles
 </ul>
 <blockquote>
 <p><strong>À retenir</strong> — Une suite plus nombreuse que le cahier
-ne prouve pas la couverture exigée ; séparez le décompte (437 fonctions)
+ne prouve pas la couverture exigée ; séparez le décompte (457 fonctions)
 des comportements validés (<code>tests/</code>, cahier des charges §
 14.2).</p>
 </blockquote>

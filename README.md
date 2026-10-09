@@ -60,15 +60,21 @@ Aucune valeur secrète réelle n'est committée ; les valeurs réelles sont inje
 
 ## Smoke test
 
-Lancer l'app, puis `make smoke` ; suite de vérifications GET/POST sur /login, /run, /api/login, /api/stats.
+Deux profils ; sans profil, le script refuse de tourner :
+- `SMOKE_PROFILE=test make smoke` : démarre une application isolée (base temporaire, sources simulées, mot de passe
+  généré) et la parcourt ;
+- `SMOKE_PROFILE=docker make smoke` : après `make up`, parcourt le conteneur sur `127.0.0.1:5000` (ou
+  `SMOKE_APP_URL`, hôte local seulement), avec le mot de passe administrateur lu dans `.env`.
+Même parcours : `/healthz`, `/login` avec jeton CSRF, `/run`, `/api/login`, `/api/stats` ; aucun secret dans les
+arguments de `curl`.
 
 ## Arborescence (après build)
 
 - `app/` — factory `create_app()`, config, extensions db, auth, notifications
-- `tests/` — pytest fixtures app/db, 17 tests, contraintes, RG18 upsert
+- `tests/` — pytest : fixtures app/db (SQLite en mémoire), un fichier de tests par module, `make test`
 - `Makefile` — cibles install, test, verify, smoke, up/down/logs
 - `docker-compose.yml` — service app, volume sqlite_data pour persistance
-- `Dockerfile` — Python 3.11-slim, gunicorn production, user non-root
+- `Dockerfile` — `python:3.11-slim-bookworm`, gunicorn production, user non-root
 
 ## Tests
 
