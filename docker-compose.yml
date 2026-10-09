@@ -8,6 +8,7 @@ services:
       - sqlite_data:/app/data
     environment:
       - DATABASE_URL=sqlite:////app/data/cloudinventory.db  # chemin absolu : un chemin relatif irait dans instance/ (non inscriptible)
+      - RATE_LIMIT_STORE_PATH=/app/data/login-budgets.json  # compteurs de connexion partagés par les workers, sur le volume inscriptible
     tmpfs:
       - /tmp
     cap_drop:

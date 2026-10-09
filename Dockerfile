@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
 WORKDIR /app
 
@@ -31,4 +31,4 @@ CMD ["gunicorn", "-w", "4", "-b", "0.0.0.0:5000", "app:create_app()"]
 
 # Healthcheck
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-  CMD curl -f http://127.0.0.1:5000/login || exit 1
+  CMD curl -f http://127.0.0.1:5000/healthz || exit 1

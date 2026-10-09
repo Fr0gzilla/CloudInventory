@@ -120,6 +120,23 @@ def create_app(config_class=Config):
     login_manager.init_app(app)
     jwt.init_app(app)
 
+    # Health check endpoint — SELECT 1 + lecture bornée d'une table métier
+    @app.route("/healthz", methods=["GET"])
+    def healthz():
+        from sqlalchemy import text
+        from app.models import Asset
+
+        try:
+            # Vérification connexion DB : SELECT 1
+            db.session.execute(text("SELECT 1"))
+            # Lecture bornée d'une table métier requise (Asset)
+            db.session.query(Asset.id).limit(1).first()
+            db.session.commit()
+            return "", 200
+        except Exception:
+            db.session.rollback()
+            return "", 503
+
     # Documentation Swagger (cahier §9.1) : UI sur /apidocs, spec JSON sur
     # /apispec_1.json ; les routes de app/api.py se documentent par docstring
     # YAML. La clé de l'UI (specs_route) est lue dans app.config["SWAGGER"].
