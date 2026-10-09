@@ -1,0 +1,2504 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="fr" xml:lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Dossier de révision E5 — CloudInventory</title>
+  <style>
+    html {
+      line-height: 1.5;
+      font-family: Georgia, serif;
+      font-size: 20px;
+      color: #1a1a1a;
+      background-color: #fdfdfd;
+    }
+    body {
+      margin: 0 auto;
+      max-width: 36em;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 1em;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #1a1a1a;
+    }
+    a:visited {
+      color: #1a1a1a;
+    }
+    img {
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #e6e6e6;
+      color: #606060;
+    }
+    code {
+      font-family: Menlo, Monaco, 'Lucida Console', Consolas, monospace;
+      font-size: 85%;
+      margin: 0;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #1a1a1a;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border-top: 1px solid #1a1a1a;
+      border-bottom: 1px solid #1a1a1a;
+    }
+    th {
+      border-top: 1px solid #1a1a1a;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    span.underline{text-decoration: underline;}
+    div.column{display: inline-block; vertical-align: top; width: 50%;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    ul.task-list{list-style: none;}
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+  <style>
+  html { font-family: system-ui, sans-serif; line-height: 1.65; color: #172b3a; background: #f4f6f8; }
+  body { max-width: 76rem; margin: auto; padding: 2rem; background: white; }
+  h1, h2, h3 { line-height: 1.25; color: #183e61; scroll-margin-top: 1rem; }
+  a { color: #145981; }
+  .notice, blockquote { border-left: .3rem solid #b17815; padding: .6rem 1rem; background: #fff8e9; }
+  table { border-collapse: collapse; display: block; overflow-x: auto; margin: 1rem 0; }
+  th, td { border: 1px solid #bcc9d2; padding: .6rem; text-align: left; vertical-align: top; }
+  th { background: #edf3f8; } code { overflow-wrap: anywhere; }
+  pre { white-space: pre-wrap; padding: 1rem; background: #edf3f8; }
+  nav { border: 1px solid #bcc9d2; padding: 1rem; }
+  @media (max-width: 600px) { body { padding: 1rem; } }
+  @media print { body { max-width: none; padding: 0; } h1 { break-before: page; } a { color: inherit; } }
+  </style>
+</head>
+<body>
+<header id="title-block-header">
+<h1 class="title">Dossier de révision E5 — CloudInventory</h1>
+</header>
+<nav id="TOC" role="doc-toc">
+<ul>
+<li><a href="#contexte-et-besoin"><span
+class="toc-section-number">1</span> Contexte et besoin</a>
+<ul>
+<li><a href="#fiche"><span class="toc-section-number">1.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses"><span
+class="toc-section-number">1.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#modèle-de-données-merise-et-uml"><span
+class="toc-section-number">2</span> Modèle de données (Merise et
+UML)</a>
+<ul>
+<li><a href="#fiche-1"><span class="toc-section-number">2.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-1"><span
+class="toc-section-number">2.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#règles-de-gestion-et-schéma-sql"><span
+class="toc-section-number">3</span> Règles de gestion et schéma SQL</a>
+<ul>
+<li><a href="#fiche-2"><span class="toc-section-number">3.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-2"><span
+class="toc-section-number">3.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#sources-et-collecte"><span
+class="toc-section-number">4</span> Sources et collecte</a>
+<ul>
+<li><a href="#fiche-3"><span class="toc-section-number">4.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-3"><span
+class="toc-section-number">4.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#algorithme-de-consolidation"><span
+class="toc-section-number">5</span> Algorithme de consolidation</a>
+<ul>
+<li><a href="#fiche-4"><span class="toc-section-number">5.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-4"><span
+class="toc-section-number">5.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#anomalies"><span class="toc-section-number">6</span>
+Anomalies</a>
+<ul>
+<li><a href="#fiche-5"><span class="toc-section-number">6.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-5"><span
+class="toc-section-number">6.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#api-rest-et-jwt"><span class="toc-section-number">7</span>
+API REST et JWT</a>
+<ul>
+<li><a href="#fiche-6"><span class="toc-section-number">7.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-6"><span
+class="toc-section-number">7.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#sécurité"><span class="toc-section-number">8</span>
+Sécurité</a>
+<ul>
+<li><a href="#fiche-7"><span class="toc-section-number">8.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-7"><span
+class="toc-section-number">8.2</span> Questions-réponses</a></li>
+</ul></li>
+<li><a href="#tests-déploiement-exports-et-notifications"><span
+class="toc-section-number">9</span> Tests, déploiement, exports et
+notifications</a>
+<ul>
+<li><a href="#fiche-8"><span class="toc-section-number">9.1</span>
+Fiche</a></li>
+<li><a href="#questions-réponses-8"><span
+class="toc-section-number">9.2</span> Questions-réponses</a></li>
+</ul></li>
+</ul>
+</nav>
+<h1 data-number="1" id="contexte-et-besoin"><span
+class="header-section-number">1</span> Contexte et besoin</h1>
+<h2 data-number="1.1" id="fiche"><span
+class="header-section-number">1.1</span> Fiche</h2>
+<h3 data-number="1.1.1" id="points-clés"><span
+class="header-section-number">1.1.1</span> Points clés</h3>
+<ol type="1">
+<li>CloudInventory est une application web d’inventaire et de
+supervision d’infrastructure virtualisée, BTS SIO SLAM, épreuve E5,
+version v2.0 (cahier des charges § 1.1 à 1.4).</li>
+<li>Proxmox VE gère machines virtuelles et conteneurs, NetBox gère
+adresses IP et enregistrements DNS : deux sources de vérité
+indépendantes qui divergent (cahier des charges § 2.1).</li>
+<li>Six difficultés sans outil centralisé : visibilité, incohérences de
+statut, machines orphelines, doublons, historique absent, renommages non
+détectés (cahier des charges § 2.2).</li>
+<li>Solution : collecte, consolidation par matching hostname, FQDN et
+IP, six anomalies, déduction du rôle, historique, interface web et API
+REST (cahier des charges § 2.3).</li>
+<li>Objectifs : seize objectifs fonctionnels OF1→OF16 et neuf objectifs
+techniques OT1→OT9, à distinguer (cahier des charges § 3.1, § 3.2).</li>
+<li>Périmètre v2.0 : collecte simulée ou réelle, matching à quatre
+niveaux, déduction de rôle, six anomalies, interface web ; évolutions
+suivantes hors périmètre (cahier des charges § 4.1, § 4.2).</li>
+</ol>
+<h3 data-number="1.1.2" id="définitions"><span
+class="header-section-number">1.1.2</span> Définitions</h3>
+<p><strong>CloudInventory</strong> : application web d’inventaire et de
+supervision d’infrastructure virtualisée (cahier des charges § 1.1).</p>
+<h3 data-number="1.1.3" id="schéma"><span
+class="header-section-number">1.1.3</span> Schéma</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Source de vérité</th>
+<th>Ce qu’elle gère</th>
+<th>Référence</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Proxmox VE</td>
+<td>machines virtuelles et conteneurs</td>
+<td>cahier des charges § 2.1</td>
+</tr>
+<tr class="even">
+<td>NetBox</td>
+<td>adresses IP et enregistrements DNS</td>
+<td>cahier des charges § 2.1</td>
+</tr>
+</tbody>
+</table>
+<h3 data-number="1.1.4" id="étiquettes"><span
+class="header-section-number">1.1.4</span> Étiquettes</h3>
+<p><strong>EXIGENCE</strong> : tout le contenu vient du cahier des
+charges (§ 1 à 4, § Mission). <strong>IMPLÉMENTATION</strong> : cette
+section ne cite aucun fait de code. <strong>LACUNE</strong> : cette
+section ne relève aucune lacune.</p>
+<h3 data-number="1.1.5" id="glossaire"><span
+class="header-section-number">1.1.5</span> Glossaire</h3>
+<ul>
+<li><strong>IPAM</strong> : outil gérant les adresses IP et les
+enregistrements DNS, NetBox (cahier des charges § 2.1)</li>
+<li><strong>VM</strong> : machine virtuelle gérée par Proxmox VE (cahier
+des charges § 2.1)</li>
+<li><strong>CT</strong> : conteneur géré par Proxmox VE (cahier des
+charges § 2.1)</li>
+<li><strong>API</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>FQDN</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>ORM</strong> : (employé sans définition dans la
+section)</li>
+</ul>
+<h3 data-number="1.1.6" id="carte-mentale"><span
+class="header-section-number">1.1.6</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Contexte et besoin))
+    Identité
+    Sources de vérité
+      Proxmox VE
+      NetBox
+    Problématique
+      Six difficultés
+    Solution
+      Matching multi-stratégie
+    Objectifs et périmètre
+      OF1 à OF16
+      OT1 à OT9</code></pre>
+<h3 data-number="1.1.7" id="pièges-dexamen"><span
+class="header-section-number">1.1.7</span> Pièges d’examen</h3>
+<ol type="1">
+<li>Confondre OF1→OF16 et OT1→OT9 : OF1→OF16 sont fonctionnels (§ 3.1),
+OT1→OT9 sont techniques (§ 3.2).</li>
+<li>Confondre difficultés et anomalies : les difficultés sont les
+problèmes sans outil centralisé (§ 2.2), les anomalies sont détectées
+par l’algorithme (§ 2.3).</li>
+<li>Confondre Proxmox VE et NetBox : Proxmox VE gère machines virtuelles
+et conteneurs, NetBox gère adresses IP et enregistrements DNS (§
+2.1).</li>
+<li>Confondre périmètre et évolutions : le périmètre v2.0 couvre
+collecte, matching, rôle, anomalies, interface (§ 4.1), les évolutions
+suivantes sont hors périmètre (§ 4.2).</li>
+</ol>
+<blockquote>
+<p><strong>À retenir</strong> — Deux sources de vérité divergentes
+fondent la consolidation ; le périmètre v2.0 et les objectifs OF1→OF16,
+OT1→OT9 cadrent l’oral.</p>
+</blockquote>
+<h2 data-number="1.2" id="questions-réponses"><span
+class="header-section-number">1.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Qu’est-ce que CloudInventory ?</strong> Application web
+d’inventaire et de supervision d’infrastructure virtualisée, BTS SIO
+SLAM, épreuve E5 (cahier des charges § 1.1, § 1.2), version v2.0 (§
+1.4).</li>
+<li><strong>Q2. Quel problème concret résout-elle ?</strong> La
+divergence entre Proxmox VE (VM/CT) et NetBox (IPAM/DNS) : visibilité,
+incohérences, machines orphelines, doublons, historique, renommages non
+détectés (cahier des charges § 2.1, § 2.2).</li>
+<li><strong>Q3. Quelle est la solution retenue ?</strong> Consolidation
+multi-stratégie (hostname, FQDN, IP), détection de six anomalies,
+déduction du rôle fonctionnel, historique, interface web et API REST
+documentée (cahier des charges § 2.3).</li>
+<li><strong>Q4. Quels objectifs faut-il pouvoir défendre à l’oral
+?</strong> Les OF1→OF16 fonctionnels et les OT1→OT9 techniques, dont OT2
+— 5 tables avec ORM et OT3 — blueprints Flask (cahier des charges § 3.1,
+§ 3.2).</li>
+<li><strong>Q5. D’où vient ce dossier de révision ?</strong> Du cahier
+des charges et de la documentation du projet, avec fidélité obligatoire
+(cahier des charges § Mission, point 4).</li>
+<li><strong>Q6. Quelles contraintes l’emportent en cas de conflit
+?</strong> Les contraintes du SDV priment : Python 3.11/3.12,
+<code>make install</code> / <code>make verify</code> /
+<code>make smoke</code>, sources simulées seules, aucun secret,
+bibliothèques d’interface copiées localement sans CDN, Docker non root
+(cahier des charges § Contraintes du SDV).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — À chaque réponse, citer la provenance :
+fichier publié ou cahier des charges § n.</p>
+</blockquote>
+<h1 data-number="2" id="modèle-de-données-merise-et-uml"><span
+class="header-section-number">2</span> Modèle de données (Merise et
+UML)</h1>
+<h2 data-number="2.1" id="fiche-1"><span
+class="header-section-number">2.1</span> Fiche</h2>
+<h3 data-number="2.1.1" id="points-clés-1"><span
+class="header-section-number">2.1.1</span> Points clés</h3>
+<ol type="1">
+<li>Le dictionnaire des données du projet porte 5 tables et 57 colonnes
+et fait foi en cas de divergence ; les § 6.1 et § 6.3 du cahier sont
+retirés de la copie, à produire par le groupe modélisation
+(<code>docs/modele/dictionnaire.md</code>,
+<code>docs/modele/schema.sql</code> ; <code>docs/modele/mcd.md</code>
+Écart 5 ; cahier des charges § 6.1, § 6.3).</li>
+<li>Le MCD compte 5 entités — Run, Asset, IpamRecord, ConsolidatedAsset,
+Anomaly — et 7 associations : produire, détecter, consolider, rattacher,
+renseigner, signaler, concerner ; aucune association ne porte d’attribut
+et aucune n’est (x,n)–(x,n) ni n-aire (<code>docs/modele/mcd.md</code> §
+Entités, § Associations).</li>
+<li>Lecture des cardinalités : un asset appartient à exactement un run ;
+un run produit zéro ou plusieurs assets (<code>docs/modele/mcd.md</code>
+§ Associations).</li>
+<li>Passage MLD : PK du côté (x,1), FK dans la table du côté (x,1),
+aucune colonne hors dictionnaire ; résultat 5 tables, 57 colonnes, 7
+clés étrangères dont <code>consolidated_asset.run_id</code>, 0 table de
+jointure, 0 attribut déplacé ; héritage absent, 1FN/2FN/3FN sans écart,
+<code>tags</code> et <code>anomaly_codes</code> en TEXT JSON
+(<code>docs/modele/mld.md</code> § Source, § Notes de clés étrangères, §
+Décisions ; <code>docs/modele/schema.sql</code>).</li>
+<li>Suppression : <code>ON DELETE</code> RESTRICT par défaut, CASCADE
+uniquement pour <code>consolidated_asset.asset_id</code>, SET NULL
+écarté ; ordre de création <code>run</code>, <code>ipam_record</code>,
+<code>asset</code>, <code>consolidated_asset</code>,
+<code>anomaly</code> ; le lien run → <code>consolidated_asset</code> est
+une FK directe <code>consolidated_asset.run_id</code> NOT NULL vers
+<code>run(id)</code>, écart clos ; six écarts restent ouverts : clé
+d’upsert IpamRecord (<code>ip</code> UNIQUE seul contre
+<code>ip + dns_name</code> en RG18), FK portées par le dictionnaire,
+matching Asset ↔︎ IpamRecord porté par <code>consolidated_asset</code>,
+<code>anomaly.asset_id</code> nullable, champs d’export RG24 absents du
+dictionnaire, exports/authentification hors MLD
+(<code>docs/modele/mld.md</code> § Décisions, § Ordre de création, §
+Écarts documentés).</li>
+<li>UML et code : 5 classes, 45 attributs + 5 PK + 7 FK = 57 colonnes,
+aucune méthode, aucune classe-association ; états du run RUNNING,
+SUCCESS, FAIL ; diagrammes de séquence : authentification web et cycle
+d’inventaire ; <code>app/models.py</code> déclare 5 modèles SQLAlchemy
+en mapping 1:1 avec <code>docs/modele/schema.sql</code>
+(<code>docs/modele/mld.md</code> § Tableau MLD,
+<code>docs/modele/classes.md</code>, <code>docs/modele/etats.md</code>,
+<code>docs/modele/sequences.md</code> § (a), § (b),
+<code>app/models.py</code>).</li>
+</ol>
+<h3 data-number="2.1.2" id="définitions-1"><span
+class="header-section-number">2.1.2</span> Définitions</h3>
+<p><strong>Dictionnaire des données</strong> :
+<code>docs/modele/dictionnaire.md</code>, 5 tables et 57 colonnes, fait
+foi en cas de divergence (<code>docs/modele/mcd.md</code> Écart 5).
+<strong>Passage MLD</strong> : Règle appliquée : PK du côté (x,1), FK
+dans la table du côté (x,1) de l’association
+(<code>docs/modele/mld.md</code> § Source).</p>
+<h3 data-number="2.1.3" id="schéma-1"><span
+class="header-section-number">2.1.3</span> Schéma</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Entité MCD</th>
+<th>Table MLD</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Run</td>
+<td><code>run</code></td>
+</tr>
+<tr class="even">
+<td>Asset</td>
+<td><code>asset</code></td>
+</tr>
+<tr class="odd">
+<td>IpamRecord</td>
+<td><code>ipam_record</code></td>
+</tr>
+<tr class="even">
+<td>ConsolidatedAsset</td>
+<td><code>consolidated_asset</code></td>
+</tr>
+<tr class="odd">
+<td>Anomaly</td>
+<td><code>anomaly</code></td>
+</tr>
+</tbody>
+</table>
+<h3 data-number="2.1.4" id="étiquettes-1"><span
+class="header-section-number">2.1.4</span> Étiquettes</h3>
+<p><strong>EXIGENCE</strong> : dictionnaire, MCD, passage MLD,
+contraintes et diagrammes (<code>docs/modele/…</code> ; cahier § 6.1, §
+6.3). <strong>IMPLÉMENTATION</strong> : <code>app/models.py</code>, clés
+<code>uk_asset_vm_id</code>, <code>uq_ipam_record_ip_dns</code>, tests
+<code>tests/test_schema_conformite.py:158-184</code> et
+<code>tests/test_relations.py:31-112</code>. <strong>LACUNE</strong> : §
+6.1 et § 6.3 à produire ; six écarts documentés ouverts.</p>
+<h3 data-number="2.1.5" id="glossaire-1"><span
+class="header-section-number">2.1.5</span> Glossaire</h3>
+<ul>
+<li><strong>MCD</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>MLD</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>UML</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>PK</strong> : PK du côté (x,1) de l’association lors du
+passage MLD (<code>docs/modele/mld.md</code> § Source)</li>
+<li><strong>FK</strong> : FK dans la table du côté (x,1) de
+l’association (<code>docs/modele/mld.md</code> § Source)</li>
+</ul>
+<h3 data-number="2.1.6" id="carte-mentale-1"><span
+class="header-section-number">2.1.6</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Modèle de données))
+    Dictionnaire des données
+      5 tables 57 colonnes
+    MCD
+      5 entités 7 associations
+    Passage MLD
+    UML
+    Implémentation réelle</code></pre>
+<h3 data-number="2.1.7" id="pièges-dexamen-1"><span
+class="header-section-number">2.1.7</span> Pièges d’examen</h3>
+<ol type="1">
+<li>Confondre dictionnaire et MCD : le dictionnaire porte 5 tables et 57
+colonnes et fait foi, le MCD compte 5 entités et 7 associations
+(<code>docs/modele/mcd.md</code> ;
+<code>docs/modele/mld.md</code>).</li>
+<li>Confondre PK et FK : PK du côté (x,1), FK dans la table du côté
+(x,1) de l’association (<code>docs/modele/mld.md</code> § Source).</li>
+<li>Confondre CASCADE et SET NULL : CASCADE uniquement pour
+<code>consolidated_asset.asset_id</code>, SET NULL écarté car remettre
+un <code>asset_id</code> à NULL détruirait la preuve de l’anomalie
+(<code>docs/modele/mld.md</code> § Décisions).</li>
+<li>Confondre les états du run : RUNNING, SUCCESS et FAIL seulement ;
+aucun état PENDING, RETRY, CANCELLED ou PAUSED n’est défini
+(<code>docs/modele/etats.md</code> § Légende).</li>
+</ol>
+<blockquote>
+<p><strong>À retenir</strong> — Le dictionnaire fait foi : 5 tables, 57
+colonnes, 7 clés étrangères et 0 table de jointure. PK du côté (x,1), FK
+dans la table du côté (x,1).</p>
+</blockquote>
+<h2 data-number="2.2" id="questions-réponses-1"><span
+class="header-section-number">2.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Combien de tables comporte la base ?</strong> Cinq :
+<code>run</code>, <code>asset</code>, <code>ipam_record</code>,
+<code>consolidated_asset</code>, <code>anomaly</code>, soit 57 colonnes
+(<code>docs/modele/schema.sql</code> ; objectif OT2, cahier des charges
+§ 3.2).</li>
+<li><strong>Q2. Pourquoi aucune table de jointure ?</strong> Aucune
+association n’est (x,n)–(x,n) ni n-aire : 7 associations deviennent 7
+clés étrangères, 0 table de jointure (<code>docs/modele/mld.md</code> §
+Décisions, § Notes de clés étrangères).</li>
+<li><strong>Q3. Pourquoi <code>consolidated_asset.ipam_record_id</code>
+est-il nullable ?</strong> La chaîne renseigner est IpamRecord (0,n) –
+ConsolidatedAsset (0,1) : min = 0, aucun enregistrement IPAM en cas de
+NO_MATCH (<code>docs/modele/mld.md</code> § Notes de clés étrangères, §
+Décisions).</li>
+<li><strong>Q4. Pourquoi <code>consolidated_asset.asset_id</code> est-il
+supprimable en cascade ?</strong> Les lignes consolidées sont dérivées
+d’un asset ; cascade uniquement sur cette clé étrangère
+(<code>docs/modele/mld.md</code> § Décisions).</li>
+<li><strong>Q5. Existe-t-il un lien direct entre un run et les lignes
+consolidées ?</strong> Oui : <code>consolidated_asset.run_id</code> NOT
+NULL est une clé étrangère vers <code>run(id)</code>, association
+<code>rattacher</code> Run (0,n) – ConsolidatedAsset (1,1) ; l’écart de
+référence est clos (<code>docs/modele/mld.md</code> § Notes de clés
+étrangères, § Écarts documentés).</li>
+<li><strong>Q6. Le modèle UML prévoit-il des méthodes ?</strong> Non :
+aucune RG n’exige un comportement porté par une classe ; les RG restent
+traçables par la colonne RG des tableaux
+(<code>docs/modele/classes.md</code> § Classes).</li>
+<li><strong>Q7. Quels états peut avoir un run ?</strong> Exactement
+RUNNING, SUCCESS et FAIL ; aucun état PENDING, RETRY, CANCELLED ou
+PAUSED n’est défini (<code>docs/modele/etats.md</code> § Légende).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — À chaque réponse, citer la provenance :
+fichier publié ou cahier des charges § n.</p>
+</blockquote>
+<h1 data-number="3" id="règles-de-gestion-et-schéma-sql"><span
+class="header-section-number">3</span> Règles de gestion et schéma
+SQL</h1>
+<h2 data-number="3.1" id="fiche-2"><span
+class="header-section-number">3.1</span> Fiche</h2>
+<h3 data-number="3.1.1" id="points-clés-2"><span
+class="header-section-number">3.1.1</span> Points clés</h3>
+<ol type="1">
+<li><code>docs/modele/regles.md</code> numérote 38 règles de RG01 à
+RG38, chacune avec son type et sa section d’origine : matching
+(RG01→RG07, RG09), anomalies (RG08→RG13), normalisation (RG14), rôle
+(RG15, RG16), pipeline de run (RG17→RG20, RG35), exports (RG21→RG24),
+authentification (RG25→RG28), variables (RG29, RG30), structure
+(RG31→RG34, RG37, RG38), index (RG36).</li>
+<li>Le run applique le matching quatre niveaux par ordre de priorité :
+hostname normalisé → FQDN → IP → NO_MATCH
+(<code>docs/modele/regles.md</code> RG01 ; cahier des charges §
+7.1).</li>
+<li>MATCHED_NAME compare les hostnames normalisés (minuscules, sans
+espaces, sans suffixe de domaine) ; MATCHED_FQDN compare le premier
+segment du FQDN normalisé avec le DNS Name IPAM ; MATCHED_IP compare
+l’IP rapportée de l’asset avec l’adresse IP de l’enregistrement IPAM
+(RG02, RG03, RG04 ; § 7.1, § 7.2).</li>
+<li>HOSTNAME_MISMATCH et STATUS_MISMATCH sont déclenchés respectivement
+quand un asset matche par IP mais que le hostname diffère du DNS NetBox,
+et quand une VM est arrêtée tandis que son IP est active dans NetBox
+(RG06, RG07) ; les six codes sont définis au tableau § 6.2
+(RG08→RG13).</li>
+<li>La normalisation convertit en minuscules, supprime les espaces et le
+suffixe de domaine (<code>web-a500.prod.local</code> →
+<code>web-a500</code>) ; le rôle d’abord par convention de nommage
+lettre + 3 chiffres (<code>web-a500</code> → lettre a → Application),
+puis par tag <code>role:xxx</code> (RG14, RG15, RG16 ; § 7.2, §
+7.3).</li>
+<li>Le pipeline crée le run avec <code>status=RUNNING</code> dès le
+début, upsert des Asset par <code>vm_id</code> et des IpamRecord par
+<code>ip+dns_name</code>, finalise à <code>SUCCESS</code> avec les
+quatre compteurs ; une exception déclenche rollback et <code>FAIL</code>
+avec message d’erreur (RG17→RG20 ; § 8.2). Chaque asset consolidé est
+rattaché au run qui l’a produit par
+<code>consolidated_asset.run_id</code>, clé étrangère NOT NULL vers
+<code>run.id</code>, colonne indexée par
+<code>idx_consolidated_asset_run_id</code> pour comparer deux runs
+(RG35, RG36 ; § 8.5, § 8.6 ; <code>docs/modele/schema.sql</code>,
+<code>app/models.py:145</code>, <code>app/models.py:179</code>).</li>
+<li>Exports et authentification : retentions 30 jours consolidé / 7
+jours brut, rapport <code>report.md</code> écrasé à chaque exécution,
+sessions signées par <code>SECRET_KEY</code>, routes web sous
+<code>@login_required</code>, API en JWT via Flask-JWT-Extended sous
+<code>@jwt_required()</code>, <code>.env</code> impératif et refus de
+démarrage si un secret vaut sa valeur par défaut (RG21→RG30 ; § 8.10, §
+10.1, § 10.2, § 10.3).</li>
+<li>Structure : collecte couvrant tous les nœuds hyperviseurs, type
+d’asset qemu/lxc enregistré, tenant et site attribués à chaque
+enregistrement IPAM (RG31→RG34 ; cahier des charges § 13.1, § 13.2). Les
+attributs et les métriques de chaque VM sont enregistrés sur l’asset à
+chaque run et une valeur absente reste vide (RG37) ; l’asset consolidé
+conserve l’IP, le DNS et le statut retenus lors de son run — instantané
+— (RG38 ; § 8.3, § 8.6, § 8.7 ;
+<code>docs/modele/regles.md</code>).</li>
+<li>Couverture du MLD : RG01→RG20 et RG31→RG34 couvertes intégralement
+par les 5 tables et leurs contraintes ; RG24 partiellement ; RG35 et
+RG36 par <code>consolidated_asset.run_id</code> NOT NULL FK vers
+<code>run(id)</code> et son index
+<code>idx_consolidated_asset_run_id</code> ; RG37, RG38 sur les
+métriques de la VM et l’instantané du run ; RG21→RG23 et RG25→RG30 hors
+MLD — exports fichiers et paramétrage (<code>docs/modele/mld.md</code> §
+RG couvertes, § Tableau MLD).</li>
+<li><code>docs/modele/schema.sql</code> porte les tables, CHECK, index
+et clés étrangères ; c’est la référence de conformité :
+<code>app/models.py</code> la reproduit en ORM (mapping 1:1, en-tête du
+fichier) et <code>tests/test_schema_conformite.py:163-188</code> compare
+la base créée par l’application à ce fichier,
+<code>tests/test_schema_conformite.py:205-264</code> simulant un écart
+de table, de type, de colonne, de nullabilité ou d’index unique. Clé
+d’upsert RG18 : le MLD retient l’index unique composite
+<code>uq_ipam_record_ip_dns</code>, <code>ip</code> seule n’est pas
+unique, et l’application crée les deux index
+<code>uq_ipam_record_ip_dns</code> et
+<code>idx_ipam_record_dns_name</code>
+(<code>app/models.py:66-67</code>).</li>
+</ol>
+<h3 data-number="3.1.2" id="définitions-2"><span
+class="header-section-number">3.1.2</span> Définitions</h3>
+<p><strong>Normalisation</strong> : convertit en minuscules, supprime
+les espaces et le suffixe de domaine (<code>web-a500.prod.local</code> →
+<code>web-a500</code>) (RG14). <strong>HOSTNAME_MISMATCH</strong> :
+déclenché quand un asset matche par IP mais que le hostname diffère du
+DNS NetBox (RG06). <strong>STATUS_MISMATCH</strong> : déclenché quand
+une VM est arrêtée tandis que son IP est active dans NetBox (RG07).
+<strong>Rôle</strong> : d’abord par convention de nommage lettre + 3
+chiffres (<code>web-a500</code> → lettre a → Application), puis par tag
+<code>role:xxx</code> si aucune lettre+chiffres n’est trouvée (RG15,
+RG16). <strong>Types SQL</strong> : les types SQL dérivent du
+dictionnaire — <code>integer</code> → INT, <code>varchar</code> →
+VARCHAR(n), <code>datetime</code> → DATETIME, <code>text</code> → TEXT,
+<code>boolean</code> → BOOLEAN (<code>docs/modele/mld.md</code> §
+Source). <strong>Clé d’upsert</strong> : RG18 impose un upsert
+IpamRecord par <code>ip + dns_name</code> ; l’index unique composite
+<code>uq_ipam_record_ip_dns (ip, dns_name)</code> porte cette clé et
+<code>ip</code> seule n’est pas unique, RG13 détecte les IP en double
+(<code>docs/modele/mld.md</code> § Écarts documentés, Écart 1 ;
+<code>docs/modele/dictionnaire.md</code>).</p>
+<h3 data-number="3.1.3" id="schéma-2"><span
+class="header-section-number">3.1.3</span> Schéma</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Règles</th>
+<th>Couverture par le MLD</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>RG01→RG20, RG31→RG34</td>
+<td>couverture intégrale : les 5 tables et leurs contraintes</td>
+</tr>
+<tr class="even">
+<td>RG35, RG36</td>
+<td><code>consolidated_asset.run_id</code> NOT NULL FK vers
+<code>run(id)</code> et index <code>idx_consolidated_asset_run_id</code>
+(<code>docs/modele/mld.md</code> § Tableau MLD)</td>
+</tr>
+<tr class="odd">
+<td>RG37, RG38</td>
+<td>métriques de la VM sur <code>asset</code> et instantané du run sur
+<code>consolidated_asset</code> (<code>docs/modele/mld.md</code> § RG
+couvertes)</td>
+</tr>
+<tr class="even">
+<td>RG24</td>
+<td>couverture partielle : colonnes d’export réparties entre les
+tables</td>
+</tr>
+<tr class="odd">
+<td>RG21→RG23 et RG25→RG30</td>
+<td>hors MLD — exports fichiers et paramétrage</td>
+</tr>
+</tbody>
+</table>
+<p>Conformité : <code>app/models.py</code> reproduit le schéma en ORM et
+<code>tests/test_schema_conformite.py:205-264</code> détecte une table,
+un type, une colonne, une nullabilité ou un index unique manquant ;
+<code>tests/test_schema_conformite.py:268-279</code> détecte une règle
+FK manquante.</p>
+<h3 data-number="3.1.4" id="étiquettes-2"><span
+class="header-section-number">3.1.4</span> Étiquettes</h3>
+<p><strong>EXIGENCE</strong> : 38 RG tracées avec leur section d’origine
+(<code>docs/modele/regles.md</code> ; cahier des charges §§ 7.1 à 7.3,
+8.2, 8.10, 10.1 à 10.3, 13.1, 13.2) et couverture annoncée par le MLD
+(<code>docs/modele/mld.md</code> § RG couvertes).
+<strong>IMPLÉMENTATION</strong> : <code>docs/modele/schema.sql</code>,
+<code>app/models.py:66-67</code> (<code>uq_ipam_record_ip_dns</code>,
+<code>idx_ipam_record_dns_name</code>),
+<code>tests/test_schema_conformite.py:163-188</code>,
+<code>tests/test_upsert.py:51-104</code> ; clé d’upsert RG18
+<code>ip + dns_name</code> portée par
+<code>uq_ipam_record_ip_dns</code>, <code>ip</code> seule n’est pas
+unique (<code>docs/modele/mld.md</code> § Écarts documentés, Écart
+1).</p>
+<h3 data-number="3.1.5" id="glossaire-2"><span
+class="header-section-number">3.1.5</span> Glossaire</h3>
+<ul>
+<li><strong>RG</strong> : règles de gestion numérotées de RG01 à RG38,
+chacune avec son type et sa section d’origine
+(<code>docs/modele/regles.md</code>)</li>
+<li><strong>MLD</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>ORM</strong> : reproduit en ORM, mapping 1:1
+(<code>app/models.py</code>, en-tête du fichier)</li>
+<li><strong>SQL</strong> : les types SQL dérivent du dictionnaire
+(<code>docs/modele/mld.md</code> § Source)</li>
+<li><strong>API</strong> : API en JWT via Flask-JWT-Extended sous
+<code>@jwt_required()</code></li>
+<li><strong>JWT</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>Flask</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>DNS</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>FQDN</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>IPAM</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>IP</strong> : (employé sans définition dans la section)</li>
+<li><strong>VM</strong> : (employé sans définition dans la section)</li>
+<li><strong>NetBox</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>MATCHED_NAME</strong> : hostnames normalisés comparés
+(minuscules, sans espaces, sans suffixe de domaine)</li>
+<li><strong>MATCHED_FQDN</strong> : premier segment du FQDN normalisé
+contre le DNS Name IPAM</li>
+<li><strong>MATCHED_IP</strong> : IP rapportée de l’asset contre
+l’adresse IP de l’enregistrement IPAM</li>
+<li><strong>NO_MATCH</strong> : sans correspondance (RG05)</li>
+<li><strong>HOSTNAME_MISMATCH</strong> : asset matché par IP dont le
+hostname diffère du DNS NetBox (RG06)</li>
+<li><strong>STATUS_MISMATCH</strong> : VM arrêtée tandis que son IP est
+active dans NetBox (RG07)</li>
+<li><strong>DUPLICATE_DNS</strong> : (employé sans définition dans la
+section)</li>
+<li><strong>DUPLICATE_IP</strong> : (employé sans définition dans la
+section)</li>
+</ul>
+<h3 data-number="3.1.6" id="carte-mentale-2"><span
+class="header-section-number">3.1.6</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Règles de gestion et schéma SQL))
+    Règles RG01 à RG38
+      Dix domaines
+    Matching quatre niveaux
+      Hostname FQDN IP
+      NO_MATCH sans correspondance
+    Anomalies six codes
+      Mismatch et doublons
+    Normalisation et rôle
+      Minuscules sans suffixe
+    Pipeline du run
+      RUNNING SUCCESS FAIL
+    Rattachement au run
+      Run_id index run
+    Couverture du MLD
+      Intégrale partielle hors MLD
+    Schéma physique
+      Mapping ORM identique</code></pre>
+<h3 data-number="3.1.7" id="pièges-dexamen-2"><span
+class="header-section-number">3.1.7</span> Pièges d’examen</h3>
+<ol type="1">
+<li>Confondre MATCHED_FQDN et MATCHED_IP : le premier compare le premier
+segment du FQDN normalisé avec le DNS Name IPAM, le second l’IP
+rapportée de l’asset avec l’adresse IP de l’enregistrement IPAM
+(<code>docs/modele/regles.md</code> RG03, RG04).</li>
+<li>Confondre HOSTNAME_MISMATCH et STATUS_MISMATCH : le premier signale
+un hostname différent du DNS NetBox après un match par IP, le second une
+VM arrêtée dont l’IP reste active dans NetBox (RG06, RG07).</li>
+<li>Confondre couverture intégrale et couverture partielle : RG01→RG20
+et RG31→RG34 sont couvertes intégralement, RG35 et RG36 par
+<code>consolidated_asset.run_id</code> et son index, RG37 et RG38 par
+les métriques et l’instantané, RG24 seulement partiellement, RG21→RG23
+et RG25→RG30 hors MLD (<code>docs/modele/mld.md</code> § RG
+couvertes).</li>
+<li>Confondre clé d’upsert et index unique : RG18 impose
+<code>ip + dns_name</code>, porté par l’index unique composite
+<code>uq_ipam_record_ip_dns (ip, dns_name)</code> ; <code>ip</code>
+seule n’est pas unique et RG13 détecte les IP en double ; l’application
+crée aussi <code>idx_ipam_record_dns_name</code>
+(<code>app/models.py:66-67</code>,
+<code>docs/modele/schema.sql</code>).</li>
+<li>Confondre rôle par nommage et rôle par tag : la convention lettre +
+3 chiffres d’abord, le tag <code>role:xxx</code> ensuite, si aucune
+lettre+chiffres n’est trouvée (RG15, RG16).</li>
+</ol>
+<blockquote>
+<p><strong>À retenir</strong> — Le matching suit l’ordre hostname
+normalisé → FQDN → IP → NO_MATCH. <code>docs/modele/schema.sql</code>
+fait foi : <code>app/models.py</code> le reproduit en ORM et les tests
+le comparent. Clé d’upsert RG18 : <code>ip + dns_name</code> via
+<code>uq_ipam_record_ip_dns</code>, <code>ip</code> seule n’est pas
+unique.</p>
+</blockquote>
+<h2 data-number="3.2" id="questions-réponses-2"><span
+class="header-section-number">3.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Combien de règles de gestion et comment sont-elles
+tracées ?</strong> 38 règles, RG01→RG38, chacune rattachée à une section
+du cahier (<code>docs/modele/regles.md</code>).</li>
+<li><strong>Q2. Dans quel ordre s’applique le matching ?</strong>
+Hostname normalisé → FQDN → IP → NO_MATCH, ordre de priorité décroissant
+(<code>docs/modele/regles.md</code> RG01 ; cahier des charges §
+7.1).</li>
+<li><strong>Q3. Que dit RG14 exactement ?</strong> Minuscules,
+suppression des espaces, suppression du suffixe de domaine :
+<code>web-a500.prod.local</code> → <code>web-a500</code>
+(<code>docs/modele/regles.md</code> RG14 ; cahier des charges §
+7.2).</li>
+<li><strong>Q4. Comment un run échoue-t-il ?</strong> Exception pendant
+le pipeline → rollback de la transaction, <code>status=FAIL</code>,
+<code>error_message</code> renseigné (<code>docs/modele/regles.md</code>
+RG20 ; état et transition dans <code>docs/modele/etats.md</code>).</li>
+<li><strong>Q5. Toutes les RG sont-elles dans le modèle ?</strong> Non :
+RG01→RG20 et RG31→RG34 intégralement, RG35 et RG36 via
+<code>consolidated_asset.run_id</code> et son index, RG37 et RG38 sur
+les métriques et l’instantané, RG24 partiellement, RG21→RG23 et
+RG25→RG30 hors MLD (<code>docs/modele/mld.md</code> § RG
+couvertes).</li>
+<li><strong>Q6. Quelle est la clé d’upsert réellement testée ?</strong>
+<code>vm_id</code> pour Asset et <code>ip + dns_name</code> pour
+IpamRecord (<code>tests/test_upsert.py:84-104</code>), avec l’index
+composite <code>uq_ipam_record_ip_dns</code>
+(<code>app/models.py:66</code>), et <code>ip</code> seule n’est pas
+unique, RG13 détecte les IP en double (<code>docs/modele/mld.md</code>,
+Écart 1 ; <code>docs/modele/dictionnaire.md</code>).</li>
+<li><strong>Q7. Que vérifie la conformité du schéma ?</strong> Tables,
+colonnes, types, index et clés étrangères de la base créée par
+l’application, confrontés à <code>docs/modele/schema.sql</code>
+(<code>tests/test_schema_conformite.py:163-188</code>), avec détection
+d’une table, d’un type, d’une colonne, d’une nullabilité, d’un index
+unique manquant (<code>tests/test_schema_conformite.py:205-264</code>)
+et d’une règle FK manquante
+(<code>tests/test_schema_conformite.py:268-279</code>).</li>
+<li><strong>Q8. Que ajoutent RG35 à RG38 au modèle ?</strong> RG35
+rattache chaque asset consolidé au run qui l’a produit
+(<code>consolidated_asset.run_id</code> NOT NULL FK vers
+<code>run.id</code>), RG36 indexe cette colonne pour comparer deux runs,
+RG37 enregistre les attributs et les métriques de la VM à chaque run,
+RG38 y conserve l’IP, le DNS et le statut retenus lors du run
+(<code>docs/modele/regles.md</code> RG35, RG36, RG37, RG38 ;
+<code>docs/modele/schema.sql</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — À chaque réponse, citer la provenance :
+fichier publié ou cahier des charges § n.</p>
+</blockquote>
+<h1 data-number="4" id="sources-et-collecte"><span
+class="header-section-number">4</span> Sources et collecte</h1>
+<h2 data-number="4.1" id="fiche-3"><span
+class="header-section-number">4.1</span> Fiche</h2>
+<h3 data-number="4.1.1" id="points-clés-3"><span
+class="header-section-number">4.1.1</span> Points clés</h3>
+<ol type="1">
+<li><strong>EXIGENCE</strong> — Le périmètre v2.0 inclut la collecte à
+partir de sources simulées (mock Proxmox + mock NetBox) ou réelles (API
+Proxmox VE + API NetBox) ; les sources sont interchangeables par
+variables d’environnement (OT4) ; les jeux simulés sont décrits en §
+13.1 (virtualisation) et § 13.2 (IPAM) (cahier des charges § 4.1, §
+3.2).</li>
+<li><strong>EXIGENCE (contrainte SDV)</strong> — Seules les sources
+simulées sont exécutées (<code>USE_MOCK_VIRT=true</code>,
+<code>USE_MOCK_IPAM=true</code>) ; les clients Proxmox et NetBox réels
+sont écrits avec la même interface, mais aucun test ne les appelle :
+aucun appel réseau sortant dans les tests ni au démarrage (rubrique «
+Contraintes du SDV » du cahier des charges).</li>
+<li><strong>EXIGENCE</strong> — Le pipeline d’un run comporte sept
+étapes : initialisation <code>Run</code> RUNNING, collecte
+virtualisation, collecte IPAM, upsert <code>Asset</code> par
+<code>vm_id</code> et <code>IpamRecord</code> par
+<code>ip + dns_name</code>, consolidation multi-stratégie, détection des
+doublons IPAM, finalisation SUCCESS avec compteurs ; en cas d’exception,
+rollback, status FAIL avec message (cahier des charges § 8.2). Le § 5.2
+place <code>collector/inventory_runner.py</code> en orchestrateur.</li>
+<li><strong>IMPLÉMENTATION</strong> — Le paquet <code>collector/</code>
+contient <code>mock_virtualisation.py</code> (<code>MOCK_VMS</code>,
+<code>fetch_mock_vms</code>,
+<code>collector/mock_virtualisation.py:496</code>),
+<code>mock_netbox.py</code> (<code>MOCK_IPAM</code>,
+<code>fetch_mock_ipam</code>, <code>collector/mock_netbox.py:71</code>),
+<code>proxmox_client.py</code> (<code>fetch_proxmox_vms</code>,
+<code>ProxmoxClientError</code>, délai par appel 15 s,
+<code>collector/proxmox_client.py:27,30,183</code>),
+<code>netbox_client.py</code> (<code>fetch_ipam_records</code>,
+<code>NetBoxClientError</code>, délai 30 s et pagination,
+<code>collector/netbox_client.py:27,37,200</code>), plus
+<code>inventory_runner.py</code>, <code>matching.py</code>,
+<code>normalisation.py</code>, <code>role.py</code>,
+<code>anomalies.py</code> et <code>exports.py</code>.</li>
+<li><strong>IMPLÉMENTATION</strong> — Le point d’entrée expose
+<code>get_vms_source()</code>, <code>get_ipam_source()</code>,
+<code>collect_vms()</code> et <code>collect_ipam()</code> ; chaque
+fonction choisit le mock ou le client réel
+(<code>collector/__init__.py:40-57</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> —
+<code>Config.use_mock_virt()</code> et
+<code>Config.use_mock_ipam()</code> lisent <code>USE_MOCK_VIRT</code> et
+<code>USE_MOCK_IPAM</code>, tous deux <code>true</code> par défaut
+(<code>app/config.py:57-64</code>).</li>
+<li><strong>IMPLÉMENTATION (champs remontés)</strong> — Une VM/CT porte
+dix-sept clés : <code>vm_id</code>, <code>vm_name</code>,
+<code>type</code>, <code>node</code>, <code>status</code>,
+<code>tags</code>, <code>ip_reported</code>, <code>os</code>,
+<code>fqdn</code>, <code>annotation</code>, <code>cpu_count</code>,
+<code>cpu_usage</code>, <code>ram_max</code>, <code>ram_used</code>,
+<code>disk_max</code>, <code>disk_used</code>, <code>uptime</code>
+(<code>tests/test_virtualisation_sources.py:36-40</code>). Un
+enregistrement IPAM en porte six : <code>ip</code>,
+<code>dns_name</code>, <code>status</code>, <code>tenant</code>,
+<code>site</code>, <code>meta_zone</code>
+(<code>tests/test_netbox_sources.py:39</code>), <code>meta_zone</code>
+lu dans les <code>custom_fields</code> côté réel
+(<code>collector/netbox_client.py:188</code>).</li>
+<li><strong>IMPLÉMENTATION (erreurs)</strong> — Les clients réels lèvent
+<code>ProxmoxClientError</code> et <code>NetBoxClientError</code>
+explicites (jeton manquant, timeout, erreur HTTP, JSON invalide, plafond
+d’octets, redirection interdite, pagination hors origine,
+<code>collector/netbox_client.py:79,104</code>) et ne divulguent jamais
+le secret de token
+(<code>tests/test_virtualisation_sources.py:422,438</code>,
+<code>tests/test_netbox_sources.py:325,426</code>). Un budget de
+collecte de 300 s est partagé par <code>RUN_DEADLINE</code> ;
+<code>remaining_timeout()</code> lève <code>TimeoutError</code>
+(<code>collector/netbox_client.py:32-47</code>).</li>
+<li><strong>IMPLÉMENTATION (orchestrateur)</strong> —
+<code>run_inventory(collect_vms=None, collect_ipam=None, now=None)</code>
+exécute les sept étapes, sources injectables en défaut
+<code>collector.collect_vms</code> / <code>collector.collect_ipam</code>
+(<code>collector/inventory_runner.py:54-69</code>) ; toute exception
+fait passer le run à FAIL avec un message tronqué à 1000 caractères
+(<code>:46,121-128</code>), un run RUNNING trop ancien passe FAIL au
+démarrage (<code>:72-80</code>), notifications et exports échouent sans
+contredire SUCCESS (<code>:136-149</code>).</li>
+<li><strong>IMPLÉMENTATION (déclenchement et tests)</strong> —
+<code>POST /run</code> et <code>POST /ajax/run</code> appellent
+l’orchestrateur (<code>app/routes.py:83,92</code>), de même que
+<code>POST /api/runs</code> (<code>app/api.py:207,220-222</code>).
+Couverture : 31 tests virtualisation, 42 tests IPAM, 12 tests
+orchestrateur, 18 tests de sécurité collecte ; le réseau est interdit au
+test (<code>tests/test_virtualisation_sources.py:52-60</code>,
+<code>tests/test_collector_security.py:34</code>).</li>
+</ol>
+<h3 data-number="4.1.2" id="définitions-3"><span
+class="header-section-number">4.1.2</span> Définitions</h3>
+<p><strong>Périmètre du cahier</strong> : collecte à partir de sources
+simulées (mock Proxmox + mock NetBox) ou réelles (API Proxmox VE + API
+NetBox), avec sources interchangeables par variables d’environnement
+(OT4) (cahier des charges § 4.1, § 3.2). <strong>Contrainte SDV</strong>
+: seules les sources simulées sont exécutées
+(<code>USE_MOCK_VIRT=true</code>, <code>USE_MOCK_IPAM=true</code>) ; les
+clients réels sont écrits avec la même interface, mais aucun test ne les
+appelle : aucun appel réseau sortant dans les tests ni au démarrage
+(rubrique « Contraintes du SDV » du cahier des charges). <strong>Bascule
+simulé / réel</strong> : <code>Config.use_mock_virt()</code> et
+<code>Config.use_mock_ipam()</code> lisent <code>USE_MOCK_VIRT</code> et
+<code>USE_MOCK_IPAM</code>, tous deux <code>true</code> par défaut
+(<code>app/config.py:57-64</code>). <strong>Injection de
+transport</strong> : les clients réels acceptent
+<code>transport(url, headers, timeout, verify_ssl) -&gt; dict</code> ;
+par défaut urllib, les tests injectent un objet de remplacement et
+n’ouvrent aucune connexion (<code>collector/__init__.py:14-16</code>,
+<code>tests/test_virtualisation_sources.py:267</code>).
+<strong>Orchestrateur</strong> : <code>run_inventory()</code> déroule le
+pipeline en sept étapes du § 8.2 et rend le <code>Run</code>, SUCCESS ou
+FAIL ; un échec ne lève pas, il est porté par le run
+(<code>collector/inventory_runner.py:54-65</code>). <strong>Module de
+collecte livré</strong> : le paquet <code>collector/</code> réunit deux
+jeux simulés, deux clients réels, l’orchestrateur et ses modules de
+consolidation (<code>collector/</code>, cahier des charges § 5.2).</p>
+<h3 data-number="4.1.3" id="schéma-3"><span
+class="header-section-number">4.1.3</span> Schéma</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Critère</th>
+<th>Source simulée</th>
+<th>Source réelle</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Jeu / fonction</td>
+<td><code>MOCK_VMS</code> (45), <code>fetch_mock_vms</code> ;
+<code>MOCK_IPAM</code> (44), <code>fetch_mock_ipam</code></td>
+<td><code>fetch_proxmox_vms</code> ;
+<code>fetch_ipam_records</code></td>
+</tr>
+<tr class="even">
+<td>Module</td>
+<td><code>collector/mock_virtualisation.py:496</code>,
+<code>collector/mock_netbox.py:71</code></td>
+<td><code>collector/proxmox_client.py:183</code>,
+<code>collector/netbox_client.py:200</code></td>
+</tr>
+<tr class="odd">
+<td>Délai</td>
+<td>aucun appel réseau</td>
+<td>15 s par appel (Proxmox), 30 s (NetBox) et pagination</td>
+</tr>
+<tr class="even">
+<td>Erreurs</td>
+<td>sans appel réseau</td>
+<td><code>ProxmoxClientError</code>, <code>NetBoxClientError</code> :
+jeton, timeout, HTTP, JSON, plafond d’octets, redirection, pagination ;
+secret jamais exposé</td>
+</tr>
+<tr class="odd">
+<td>Activation</td>
+<td><code>USE_MOCK_VIRT=true</code>, <code>USE_MOCK_IPAM=true</code> par
+défaut (<code>app/config.py:57-64</code>)</td>
+<td>variables d’environnement (OT4), transport injectable (URL,
+en-têtes, délai, drapeau SSL)</td>
+</tr>
+<tr class="even">
+<td>Champs</td>
+<td>VM/CT : 17 clés
+(<code>tests/test_virtualisation_sources.py:36-40</code>) ; IPAM : 6
+clés (<code>tests/test_netbox_sources.py:39</code>)</td>
+<td>mêmes clés que le format simulé
+(<code>tests/test_virtualisation_sources.py:211</code>,
+<code>tests/test_netbox_sources.py:212</code>)</td>
+</tr>
+<tr class="odd">
+<td>Tests</td>
+<td>45 VM/CT sur cinq nœuds, qemu et lxc
+(<code>tests/test_virtualisation_sources.py:158,179-185</code>) ; 44
+enregistrements IPAM
+(<code>tests/test_netbox_sources.py:173</code>)</td>
+<td>transport injecté, sans réseau
+(<code>tests/test_virtualisation_sources.py:267</code>,
+<code>tests/test_netbox_sources.py:289</code>)</td>
+</tr>
+</tbody>
+</table>
+<p>Sept étapes du run (cahier des charges § 8.2,
+<code>collector/inventory_runner.py:1-16</code>) : 1. initialisation du
+<code>Run</code> RUNNING ; 2. collecte virtualisation ; 3. collecte IPAM
+; 4. upsert des <code>Asset</code> et <code>IpamRecord</code> ; 5.
+consolidation (matching, rôle, anomalies) ; 6. anomalies IPAM (doublons
+DNS et IP) ; 7. finalisation SUCCESS avec compteurs.</p>
+<h3 data-number="4.1.4" id="étiquettes-3"><span
+class="header-section-number">4.1.4</span> Étiquettes</h3>
+<p><strong>EXIGENCE</strong> : collecte simulée ou réelle
+interchangeable par variables d’environnement (OT4) (cahier des charges
+§ 4.1, § 3.2), jeux décrits en § 13.1 et § 13.2, contrainte du SDV,
+pipeline en sept étapes et gestion d’erreur du § 8.2, orchestrateur du §
+5.2. <strong>IMPLÉMENTATION</strong> : paquet <code>collector/</code>
+complet (deux jeux, deux clients, orchestrateur, consolidation), bascule
+<code>app/config.py:57-64</code>, champs des collecteurs vérifiés par
+les tests, erreurs explicites sans secret, budget 300 s, déclenchement
+web et API, 31 + 42 + 12 + 18 tests. <strong>LACUNE</strong> :
+<code>IpamRecord</code> ne stocke pas <code>meta_zone</code>, remonté
+pourtant par les deux collecteurs (<code>docs/modele/mcd.md:95</code>,
+<code>collector/inventory_runner.py:189-190</code>).</p>
+<h3 data-number="4.1.5" id="glossaire-3"><span
+class="header-section-number">4.1.5</span> Glossaire</h3>
+<ul>
+<li><strong>API</strong> : API Proxmox VE et API NetBox, sources réelles
+du périmètre v2.0 (cahier des charges § 4.1)</li>
+<li><strong>IPAM</strong> : source simulée <code>MOCK_IPAM</code>,
+fonction <code>fetch_mock_ipam</code>, 42 tests IPAM
+(<code>collector/mock_netbox.py:71</code>,
+<code>tests/test_netbox_sources.py</code>)</li>
+<li><strong>VM</strong> : enregistrements <code>MOCK_VMS</code>, 45
+VM/CT sur cinq nœuds
+(<code>tests/test_virtualisation_sources.py:158,179-185</code>)</li>
+<li><strong>CT</strong> : type <code>lxc</code> du jeu simulé, avec
+<code>qemu</code>
+(<code>tests/test_virtualisation_sources.py:183</code>)</li>
+<li><strong>Proxmox</strong> : client <code>proxmox_client.py</code>,
+<code>ProxmoxClientError</code>, 15 s par appel
+(<code>collector/proxmox_client.py:27,30</code>)</li>
+<li><strong>NetBox</strong> : client <code>netbox_client.py</code>,
+<code>NetBoxClientError</code>, 30 s et pagination
+(<code>collector/netbox_client.py:27,37</code>)</li>
+<li><strong>OT4</strong> : sources interchangeables par variables
+d’environnement (cahier des charges § 3.2)</li>
+<li><strong><code>USE_MOCK_VIRT</code></strong> : variable lue par
+<code>Config.use_mock_virt()</code>, <code>true</code> par défaut
+(<code>app/config.py:57-59</code>)</li>
+<li><strong><code>USE_MOCK_IPAM</code></strong> : variable lue par
+<code>Config.use_mock_ipam()</code>, <code>true</code> par défaut
+(<code>app/config.py:62-64</code>)</li>
+<li><strong>Transport</strong> :
+<code>transport(url, headers, timeout, verify_ssl) -&gt; dict</code>
+accepté par les clients réels
+(<code>collector/__init__.py:14-16</code>)</li>
+<li><strong>Pagination</strong> : enchaînement des pages NetBox, origine
+vérifiée avant chaque appel
+(<code>collector/netbox_client.py:227-230</code>)</li>
+<li><strong>Budget de collecte</strong> : <code>RUN_BUDGET = 300</code>
+s partagé par <code>RUN_DEADLINE</code>,
+<code>remaining_timeout()</code> lève <code>TimeoutError</code>
+(<code>collector/netbox_client.py:32-47</code>)</li>
+<li><strong><code>meta_zone</code></strong> : sixième clé IPAM, lue dans
+les <code>custom_fields</code> du client réel
+(<code>collector/netbox_client.py:188</code>)</li>
+<li><strong><code>inventory_runner.py</code></strong> : orchestrateur du
+run, <code>run_inventory()</code>
+(<code>collector/inventory_runner.py:54</code>)</li>
+</ul>
+<h3 data-number="4.1.6" id="carte-mentale-3"><span
+class="header-section-number">4.1.6</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Sources et collecte))
+    Périmètre v2.0
+      Simulé ou réel
+      Interchangeable OT4
+    Contrainte SDV
+      Mocks seuls exécutés
+      Aucun appel réseau
+    Deux collecteurs
+      17 clés VM
+      6 clés IPAM
+    Bascule par variables
+      USE_MOCK_VIRT
+      USE_MOCK_IPAM
+    Erreurs explicites
+      Secret jamais exposé
+      Budget 300 s
+    Orchestrateur
+      Sept étapes
+      SUCCESS ou FAIL
+    Déclenchement
+      Routes web
+      API POST runs</code></pre>
+<h3 data-number="4.1.7" id="pièges-dexamen-3"><span
+class="header-section-number">4.1.7</span> Pièges d’examen</h3>
+<ol type="1">
+<li>Confondre exigence du cahier et appels réels des tests : la
+contrainte SDV interdit tout appel réseau sortant dans les tests ni au
+démarrage (rubrique « Contraintes du SDV » du cahier des charges), alors
+que les fonctions réelles sont appelées avec un transport de
+remplacement, sans réseau
+(<code>tests/test_virtualisation_sources.py:267</code>,
+<code>tests/test_netbox_sources.py:289</code>).</li>
+<li>Confondre collecte et exécution de run : <code>collect_vms()</code>
+et <code>collect_ipam()</code> ne ramènent qu’une liste de dict
+(<code>collector/__init__.py:50-57</code>), le pipeline à sept étapes,
+l’upsert et les anomalies sont le travail de
+<code>run_inventory()</code>
+(<code>collector/inventory_runner.py:54</code>).</li>
+<li>Confondre <code>match_status</code> et anomalie :
+<code>MATCHED_IP</code> est le statut de correspondance,
+<code>HOSTNAME_MISMATCH</code> l’anomalie détectée ensuite
+(<code>collector/inventory_runner.py:220-226</code>).</li>
+<li>Confondre délai par appel et budget de run : 15 s (Proxmox) et 30 s
+(NetBox) valent par appel HTTP
+(<code>collector/proxmox_client.py:27</code>,
+<code>collector/netbox_client.py:27</code>), le budget du run est de 300
+s (<code>collector/netbox_client.py:32</code>).</li>
+<li>Confondre nombre d’enregistrements et couverture : le jeu simulé
+contient 45 VM/CT
+(<code>tests/test_virtualisation_sources.py:158</code>) et 44
+enregistrements IPAM (<code>tests/test_netbox_sources.py:173</code>) ;
+le § 13.2 décrit 40 enregistrements de VM nommées plus deux orphelins et
+les doublons volontaires.</li>
+</ol>
+<blockquote>
+<p><strong>À retenir</strong> — Le périmètre prévoit simulé et réel, la
+contrainte SDV n’exécute que les mocks. Les deux collecteurs remontent
+des formats identiques simulé comme réel, onze clés de plus côté VM.
+<code>run_inventory()</code> enchaîne sept étapes et rend SUCCESS ou
+FAIL sans lever.</p>
+</blockquote>
+<h2 data-number="4.2" id="questions-réponses-3"><span
+class="header-section-number">4.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Quelles sources l’application peut-elle utiliser
+?</strong> Deux sources simulées ou deux sources réelles, basculées par
+<code>USE_MOCK_VIRT</code> et <code>USE_MOCK_IPAM</code>,
+<code>true</code> par défaut (<code>app/config.py:57-64</code>, cahier
+des charges § 4.1).</li>
+<li><strong>Q2. Les tests font-ils des appels réseau ?</strong> Non :
+aucun appel réseau sortant dans les tests ni au démarrage (rubrique «
+Contraintes du SDV » du cahier des charges) ; le réseau y est même rendu
+impossible (<code>tests/test_virtualisation_sources.py:52-60</code>,
+<code>tests/test_collector_security.py:34</code>).</li>
+<li><strong>Q3. Combien de VM et d’enregistrements IPAM le jeu simulé
+contient-il ?</strong> 45 VM/CT sur les cinq nœuds, types qemu et lxc
+(<code>tests/test_virtualisation_sources.py:158,179-185</code>), et 44
+enregistrements IPAM (<code>tests/test_netbox_sources.py:173</code> ;
+cahier des charges § 13.1, § 13.2).</li>
+<li><strong>Q4. Que se passe-t-il si le mode réel est activé sans jetons
+?</strong> La collecte échoue avec une erreur explicite nommant la
+variable attendue, avant tout appel réseau
+(<code>tests/test_virtualisation_sources.py:253-260</code>,
+<code>tests/test_netbox_sources.py:264</code>).</li>
+<li><strong>Q5. Les erreurs exposent-elles les secrets ?</strong> Non :
+les messages ne contiennent jamais le secret de token ni les valeurs
+configurées, y compris dans les URLs de pagination
+(<code>tests/test_virtualisation_sources.py:422,438</code>,
+<code>tests/test_netbox_sources.py:325,426</code>).</li>
+<li><strong>Q6. Quels champs chaque collecteur remonte-t-il ?</strong>
+Une VM/CT : dix-sept clés (<code>vm_id</code> à <code>uptime</code>,
+<code>tests/test_virtualisation_sources.py:36-40</code>) ; un
+enregistrement IPAM : <code>ip</code>, <code>dns_name</code>,
+<code>status</code>, <code>tenant</code>, <code>site</code>,
+<code>meta_zone</code>
+(<code>tests/test_netbox_sources.py:39</code>).</li>
+<li><strong>Q7. Quels modules compose le paquet <code>collector/</code>
+?</strong> Deux jeux (<code>mock_virtualisation.py</code>,
+<code>mock_netbox.py</code>), deux clients
+(<code>proxmox_client.py</code>, <code>netbox_client.py</code>),
+l’orchestrateur <code>inventory_runner.py</code> et les modules de
+consolidation <code>matching.py</code>, <code>normalisation.py</code>,
+<code>role.py</code>, <code>anomalies.py</code>, <code>exports.py</code>
+(<code>collector/</code>, cahier des charges § 5.2).</li>
+<li><strong>Q8. Comment l’orchestrateur gère-t-il un échec ?</strong> Il
+annule la transaction, passe le run à FAIL avec le message tronqué à
+1000 caractères et ne lève pas ; un run RUNNING abandonné est passé FAIL
+au démarrage suivant
+(<code>collector/inventory_runner.py:46,72-80,121-128</code> ; cahier
+des charges § 8.2).</li>
+<li><strong>Q9. Quels sont les délais de collecte ?</strong> 15 s par
+appel Proxmox, 30 s par appel NetBox avec pagination, et un budget de
+run de 300 s imposé par <code>remaining_timeout()</code>
+(<code>collector/proxmox_client.py:27</code>,
+<code>collector/netbox_client.py:27,32-47</code>).</li>
+<li><strong>Q10. D’où part un run ?</strong> <code>POST /run</code> et
+<code>POST /ajax/run</code> côté web (<code>app/routes.py:83,92</code>),
+<code>POST /api/runs</code> côté API avec jeton
+(<code>app/api.py:207,220-222</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — À chaque réponse, citer la provenance :
+fichier publié ou cahier des charges § n.</p>
+</blockquote>
+<h1 data-number="5" id="algorithme-de-consolidation"><span
+class="header-section-number">5</span> Algorithme de consolidation</h1>
+<h2 data-number="5.1" id="fiche-4"><span
+class="header-section-number">5.1</span> Fiche</h2>
+<h3 data-number="5.1.1" id="points-clés-4"><span
+class="header-section-number">5.1.1</span> Points clés</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — Quatre stratégies par ordre de priorité
+décroissante : MATCHED_NAME, MATCHED_FQDN, MATCHED_IP, puis NO_MATCH,
+source VIRT (cahier des charges § 7.1 ;
+<code>docs/modele/regles.md</code> RG01→RG05).</li>
+<li><strong>IMPLÉMENTATION</strong> — <code>resolve_match</code>
+s’arrête au premier niveau trouvé ; les index DNS et IP se construisent
+une fois par run et, parmi les doublons DNS, le record dont l’IP égale
+<code>ip_reported</code> est retenu
+(<code>collector/matching.py:78-101,84-88</code>,
+<code>collector/inventory_runner.py:204-212</code>,
+<code>tests/test_matching.py:148</code>).</li>
+<li><strong>EXIGENCE</strong> — La normalisation convertit en
+minuscules, supprime les espaces puis le suffixe de domaine :
+<code>web-a500.prod.local</code> → <code>web-a500</code> (cahier des
+charges § 7.2, RG14) ; <code>normalize_hostname</code> et
+<code>normalize_fqdn</code> l’appliquent, jamais <code>None</code> en
+retour (<code>collector/normalisation.py</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Le rôle combine lettre suivie de
+exactement trois chiffres dans <code>ROLE_MAP</code> (21 lettres), sinon
+tag <code>role:xxx</code> dans <code>TAG_ROLE_MAP</code>, sinon «
+Indéterminé » (<code>collector/role.py</code> ; cahier des charges §
+7.3, RG15 et RG16).</li>
+<li><strong>IMPLÉMENTATION</strong> — Trois anomalies naissent pendant
+le matching : NO_MATCH au dernier niveau, HOSTNAME_MISMATCH seulement
+sous MATCHED_IP, STATUS_MISMATCH si VM arrêtée et IP active
+(<code>collector/inventory_runner.py:217-233</code>, RG06→RG11).</li>
+<li><strong>IMPLÉMENTATION</strong> — Une ligne
+<code>consolidated_asset</code> par asset et par run porte
+<code>run_id</code> NOT NULL, <code>match_status</code>,
+<code>role</code>, <code>anomaly_codes</code> et l’instantané
+<code>ip_final</code>, <code>dns_final</code>, <code>vm_status</code> ;
+les quatre compteurs sont posés sur <code>run</code> en finalisation
+SUCCESS (<code>collector/inventory_runner.py:239-250,114-119</code>,
+<code>docs/modele/schema.sql:96-107</code>, RG35, RG38, RG19).</li>
+<li><strong>IMPLÉMENTATION</strong> — L’historique se lit par run :
+inventaire filtré par <code>consolidated_asset.run_id</code>
+(<code>app/queries.py:43-50</code>), comparaison de deux runs sur les
+instantanés, jamais sur <code>asset</code>
+(<code>app/queries.py:168-217</code>), listes du § 8.4 à § 8.6 (cahier
+des charges § 8.4-8.6).</li>
+<li><strong>IMPLÉMENTATION</strong> — Couverture : 14 tests de matching,
+17 de normalisation, 14 de rôle, 12 d’orchestrateur dont deux runs qui
+gardent chacun leurs résultats (<code>tests/test_matching.py</code>,
+<code>tests/test_normalisation.py</code>,
+<code>tests/test_role.py</code>,
+<code>tests/test_inventory_runner.py:160</code>).</li>
+</ul>
+<h3 data-number="5.1.2" id="définitions-4"><span
+class="header-section-number">5.1.2</span> Définitions</h3>
+<ul>
+<li><strong>MATCHED_NAME</strong> :
+<code>normalize(asset.vm_name) == normalize(ipam.dns_name)</code>
+(cahier des charges § 7.1).</li>
+<li><strong>MATCHED_FQDN</strong> :
+<code>normalize(asset.fqdn).split('.')[0] == normalize(ipam.dns_name)</code>
+(cahier des charges § 7.1).</li>
+<li><strong>MATCHED_IP</strong> :
+<code>asset.ip_reported == ipam.ip</code> (cahier des charges §
+7.1).</li>
+<li><strong>NO_MATCH</strong> : aucune correspondance, données de
+l’hyperviseur uniquement, anomalie NO_MATCH (cahier des charges §
+7.1).</li>
+<li><strong>Normalisation</strong> : Conversion en minuscules,
+suppression des espaces, suppression du suffixe de domaine (ex:
+<code>web-a500.prod.local</code> → <code>web-a500</code>) (cahier des
+charges § 7.2).</li>
+<li><strong>Déduction du rôle fonctionnel</strong> : Deux stratégies
+combinées, convention lettre + 3 chiffres puis tags
+<code>role:xxx</code> (cahier des charges § 7.3).</li>
+</ul>
+<h3 data-number="5.1.3" id="schéma-4"><span
+class="header-section-number">5.1.3</span> Schéma</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Niveau</th>
+<th>Condition (cahier des charges § 7.1)</th>
+<th>Anomalie associée</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>MATCHED_NAME</td>
+<td><code>normalize(asset.vm_name) == normalize(ipam.dns_name)</code></td>
+<td>STATUS_MISMATCH si VM arrêtée et IP active</td>
+</tr>
+<tr class="even">
+<td>MATCHED_FQDN</td>
+<td><code>normalize(asset.fqdn).split('.')[0] == normalize(ipam.dns_name)</code></td>
+<td>—</td>
+</tr>
+<tr class="odd">
+<td>MATCHED_IP</td>
+<td><code>asset.ip_reported == ipam.ip</code></td>
+<td>HOSTNAME_MISMATCH si hostname ≠ DNS NetBox</td>
+</tr>
+<tr class="even">
+<td>NO_MATCH</td>
+<td>aucune correspondance, source VIRT</td>
+<td>NO_MATCH</td>
+</tr>
+</tbody>
+</table>
+<p>Historique par run : 1. compteurs sur <code>run</code> en SUCCESS
+(<code>collector/inventory_runner.py:114-119</code>) ; 2. ligne
+consolidée avec <code>run_id</code>
+(<code>docs/modele/schema.sql:98</code>) ; 3. inventaire filtré par run
+(<code>app/queries.py:43-50</code>) ; 4. comparaison sur les instantanés
+(<code>app/queries.py:168-217</code>).</p>
+<h3 data-number="5.1.4" id="glossaire-4"><span
+class="header-section-number">5.1.4</span> Glossaire</h3>
+<ul>
+<li><strong>FQDN</strong> : premier segment du champ <code>fqdn</code>
+comparé au DNS Name (<code>collector/matching.py:91-94</code>).
+<strong>IPAM</strong> : enregistrements <code>{ip, dns_name, ...}</code>
+indexés par DNS puis par IP (<code>collector/matching.py:16-49</code>).
+<strong>VM</strong> : dicts
+<code>{vm_name, fqdn, ip_reported, ...}</code> remontés par la
+virtualisation (<code>collector/matching.py:107</code>).
+<strong>DNS</strong> : <code>dns_name</code> normalisé, clé de l’index
+(<code>collector/matching.py:26-30</code>). <strong>NetBox</strong> :
+source de vérité réseau dont le hostname diverge → HOSTNAME_MISMATCH
+(<code>collector/inventory_runner.py:223-226</code>).</li>
+<li><strong>run</strong> : exécution RUNNING puis SUCCESS ou FAIL,
+quatre compteurs et message d’échec
+(<code>docs/modele/schema.sql:14-24</code>). <strong>RG14</strong> :
+normalisation (<code>collector/normalisation.py:1</code>). <strong>RG15
+et RG16</strong> : déduction du rôle (<code>collector/role.py:1</code>).
+<strong>RG35</strong> : rattachement de l’asset consolidé à son run
+(<code>docs/modele/regles.md:39</code>). <strong>RG38</strong> :
+instantané du run (<code>docs/modele/regles.md</code>).
+<strong>STATUS_MISMATCH</strong> : VM arrêtée mais IP active dans NetBox
+(<code>docs/modele/regles.md:11</code>).</li>
+</ul>
+<h3 data-number="5.1.5" id="carte-mentale-4"><span
+class="header-section-number">5.1.5</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Algorithme de consolidation))
+    Quatre niveaux
+      MATCHED_NAME
+      MATCHED_FQDN
+      MATCHED_IP
+      NO_MATCH
+    Normalisation
+      Minuscules et suffixe
+    Rôle fonctionnel
+      Lettre puis tag
+    Historique par run
+      Instantané par run</code></pre>
+<h3 data-number="5.1.6" id="pièges-dexamen-4"><span
+class="header-section-number">5.1.6</span> Pièges d’examen</h3>
+<ul>
+<li>Confondre MATCHED_NAME et MATCHED_FQDN : MATCHED_NAME compare
+<code>normalize(asset.vm_name)</code> à
+<code>normalize(ipam.dns_name)</code>, MATCHED_FQDN compare
+<code>normalize(asset.fqdn).split('.')[0]</code> au même DNS Name
+(cahier des charges § 7.1).</li>
+<li>Confondre MATCHED_IP et HOSTNAME_MISMATCH : MATCHED_IP est le statut
+de correspondance, HOSTNAME_MISMATCH l’anomalie levée sous ce statut
+quand le hostname diffère du DNS NetBox
+(<code>collector/inventory_runner.py:220-226</code>).</li>
+<li>Confondre <code>asset</code> et <code>consolidated_asset</code> :
+<code>asset</code> garde le dernier résultat, la ligne consolidée garde
+celui de son run
+(<code>collector/inventory_runner.py:235-250</code>).</li>
+<li>Confondre métriques et instantané : les métriques se lisent sur
+<code>asset</code>, IP, DNS et statut viennent exclusivement de
+l’instantané du run (<code>app/queries.py:87-112</code>, RG37 et
+RG38).</li>
+<li>Confondre normalisation et déduction du rôle : la normalisation
+supprime le suffixe de domaine, la déduction du rôle lit la lettre du
+nom puis le tag <code>role:xxx</code>
+(<code>collector/normalisation.py:7-28</code>,
+<code>collector/role.py:92-107</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — L’ordre de priorité va de MATCHED_NAME à
+NO_MATCH ; le rôle combine nom puis tag. Chaque run garde ses compteurs,
+ses lignes consolidées et son instantané.</p>
+</blockquote>
+<h2 data-number="5.2" id="questions-réponses-4"><span
+class="header-section-number">5.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Quels sont les quatre niveaux de matching et dans quel
+ordre ?</strong> MATCHED_NAME, MATCHED_FQDN, MATCHED_IP puis NO_MATCH,
+par ordre de priorité décroissante ; <code>resolve_match</code> s’arrête
+au premier niveau trouvé (<strong>IMPLÉMENTATION</strong>, cahier des
+charges § 7.1 ; <code>collector/matching.py:78-101</code>).</li>
+<li><strong>Q2. Comment normalise-t-on un hostname ?</strong> Conversion
+en minuscules, suppression des espaces, suppression du suffixe de
+domaine : <code>web-a500.prod.local</code> → <code>web-a500</code>
+(<strong>EXIGENCE</strong>, cahier des charges § 7.2 ;
+<code>collector/normalisation.py:7-28</code>, RG14).</li>
+<li><strong>Q3. Comment le rôle fonctionnel est-il déduit ?</strong>
+D’abord la convention lettre + 3 chiffres du nom (<code>web-a500</code>
+→ a → Application), sinon le tag <code>role:xxx</code> de la VM, sinon «
+Indéterminé » (<strong>IMPLÉMENTATION</strong>, cahier des charges § 7.3
+; <code>collector/role.py</code>, RG15 et RG16).</li>
+<li><strong>Q4. Qu’est-ce qu’un instantané de run ?</strong> La ligne
+<code>consolidated_asset</code> conserve l’IP, le DNS et le statut de la
+VM retenus lors de son run ; l’inventaire et la comparaison lisent ces
+colonnes sans repli sur <code>asset</code> (<strong>EXIGENCE</strong>,
+<code>docs/modele/regles.md</code> RG38 ;
+<code>app/queries.py:87-112</code>).</li>
+<li><strong>Q5. Comment l’historique par run est-il construit ?</strong>
+Les quatre compteurs sont posés sur <code>run</code> en finalisation
+SUCCESS, chaque ligne consolidée porte <code>run_id</code>, et
+l’inventaire se filtre par ce <code>run_id</code>
+(<strong>IMPLÉMENTATION</strong>,
+<code>collector/inventory_runner.py:114-119</code> ;
+<code>app/queries.py:43-50</code> ; cahier des charges § 8.4-8.6).</li>
+<li><strong>Q6. Que couvrent les tests de la consolidation ?</strong> 14
+tests de matching, 17 de normalisation, 14 de rôle et 12
+d’orchestrateur, dont deux runs indépendants ; le critère d’acceptation
+1 exige cette couverture (<strong>IMPLÉMENTATION</strong>,
+<code>tests/test_matching.py</code>,
+<code>tests/test_normalisation.py</code>,
+<code>tests/test_role.py</code>,
+<code>tests/test_inventory_runner.py:160</code> ; cahier des charges,
+rubrique Critères d’acceptation).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — Distinguez l’exigence du cahier et le
+code qui l’applique : chaque niveau, chaque colonne et chaque test se
+cite fichier par fichier.</p>
+</blockquote>
+<h1 data-number="6" id="anomalies"><span
+class="header-section-number">6</span> Anomalies</h1>
+<h2 data-number="6.1" id="fiche-5"><span
+class="header-section-number">6.1</span> Fiche</h2>
+<h3 data-number="6.1.1" id="points-clés-5"><span
+class="header-section-number">6.1.1</span> Points clés</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — Six codes portent une anomalie :
+NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS,
+DUPLICATE_IP ; RG08→RG13 fixent leur condition (cahier des charges § 6.2
+; <code>docs/modele/regles.md</code>).</li>
+<li><strong>EXIGENCE</strong> — L’étape 5 détecte NO_MATCH,
+HOSTNAME_MISMATCH et STATUS_MISMATCH pendant le matching ; l’étape 6
+cherche les doublons après la consolidation (cahier des charges § 7.4 ;
+<code>collector/inventory_runner.py:197</code>,
+<code>collector/inventory_runner.py:256</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Les lignes <code>anomaly</code>
+s’écrivent dans la transaction du run ; un échec du pipeline les annule
+avec le reste (<code>collector/inventory_runner.py:90-128</code> ;
+<code>tests/test_inventory_runner.py:197-211</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Un groupe de doublons ne produit
+qu’une anomalie : monitoring pour le DNS, 10.0.4.16 pour l’IP, ancrée
+sur le premier asset consolidé
+(<code>tests/test_inventory_runner.py:103-114</code> ;
+<code>collector/inventory_runner.py:256-290</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Sans VM rapprochée, l’anomalie
+reste sur l’enregistrement, avec <code>asset_id</code> NULL
+(<code>tests/test_inventory_runner.py:116-127</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Un couple (ip, dns_name) répété
+par la source fait un seul enregistrement : aucun doublon n’est alors
+signalé (<code>collector/inventory_runner.py:97-99</code> ;
+<code>tests/test_inventory_runner.py:150-157</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Chaque run garde ses anomalies :
+compteurs du dernier run, filtres par type et par run, deux runs
+indépendants (<code>app/queries.py:130-136</code>,
+<code>app/queries.py:220-233</code> ;
+<code>tests/test_inventory_runner.py:178-179</code>).</li>
+<li><strong>LACUNE</strong> — MATCHED_IP reste un statut, jamais une
+ligne <code>anomaly</code> : ghost-vm affiche <code>match_status</code>
+MATCHED_IP et <code>anomaly_codes</code> « HOSTNAME_MISMATCH »
+(<code>tests/test_inventory_runner.py:78-80</code> ;
+<code>collector/inventory_runner.py:218-228</code>).</li>
+<li><strong>LACUNE</strong> — Le CHECK de l’application admet six codes,
+celui de <code>schema.sql</code> en admet cinq ; les tests comparent
+tables, colonnes, index et clés étrangères, pas les CHECK
+(<code>app/models.py:218-219</code> ;
+<code>docs/modele/schema.sql:128</code> ;
+<code>tests/test_schema_conformite.py:163-189</code>).</li>
+</ul>
+<h3 data-number="6.1.2" id="définitions-et-schéma"><span
+class="header-section-number">6.1.2</span> Définitions et schéma</h3>
+<p><strong>EXIGENCE</strong> — Six codes, conditions et rattachement :
+cahier des charges § 6.2 ; <code>docs/modele/regles.md</code> RG04→RG13
+; étapes et ancrage : <code>collector/inventory_runner.py</code>. | Code
+| Condition (RG) | Détection | Rattachement | |—|—|—|—| | NO_MATCH |
+<strong>RG08</strong> — aucune correspondance n’est trouvée (ni
+hostname, ni FQDN, ni IP) | étape 5, quatrième niveau du matching |
+<code>run_id</code>, <code>asset_id</code> ; <code>ipam_record_id</code>
+NULL | | MATCHED_IP | <strong>RG09</strong> — l’IP rapportée correspond
+à l’adresse IP d’un enregistrement IPAM | étape 5, statut
+<code>consolidated_asset.match_status</code> | ligne consolidée du run,
+sans ligne <code>anomaly</code> | | HOSTNAME_MISMATCH |
+<strong>RG10</strong> — une VM est matcheée par IP mais que le hostname
+diffère du DNS NetBox | étape 5, statut MATCHED_IP |
+<code>run_id</code>, <code>asset_id</code>, <code>ipam_record_id</code>
+| | STATUS_MISMATCH | <strong>RG11</strong> — une VM est arrêtée
+(stopped) mais que son IP est active dans NetBox | étape 5,
+enregistrement IPAM trouvé | <code>run_id</code>, <code>asset_id</code>,
+<code>ipam_record_id</code> | | DUPLICATE_DNS | <strong>RG12</strong> —
+un même nom DNS normalisé apparaît dans plusieurs enregistrements IPAM |
+étape 6, second passage | une anomalie par groupe | | DUPLICATE_IP |
+<strong>RG13</strong> — une même adresse IP apparaît dans plusieurs
+enregistrements IPAM | étape 6, second passage | une anomalie par
+groupe, <code>asset_id</code> NULL sans VM |</p>
+<h3 data-number="6.1.3" id="glossaire-5"><span
+class="header-section-number">6.1.3</span> Glossaire</h3>
+<p><strong>NO_MATCH</strong>, <strong>MATCHED_IP</strong>,
+<strong>HOSTNAME_MISMATCH</strong> : codes de la § 6.2, conditions RG08,
+RG09, RG10 (<code>docs/modele/regles.md</code>).
+<strong>STATUS_MISMATCH</strong>, <strong>DUPLICATE_DNS</strong>,
+<strong>DUPLICATE_IP</strong> : codes de la § 6.2, conditions RG11,
+RG12, RG13 (<code>docs/modele/regles.md</code>). <strong>VM</strong>,
+<strong>IPAM</strong>, <strong>DNS</strong>, <strong>FQDN</strong>,
+<strong>IP</strong>, <strong>NetBox</strong>, <strong>RG</strong>,
+<strong>matching</strong>, <strong>CHECK</strong>,
+<strong>TEXT</strong>, <strong>run</strong> : (employés sans définition
+dans la section).</p>
+<h3 data-number="6.1.4" id="carte-mentale-5"><span
+class="header-section-number">6.1.4</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Anomalies))
+    Détection étape 5
+      NO_MATCH
+      HOSTNAME_MISMATCH
+      STATUS_MISMATCH
+    Second passage
+      DUPLICATE_DNS
+      DUPLICATE_IP
+    Statut de matching
+      MATCHED_IP
+    Rattachement
+      run_id obligatoire
+      asset_id facultatif
+    Historique
+      Filtre par run</code></pre>
+<h3 data-number="6.1.5" id="pièges-dexamen-5"><span
+class="header-section-number">6.1.5</span> Pièges d’examen</h3>
+<ul>
+<li>Confondre MATCHED_IP et HOSTNAME_MISMATCH : MATCHED_IP est le statut
+de correspondance, HOSTNAME_MISMATCH l’anomalie enregistrée
+(<code>tests/test_inventory_runner.py:78-80</code>).</li>
+<li>Confondre étape 5 et étape 6 : les trois anomalies de correspondance
+se détectent pendant le matching, les doublons seulement après
+(<code>collector/inventory_runner.py:218-228</code>,
+<code>collector/inventory_runner.py:255-274</code>).</li>
+<li>Confondre <code>run_id</code> et <code>asset_id</code> :
+<code>run_id</code> reste NOT NULL, <code>asset_id</code> reste NULL
+quand aucune VM ne rapproche le groupe
+(<code>docs/modele/schema.sql:125-126</code> ;
+<code>tests/test_inventory_runner.py:124-125</code>).</li>
+<li>Lire le CHECK de <code>schema.sql</code> : il admet cinq codes,
+celui de l’application en admet six
+(<code>docs/modele/schema.sql:128</code> ;
+<code>app/models.py:218-219</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — EXIGENCE : six codes en deux temps,
+matching puis second passage ; IMPLÉMENTATION : cinq codes écrits comme
+lignes <code>anomaly</code>, tout rattaché à un run (cahier des charges
+§ 6.2, § 7.4).</p>
+</blockquote>
+<h2 data-number="6.2" id="questions-réponses-5"><span
+class="header-section-number">6.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Quels sont les six codes ?</strong> NO_MATCH,
+MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS,
+DUPLICATE_IP (<strong>EXIGENCE</strong>, cahier des charges § 6.2).</li>
+<li><strong>Q2. Quand STATUS_MISMATCH apparaît-il ?</strong> Quand une
+VM est arrêtée (stopped) mais que son IP est active dans NetBox
+(<strong>EXIGENCE</strong>, <code>docs/modele/regles.md</code>,
+RG11).</li>
+<li><strong>Q3. Où les doublons sont-ils détectés ?</strong> Au second
+passage, après le matching : un nom DNS normalisé ou une IP présents
+plusieurs fois (<strong>EXIGENCE</strong>, cahier des charges § 7.4 ;
+<code>collector/inventory_runner.py:255</code>).</li>
+<li><strong>Q4. Une anomalie impose-t-elle un asset ?</strong> Non :
+<code>run_id</code> reste NOT NULL, <code>asset_id</code> reste NULL
+pour un doublon sans VM (<strong>IMPLÉMENTATION</strong>,
+<code>docs/modele/schema.sql:125-126</code> ;
+<code>tests/test_inventory_runner.py:124-125</code>).</li>
+<li><strong>Q5. MATCHED_IP est-il enregistré comme anomalie ?</strong>
+Non : c’est le statut de la ligne consolidée ; l’anomalie de ghost-vm
+est HOSTNAME_MISMATCH (<strong>IMPLÉMENTATION</strong>,
+<code>tests/test_inventory_runner.py:78-80</code>).</li>
+<li><strong>Q6. Comment l’historique conserve-t-il les anomalies
+?</strong> Chaque run porte les siennes : compteurs du dernier run,
+filtres par type et par run (<strong>IMPLÉMENTATION</strong>,
+<code>app/queries.py:130-136</code>,
+<code>app/queries.py:220-233</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — Distinguez statut de correspondance et
+ligne d’anomalie, puis lecture du dernier run et filtre sur un run
+précis (<code>tests/test_inventory_runner.py:78-80</code> ;
+<code>app/queries.py:130-136</code>).</p>
+</blockquote>
+<h1 data-number="7" id="api-rest-et-jwt"><span
+class="header-section-number">7</span> API REST et JWT</h1>
+<h2 data-number="7.1" id="fiche-6"><span
+class="header-section-number">7.1</span> Fiche</h2>
+<h3 data-number="7.1.1" id="points-clés-6"><span
+class="header-section-number">7.1.1</span> Points clés</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — L’API préfixe <code>/api/</code>,
+échange du JSON, documente ses routes sur Swagger UI
+<code>/apidocs</code> et s’authentifie par Bearer token (cahier des
+charges § 9.1).</li>
+<li><strong>EXIGENCE</strong> — <code>POST /api/login</code> reçoit
+<code>{ "username": …, "password": … }</code> et renvoie
+<code>{ "access_token": … }</code> ; chaque route protégée exige
+<code>Authorization: Bearer &lt;token&gt;</code> et
+<code>@jwt_required()</code>, signée avec <code>JWT_SECRET_KEY</code>
+(cahier des charges § 9.2, § 10.2).</li>
+<li><strong>EXIGENCE</strong> — Neuf endpoints :
+<code>GET /api/stats</code>, <code>GET</code> et
+<code>POST /api/runs</code>, <code>GET /api/runs/&lt;id&gt;</code>,
+<code>GET /api/runs/compare</code>, <code>GET /api/inventory</code>,
+<code>GET /api/inventory/export</code>,
+<code>GET /api/assets/&lt;id&gt;</code>, <code>GET /api/anomalies</code>
+; codes 200, 201, 400, 401, 404 (cahier des charges § 9.3, § 9.5).</li>
+<li><strong>IMPLÉMENTATION</strong> — Le blueprint <code>/api</code>
+enregistre onze routes, dix avec <code>@jwt_required()</code> ;
+<code>POST /api/runs</code> répond 201.
+<code>Flask-JWT-Extended==4.7.1</code> et <code>flasgger==0.9.7.1</code>
+figurent dans <code>requirements.txt</code>, la factory appelle
+<code>jwt.init_app(app)</code> et configure Swagger
+(<code>app/api.py:33,57,149-150,207-222,303</code> ;
+<code>app/__init__.py:121,143-160,168-172</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — <code>/apidocs</code> exige la
+session web, <code>/apispec_1.json</code> exige le JWT, le reste du site
+garde la CSP stricte (<code>app/auth.py:121-136</code> ;
+<code>app/__init__.py:29-31,178-183</code>).</li>
+<li><strong>EXIGENCE + IMPLÉMENTATION</strong> — Filtres <code>q</code>,
+<code>status</code>, <code>node</code>, <code>type</code>,
+<code>match</code>, <code>tag</code>, <code>sort</code>,
+<code>order</code> (cahier des charges § 9.4) ; pagination
+<code>page</code>, <code>per_page</code> prévue au § 9.3. Le code ajoute
+<code>role</code> et trie par liste blanche
+(<code>app/api.py:389-432,411</code> ;
+<code>app/queries.py:17-29,81</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — L’historique d’un asset réunit
+jusqu’à 30 instantanés datés du run, puis ses anomalies ; inventaire,
+stats et comparaison lisent <code>consolidated_asset</code>, jamais
+<code>asset</code> (<code>app/api.py:6-8,531-587</code> ;
+<code>app/queries.py:87-112</code>).</li>
+<li><strong>IMPLÉMENTATION + LACUNE</strong> — 413 au-delà de 8192
+octets, 429 avec <code>Retry-After</code>, 503 sur budget indisponible,
+et <code>POST /api/runs/purge</code>, tout hors § 9.5 et § 9.3
+(<code>app/api.py:96-128,303-332</code>). <code>tests/test_api.py</code>
+compte 35 tests contre 4 + 20 annoncés
+(<code>tests/test_api.py:36-47,124-130</code> ; cahier des charges §
+14.2). La comparaison est servie sous <code>/compare</code>, pas
+<code>/runs/compare</code> (<code>app/routes.py:332</code> ; cahier des
+charges § 11.2).</li>
+</ul>
+<h3 data-number="7.1.2" id="définitions-5"><span
+class="header-section-number">7.1.2</span> Définitions</h3>
+<p><strong>Bearer token</strong> : header HTTP
+<code>Authorization: Bearer &lt;token&gt;</code> utilisé sur toutes les
+routes protégées (cahier des charges § 9.2). <strong>Tri sur liste
+blanche</strong> : « Les colonnes de tri sont lues via une liste blanche
+(jamais concaténées) » ; une colonne inconnue retombe sur
+<code>vm_name</code> (<code>app/queries.py:8,17-29,81</code> ;
+<code>tests/test_web.py:555</code>).</p>
+<h3 data-number="7.1.3" id="schéma-5"><span
+class="header-section-number">7.1.3</span> Schéma</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Page (cahier § 11.2)</th>
+<th>Route prévue</th>
+<th>Route servie</th>
+<th>État</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Connexion</td>
+<td><code>/login</code></td>
+<td><code>/login</code> (<code>app/auth.py:257</code>)</td>
+<td>conforme</td>
+</tr>
+<tr class="even">
+<td>Tableau de bord</td>
+<td><code>/</code></td>
+<td><code>/</code> (<code>app/routes.py:40</code>)</td>
+<td>conforme</td>
+</tr>
+<tr class="odd">
+<td>Inventaire</td>
+<td><code>/inventory</code></td>
+<td><code>/inventory</code>, <code>/inventory/export</code>
+(<code>app/routes.py:153,305</code>)</td>
+<td>conforme</td>
+</tr>
+<tr class="even">
+<td>Historique et détail des runs</td>
+<td><code>/runs</code>, <code>/runs/&lt;id&gt;</code></td>
+<td>identiques (<code>app/routes.py:376,391</code>)</td>
+<td>conforme</td>
+</tr>
+<tr class="odd">
+<td>Comparaison de runs</td>
+<td><code>/runs/compare</code></td>
+<td><code>/compare</code>, sans lien
+(<code>app/routes.py:332</code>)</td>
+<td>LACUNE</td>
+</tr>
+<tr class="even">
+<td>Détail asset et anomalies</td>
+<td><code>/assets/&lt;id&gt;</code>, <code>/anomalies</code></td>
+<td>identiques (<code>app/routes.py:353,419</code>)</td>
+<td>conforme</td>
+</tr>
+<tr class="odd">
+<td>Documentation API</td>
+<td><code>/apidocs</code></td>
+<td><code>/apidocs</code> avec session
+(<code>app/__init__.py:143</code>)</td>
+<td>conforme</td>
+</tr>
+</tbody>
+</table>
+<h3 data-number="7.1.4" id="glossaire-6"><span
+class="header-section-number">7.1.4</span> Glossaire</h3>
+<ul>
+<li><strong>API</strong>, <strong>REST</strong>, <strong>JWT</strong> :
+(employé sans définition dans la section) ; cahier des charges §
+9.1.</li>
+<li><strong>JSON</strong>, <strong>Bearer token</strong>,
+<strong>Swagger UI</strong>, <strong>endpoint</strong>,
+<strong>pagination</strong> : (employé sans définition dans la section)
+; cahier des charges § 9.1–9.3.</li>
+<li><strong>Flask-JWT-Extended</strong>, <strong>Flasgger</strong>,
+<strong>blueprint</strong> : (employé sans définition dans la section) ;
+<code>requirements.txt</code>, <code>app/api.py:33</code>.</li>
+<li><strong>instantané</strong> : l’inventaire d’un run se lit par
+<code>consolidated_asset.run_id</code>, FK NOT NULL vers
+<code>run</code> (<code>app/queries.py:4-6</code>).</li>
+</ul>
+<h3 data-number="7.1.5" id="carte-mentale-6"><span
+class="header-section-number">7.1.5</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((API REST et JWT))
+    Pages web
+      Comparaison décalée
+    Endpoints API
+      Onze routes
+    Authentification JWT
+      Bearer header
+    Swagger
+    Filtres et tri
+      Liste blanche
+    Historique
+      Trente instantanés</code></pre>
+<h3 data-number="7.1.6" id="pièges-dexamen-6"><span
+class="header-section-number">7.1.6</span> Pièges d’examen</h3>
+<ul>
+<li>Confondre <code>POST /login</code> et <code>POST /api/login</code> :
+le premier ouvre une session web avec jeton CSRF ; le second renvoie un
+<code>access_token</code> JWT (cahier des charges § 9.2 ;
+<code>app/auth.py:257</code> ; <code>app/api.py:57</code>).</li>
+<li>Confondre <code>/apidocs</code> et <code>/apispec_1.json</code> : le
+premier demande la session web, le second exige le JWT (cahier des
+charges § 9.1 ; <code>app/auth.py:121-136</code>).</li>
+<li>Confondre <code>/compare</code> et <code>/api/runs/compare</code> :
+la page web sert <code>/compare</code> au lieu de
+<code>/runs/compare</code> ; l’API sert bien
+<code>/api/runs/compare</code> (cahier des charges § 11.2, § 9.3 ;
+<code>app/routes.py:332</code> ; <code>app/api.py:265</code>).</li>
+<li>Croire que l’inventaire API lit la table <code>asset</code> : IP,
+DNS et statut proviennent de l’instantané
+<code>consolidated_asset</code> du run
+(<code>app/queries.py:87-112</code> ; <code>app/api.py:6-8</code>).</li>
+<li>Confondre les codes du § 9.5 avec les codes servis : 413, 429 et 503
+complètent 200, 201, 400, 401, 404 (cahier des charges § 9.5 ;
+<code>app/api.py:96-128</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — IMPLÉMENTATION : onze routes
+<code>/api</code>, Swagger et JWT actifs ; LACUNE : comparaison sous
+<code>/compare</code> (cahier des charges § 9, § 11.2 ;
+<code>app/api.py</code>, <code>app/routes.py:332</code>).</p>
+</blockquote>
+<h2 data-number="7.2" id="questions-réponses-6"><span
+class="header-section-number">7.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Quelles pages sont réellement accessibles ?</strong>
+IMPLÉMENTATION : <code>/login</code>, <code>/</code>,
+<code>/inventory</code>, <code>/inventory/export</code>,
+<code>/runs</code>, <code>/runs/&lt;id&gt;</code>,
+<code>/compare</code>, <code>/assets/&lt;id&gt;</code>,
+<code>/anomalies</code>, <code>/apidocs</code>
+(<code>app/auth.py:257</code> ; <code>app/routes.py:40-421</code> ;
+<code>app/__init__.py:143</code>). Observation : le menu Anomalies
+renvoie à l’inventaire, et aucun lien n’ouvre <code>/compare</code>
+(<code>app/templates/base.html:111</code> ;
+<code>app/templates/</code>).</li>
+<li><strong>Q2. Quels endpoints l’API expose-t-elle ?</strong>
+IMPLÉMENTATION : onze routes sous <code>/api</code>, dont
+<code>POST /api/login</code> et <code>POST /api/runs/purge</code> ; les
+neuf endpoints du § 9.3 sont tous servis (cahier des charges § 9.3 ;
+<code>app/api.py:57-654</code>).</li>
+<li><strong>Q3. Décrivez le flux d’un appel protégé.</strong>
+IMPLÉMENTATION : identifiants JSON à <code>POST /api/login</code>,
+réponse <code>access_token</code>, en-tête
+<code>Authorization: Bearer &lt;token&gt;</code>, puis
+<code>@jwt_required()</code> valide le jeton, sinon 401 (cahier des
+charges § 9.2, § 10.2 ; <code>app/api.py:57-150</code>).</li>
+<li><strong>Q4. Où Swagger, et qui y accède ?</strong> IMPLÉMENTATION :
+interface sur <code>/apidocs</code> avec session web, spec JSON sur
+<code>/apispec_1.json</code> avec JWT ; deux tests vérifient les deux
+(cahier des charges § 9.1 ; <code>app/__init__.py:143-160</code> ;
+<code>app/auth.py:121-136</code> ;
+<code>tests/test_api.py:210,233</code>).</li>
+<li><strong>Q5. Quels filtres et tris l’API accepte-t-elle ?</strong>
+EXIGENCE : <code>q</code>, <code>status</code>, <code>node</code>,
+<code>type</code>, <code>match</code>, <code>tag</code>,
+<code>sort</code>, <code>order</code> (cahier des charges § 9.4).
+IMPLÉMENTATION : <code>role</code>, <code>page</code> et
+<code>per_page</code> en plus ; un <code>sort</code> inconnu retombe sur
+<code>vm_name</code> (<code>app/api.py:389-432</code> ;
+<code>app/queries.py:81</code>).</li>
+<li><strong>Q6. Que renvoie l’historique d’un asset ?</strong>
+IMPLÉMENTATION : jusqu’à 30 entrées portant <code>run_id</code>,
+<code>run_date</code>, <code>ip</code>, <code>dns</code>,
+<code>match_status</code>, <code>tenant</code>, <code>site</code>,
+suivies des anomalies de l’asset (<code>app/api.py:531-587</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — Distinguez le § 9.3 (neuf endpoints
+exigés) des onze routes servies, et les 4 + 20 tests annoncés des 35
+tests de <code>tests/test_api.py</code> (cahier des charges § 9.3, §
+14.2).</p>
+</blockquote>
+<h1 data-number="8" id="sécurité"><span
+class="header-section-number">8</span> Sécurité</h1>
+<h2 data-number="8.1" id="fiche-7"><span
+class="header-section-number">8.1</span> Fiche</h2>
+<h3 data-number="8.1.1" id="points-clés-7"><span
+class="header-section-number">8.1.1</span> Points clés</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — Web : formulaire, cookie de session
+signé par <code>SECRET_KEY</code>, compte unique
+<code>ADMIN_USERNAME</code>/<code>ADMIN_PASSWORD</code>, routes web sous
+<code>@login_required</code>, redirection vers <code>/login</code> ; API
+: JWT via Flask-JWT-Extended, <code>POST /api/login</code>, header
+<code>Authorization</code>, routes sous <code>@jwt_required()</code>,
+clé <code>JWT_SECRET_KEY</code> ; <code>.env</code> non versionné
+(cahier des charges § 10.1, § 10.2, § 10.3 ;
+<code>docs/modele/regles.md:29-34</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Secrets :
+<code>Config.validate()</code> lève <code>RuntimeError</code> si
+<code>SECRET_KEY</code>, <code>JWT_SECRET_KEY</code> ou
+<code>ADMIN_PASSWORD</code> est absent, vide, une valeur d’exemple
+(<code>""</code>, <code>change-me</code>, <code>changeme</code>,
+<code>dev-only-insecure-key</code>, <code>replace-me</code>) ou, pour
+les deux clés, plus court que 32 octets
+(<code>app/config.py:6-15,29-48</code> ;
+<code>tests/test_config.py:43-94</code>) ; <code>.env.example</code>
+documente chaque variable sans valeur. Le mot de passe n’existe en
+configuration que sous forme de hash werkzeug, mémoïsé par empreinte
+SHA-256, une valeur <code>pbkdf2:</code> ou <code>scrypt:</code> étant
+conservée (<code>app/__init__.py:50-58,85-89</code> ;
+<code>tests/test_auth.py:400</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Session : cookie
+<code>HttpOnly</code>, <code>SameSite=Lax</code>, <code>Secure</code>
+selon <code>APP_ENV</code> (<code>app/__init__.py:91-95</code>) ; cookie
+falsifié refusé (<code>tests/test_auth.py:308</code>), Secure en
+production (<code>tests/test_auth.py:337</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — CSRF : jeton aléatoire de session
+comparé en temps constant, exigé sur tout POST web
+(<code>app/auth.py:195-210,261-262</code> ;
+<code>app/routes.py:27-37</code>) ; POST sans jeton répond 400 avant
+toute consommation d’essai (<code>tests/test_auth.py:156</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Essais : trois budgets partagés
+web et API — IP 10, compte 5, global 100, fenêtre 300 s — persistés en
+fichier écrit atomiquement sous verrou (<code>app/auth.py:57-111</code>
+; <code>app/__init__.py:67-84</code> ;
+<code>tests/test_security_login.py:60,184</code>) ; 429 avec
+<code>Retry-After</code>, 503 si le stockage échoue
+(<code>app/auth.py:280-292</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Comparaisons : identifiant vérifié
+par comparaison en temps constant, vérification du mot de passe toujours
+exécutée (<code>app/auth.py:297-300</code>) ; <code>next</code> limité à
+une URL relative sans hôte, <code>//</code>, antislash ni saut de ligne
+(<code>app/auth.py:213-222</code> ;
+<code>tests/test_auth.py:241-266</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — API et documentation :
+<code>POST /api/login</code> est la seule route sans
+<code>@jwt_required()</code>, corps borné à 8192 octets
+(<code>app/api.py:57-143</code>) ; <code>/apidocs</code> exige la
+session, <code>/apispec</code> le JWT (<code>app/auth.py:121-136</code>
+; <code>tests/test_security_login.py:195</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Réponses et exports : CSP stricte,
+<code>nosniff</code>, <code>X-Frame-Options: DENY</code>,
+<code>Referrer-Policy</code>, <code>Permissions-Policy</code>, HSTS si
+HTTPS (<code>app/__init__.py:20-31,175-192</code> ;
+<code>tests/test_auth.py:290</code>) ; cellule CSV amorçant une formule
+reçoit une apostrophe en tête (<code>app/queries.py:31-40</code>) sur
+l’export web et l’export API (<code>tests/test_web.py:666</code>).</li>
+<li><strong>IMPLÉMENTATION + LACUNE</strong> — Déploiement : utilisateur
+non root, port publié sur <code>127.0.0.1</code>, <code>cap_drop</code>
+et <code>no-new-privileges</code> (<code>Dockerfile:5-6,27</code> ;
+<code>docker-compose.yml:5,14-17</code>) ; TLS des sources vérifié, SMB
+chiffré exigé
+(<code>tests/test_collector_security.py:83-128,244</code>). Limites :
+<code>'unsafe-inline'</code> dans la CSP de <code>/apidocs</code>
+(<code>app/__init__.py:29-31</code>), <code>ADMIN_PASSWORD</code> sans
+longueur minimale (<code>app/config.py:39</code>), aucun paramètre de
+durée de jeton lu dans <code>app/</code>.</li>
+</ul>
+<h3 data-number="8.1.2" id="définitions-6"><span
+class="header-section-number">8.1.2</span> Définitions</h3>
+<p><strong>Authentification web</strong> : « Authentification web par
+formulaire avec cookie de session signé par <code>SECRET_KEY</code> »
+(cahier des charges § 10.1 ; <code>app/auth.py:257</code>).
+<strong>Authentification API</strong> : « API en JWT via
+Flask-JWT-Extended, clé <code>JWT_SECRET_KEY</code> » ; ses routes
+portent <code>@jwt_required()</code> (cahier des charges § 10.2 ;
+<code>app/api.py:150</code>). <strong>Jeton CSRF</strong> : « Jeton
+aléatoire lié à la session, comparé en temps constant »
+(<code>app/auth.py:195-210</code>).</p>
+<h3 data-number="8.1.3" id="schéma-6"><span
+class="header-section-number">8.1.3</span> Schéma</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Critère</th>
+<th>Session web</th>
+<th>Jeton JWT</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Usage</td>
+<td>routes web (cahier § 10.1)</td>
+<td>routes API (cahier § 10.2)</td>
+</tr>
+<tr class="even">
+<td>Obtention</td>
+<td><code>POST /login</code> avec jeton CSRF</td>
+<td><code>POST /api/login</code> en JSON
+(<code>app/api.py:57</code>)</td>
+</tr>
+<tr class="odd">
+<td>Transport</td>
+<td>cookie <code>HttpOnly</code> et <code>SameSite</code></td>
+<td>header <code>Authorization</code> (cahier § 10.2)</td>
+</tr>
+<tr class="even">
+<td>Routes protégées</td>
+<td><code>@login_required</code> (<code>app/routes.py:41</code>)</td>
+<td><code>@jwt_required()</code> (<code>app/api.py:150</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 data-number="8.1.4" id="glossaire-7"><span
+class="header-section-number">8.1.4</span> Glossaire</h3>
+<ul>
+<li><strong>API</strong>, <strong>JWT</strong>, <strong>Flask</strong> :
+(employé sans définition dans la section) ; cahier des charges § 10.2,
+<code>requirements.txt</code>.</li>
+<li><strong>CSP</strong>, <strong>HSTS</strong> : en-têtes de sécurité
+posés sur toutes les réponses
+(<code>app/__init__.py:175-192</code>).</li>
+<li><strong>RG30</strong> : refus de démarrer si un secret obligatoire
+manque ou vaut sa valeur d’exemple
+(<code>docs/modele/regles.md:34</code>).</li>
+</ul>
+<h3 data-number="8.1.5" id="carte-mentale-7"><span
+class="header-section-number">8.1.5</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Sécurité))
+    Secrets
+      Refus au démarrage
+      Mot de passe haché
+    Session web
+      Cookie HttpOnly
+      Jeton CSRF
+    Budgets d&#39;essais
+      Trois compteurs
+      Réponse 429
+    API JWT
+      Bearer token
+      Swagger protégé
+    En-têtes
+      CSP stricte
+      HSTS en HTTPS
+    Exports et Docker
+      Antisèche CSV
+      Conteneur non root</code></pre>
+<h3 data-number="8.1.6" id="pièges-dexamen-7"><span
+class="header-section-number">8.1.6</span> Pièges d’examen</h3>
+<ul>
+<li>Confondre session web et jeton JWT : la session porte les routes web
+avec <code>SECRET_KEY</code>, le JWT signe l’API avec
+<code>JWT_SECRET_KEY</code> (cahier des charges § 10.1, § 10.2 ;
+<code>app/__init__.py:91-95,121</code>).</li>
+<li>Confondre jeton CSRF manquant et échec de connexion : le POST sans
+jeton répond 400 sans consommer d’essai, seuls les identifiants entrent
+dans les budgets (<code>app/auth.py:261-279</code> ;
+<code>tests/test_auth.py:156</code>).</li>
+<li>Confondre valeur d’exemple et secret valide : <code>change-me</code>
+et <code>changeme</code> bloquent le démarrage, une clé de 32 octets
+l’autorise (<code>app/config.py:6-15,39</code>).</li>
+<li>Oublier la condition HSTS : l’en-tête ne s’ajoute que si la requête
+est HTTPS (<code>app/__init__.py:190-191</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — IMPLÉMENTATION : secrets bloqués au
+démarrage, CSRF et budgets d’essais partagés web/API, en-têtes sur
+toutes les réponses. LACUNE : <code>'unsafe-inline'</code> sur
+<code>/apidocs</code>, aucune longueur minimale au mot de passe admin
+(<code>app/config.py:39</code>).</p>
+</blockquote>
+<h2 data-number="8.2" id="questions-réponses-7"><span
+class="header-section-number">8.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Que se passe-t-il si un secret manque ou vaut
+<code>change-me</code> ?</strong> IMPLÉMENTATION : démarrage refusé par
+<code>RuntimeError</code> qui liste les variables fautives, y compris
+une clé de moins de 32 octets (<code>app/config.py:29-48</code> ;
+<code>tests/test_config.py:43-94</code>). C’est RG30
+(<code>docs/modele/regles.md:34</code>).</li>
+<li><strong>Q2. Le mot de passe admin est-il stocké en clair ?</strong>
+IMPLÉMENTATION : non ; après amorçage, la configuration ne porte que
+<code>ADMIN_PASSWORD_HASH</code> et le clair est supprimé de la classe
+de configuration (<code>app/__init__.py:85-89</code> ;
+<code>tests/test_auth.py:400</code>).</li>
+<li><strong>Q3. Quand la session web, et quand le JWT ?</strong>
+IMPLÉMENTATION : la session ouvre les routes web sous
+<code>@login_required</code> ; le JWT ouvre les routes API sous
+<code>@jwt_required()</code> après <code>POST /api/login</code>.
+<code>/apidocs</code> demande la session, <code>/apispec</code> demande
+le JWT (cahier des charges § 10.1, § 10.2 ;
+<code>app/auth.py:121-136</code> ; <code>app/api.py:57,150</code>).</li>
+<li><strong>Q4. Comment les formulaires sont-ils protégés en CSRF
+?</strong> IMPLÉMENTATION : jeton de session, comparaison en temps
+constant, exigé sur tout POST ; POST sans jeton ou jeton invalide répond
+400 sans consommer d’essai de connexion
+(<code>app/auth.py:195-210,261-262</code> ;
+<code>app/routes.py:27-37</code>).</li>
+<li><strong>Q5. Comment la limitation des essais fonctionne-t-elle
+?</strong> IMPLÉMENTATION : budgets IP 10, compte 5, global 100 sur une
+fenêtre de 300 secondes, enregistrés par écriture atomique ; 429 avec
+<code>Retry-After</code>, 503 si le stockage est indisponible, web et
+API partagés (<code>app/auth.py:57-111</code> ;
+<code>app/__init__.py:67-84</code>).</li>
+<li><strong>Q6. Que fait l’application contre l’injection de formules
+CSV, et quelles limites le code prouve-t-il ?</strong> IMPLÉMENTATION :
+<code>_csv_safe</code> préfixe une apostrophe aux cellules qui
+commencent par <code>=</code>, <code>+</code>, <code>-</code>,
+<code>@</code>, tabulation ou retour chariot ;
+<code>export_inventory_csv</code> applique cette neutralisation aux deux
+exports, page <code>/inventory/export</code> et route
+<code>/api/inventory/export</code>
+(<code>app/queries.py:31-40,236-254</code> ;
+<code>app/routes.py:308-321</code> ; <code>app/api.py:474-500</code> ;
+<code>tests/test_web.py:666</code>). Limites prouvées : la
+neutralisation ne touche que ce générateur CSV, les autres exports
+écrivent JSONL, JSON ou Markdown
+(<code>collector/exports.py:95,256,154</code>) ;
+<code>script-src 'unsafe-inline'</code> subsiste dans la CSP de
+<code>/apidocs</code> (<code>app/__init__.py:29-31</code>) ;
+<code>ADMIN_PASSWORD</code> n’a aucune longueur minimale, à la
+différence des deux clés exigées à 32 octets
+(<code>app/config.py:15,39</code>) ; <code>app/</code> ne lit aucun
+paramètre de durée de jeton, si bien que la durée appliquée reste celle
+par défaut de Flask-JWT-Extended, valeur de bibliothèque que le dépôt ne
+permet pas de déduire (<code>app/__init__.py</code>,
+<code>app/config.py</code>, <code>requirements.txt</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — Distinguez l’exigence § 10.3 (variables
+dans <code>.env</code>) du refus de démarrage du code, et la session web
+du jeton JWT ; les limites restantes se lisent dans <code>app/</code>,
+pas dans le cahier des charges.</p>
+</blockquote>
+<h1 data-number="9"
+id="tests-déploiement-exports-et-notifications"><span
+class="header-section-number">9</span> Tests, déploiement, exports et
+notifications</h1>
+<h2 data-number="9.1" id="fiche-8"><span
+class="header-section-number">9.1</span> Fiche</h2>
+<h3 data-number="9.1.1" id="points-clés--tests"><span
+class="header-section-number">9.1.1</span> Points clés — Tests</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — Le cahier prévoit pytest 8.3.4, base
+SQLite en mémoire, 2 fichiers (<code>test_app.py</code>,
+<code>test_api.py</code>) et 58 tests (34 web + 24 API) (cahier des
+charges § 14.1).</li>
+<li><strong>IMPLÉMENTATION</strong> — La suite compte 437 fonctions de
+test réparties dans 24 fichiers <code>tests/test_*.py</code> ;
+<code>tests/conftest.py</code> fournit les fixtures app/db (SQLite
+<code>:memory:</code> par test) (<code>tests/</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — <code>make test</code> exécute
+<code>venv/bin/python -m pytest -v --ignore=reference</code> et tolère
+le code 5 (aucun test collecté) (<code>Makefile:13-14</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — <code>make smoke</code> appelle
+<code>scripts/smoke.sh</code> : parcours GET/POST sur
+<code>/login</code>, <code>/run</code>, <code>/api/login</code>,
+<code>/api/stats</code> après démarrage de l’app
+(<code>Makefile:16-17</code>, <code>README.md:55-57</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Les collecteurs et clients réels
+sont testés sans réseau (transport injecté) ; NetBox et virtualisation
+couverts (<code>tests/test_netbox_sources.py</code>,
+<code>tests/test_virtualisation_sources.py</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Exports et notifications ont leurs
+propres tests : <code>tests/test_exports.py</code> (10),
+<code>tests/test_notifications.py</code> (16)
+(<code>tests/</code>).</li>
+<li><strong>LACUNE</strong> — <code>verify</code> est déclaré
+<code>.PHONY</code> mais sans recette : <code>make verify</code> échoue
+; AGENTS.md indique <code>make test</code> à sa place
+(<code>Makefile:5</code>, <code>README.md</code>).</li>
+<li><strong>LACUNE</strong> — <code>README.md:62</code> annonce « 17
+tests » : chiffre périmé face aux 437 fonctions réelles
+(<code>README.md:62</code>, <code>tests/</code>).</li>
+</ul>
+<h3 data-number="9.1.2" id="points-clés--déploiement-docker"><span
+class="header-section-number">9.1.2</span> Points clés — Déploiement
+Docker</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — Docker et Docker Compose sont attendus
+avec documentation d’installation (cahier des charges § 12,
+Mission).</li>
+<li><strong>IMPLÉMENTATION</strong> — <code>Dockerfile</code> : image
+<code>python:3.11-slim-bookworm</code>, dépendances avant code (cache de
+couche), utilisateur non-root <code>app</code>, <code>/app/data</code>
+appartenant à <code>app</code> (<code>Dockerfile:1-27</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Serveur de production : gunicorn,
+4 workers, bind <code>0.0.0.0:5000</code>, factory appelée
+<code>app:create_app()</code> (<code>Dockerfile:29-30</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Healthcheck :
+<code>curl -f http://127.0.0.1:5000/healthz</code>, intervalle 30 s,
+timeout 10 s, start-period 30 s, 3 retries
+(<code>Dockerfile:32-34</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Compose : port
+<code>127.0.0.1:5000:5000</code>, <code>env_file: .env</code>, volume
+nommé <code>sqlite_data</code> sur <code>/app/data</code>
+(<code>docker-compose.yml</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Persistance :
+<code>DATABASE_URL=sqlite:////app/data/cloudinventory.db</code> (chemin
+absolu, sinon <code>instance/</code> non inscriptible) ;
+<code>RATE_LIMIT_STORE_PATH=/app/data/login-budgets.json</code> partagé
+entre workers (<code>docker-compose.yml:9-11</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Durcissement :
+<code>tmpfs /tmp</code>, <code>cap_drop: ALL</code>,
+<code>no-new-privileges:true</code>
+(<code>docker-compose.yml:12-17</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Cibles Make : <code>up</code>
+(<code>docker compose up -d --wait</code>), <code>down</code>,
+<code>logs</code>, <code>audit</code> (pip-audit)
+(<code>Makefile:19-29</code>).</li>
+<li><strong>ÉCART</strong> — Le cahier § 12.1 et § 12.2 citent le port
+5050 ; le code publie 5000 sur 127.0.0.1
+(<code>docker-compose.yml:5</code>).</li>
+</ul>
+<h3 data-number="9.1.3" id="points-clés--exports"><span
+class="header-section-number">9.1.3</span> Points clés — Exports</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — Formats attendus : export consolidé
+JSONL.gz, rapport Markdown, exports bruts JSON.gz ; stockage local ou
+partage Samba configurable (cahier des charges § 4.1, OF14→OF16).</li>
+<li><strong>IMPLÉMENTATION</strong> — Trois formats :
+<code>consolidated/run_{id}_{date}.jsonl.gz</code> (1 ligne = 1 VM,
+rétention 30 j) ; <code>report.md</code> écrasé à chaque run ;
+<code>raw/vms_run_…json.gz</code> et <code>raw/ipam_run_…json.gz</code>
+optionnels (rétention 7 j) (<code>collector/exports.py:1-9</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Déclenchement :
+<code>run_exports(run_id, vm_list=…, ipam_list=…)</code> appelé par le
+runner après <code>notify_run</code>, uniquement si le run a
+<code>status == SUCCESS</code>
+(<code>collector/inventory_runner.py:143-149</code>,
+<code>collector/exports.py:355-366</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Activation par variables :
+<code>EXPORT_ENABLED</code> (défaut <code>false</code>),
+<code>EXPORT_LOCAL_PATH</code> (défaut <code>exports</code>),
+<code>EXPORT_SMB_PATH</code>, <code>EXPORT_RAW_ENABLED</code>
+(<code>collector/exports.py:66-79</code>,
+<code>README.md:44-51</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Écriture atomique via
+<code>tempfile.mkstemp</code> + <code>os.replace</code> ; sous-dossiers
+et fichiers symboliques interdits ; noms de fichiers validés par
+expressions régulières (<code>collector/exports.py:32-63</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Publication SMB : chemin UNC
+validé, session chiffrée, copie puis nettoyage des rétentions à distance
+(<code>collector/exports.py:312-352</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Échec confiné : une exception
+d’export est journalisée en warning, le run SUCCESS est conservé
+(<code>collector/exports.py:380-382</code>).</li>
+</ul>
+<h3 data-number="9.1.4" id="points-clés--notifications"><span
+class="header-section-number">9.1.4</span> Points clés —
+Notifications</h3>
+<ul>
+<li><strong>EXIGENCE</strong> — Le cahier prévoit alertes SMTP et
+webhook après un run, plus badge navbar et bandeau d’alerte (cahier des
+charges § 8.9, OF12→OF13).</li>
+<li><strong>IMPLÉMENTATION</strong> — <code>notify_run(run)</code> ne
+déclenche rien si <code>status != SUCCESS</code> ; elle interroge
+anomalies, asset et IPAM du run, puis appelle email et webhook
+(<code>app/notifications.py:144-158</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — SMTP facultatif :
+<code>SMTP_ENABLED=true</code> et <code>SMTP_TO</code> non vide requis ;
+HTML échappé via <code>html.escape</code> ; TLS par défaut ; erreurs
+confinées au canal (<code>app/notifications.py:95-114</code>,
+<code>README.md:36-42</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Webhook : POST JSON
+(<code>text</code>, <code>run_id</code>, <code>status</code>,
+<code>anomaly_count</code>), URL validée en http/https, délai 10 s, code
+2xx exigé, aucun secret journalisé
+(<code>app/notifications.py:117-141</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Bandeau et badge navbar :
+<code>notification_context()</code> alimente le compte d’anomalies et le
+dernier run, réservé aux utilisateurs connectés ; enregistré une fois
+avant les blueprints (<code>app/notifications.py:31-57</code>).</li>
+<li><strong>IMPLÉMENTATION</strong> — Déclenchement dans le runner juste
+après le commit de SUCCESS, avant les exports ; échec notifié en
+warning, SUCCESS conservé
+(<code>collector/inventory_runner.py:136-141</code>).</li>
+</ul>
+<h3 data-number="9.1.5" id="schéma--exigences-et-état-actuel"><span
+class="header-section-number">9.1.5</span> Schéma — exigences et état
+actuel</h3>
+<table>
+<thead>
+<tr class="header">
+<th>Critère</th>
+<th>EXIGENCE (cahier)</th>
+<th>IMPLÉMENTATION ou LACUNE</th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td>Framework</td>
+<td>pytest 8.3.4, SQLite mémoire (§ 14.1)</td>
+<td>pytest avec fixtures <code>:memory:</code>
+(<code>tests/conftest.py</code>)</td>
+</tr>
+<tr class="even">
+<td>Organisation</td>
+<td>2 fichiers, 58 tests (§ 14.1)</td>
+<td>24 fichiers, 437 fonctions (<code>tests/</code>)</td>
+</tr>
+<tr class="odd">
+<td>Exécution</td>
+<td><code>pytest tests/ -v</code> (§ 14.3)</td>
+<td><code>make test</code> avec <code>--ignore=reference</code> et
+tolérance code 5 (<code>Makefile:13-14</code>)</td>
+</tr>
+<tr class="even">
+<td>Vérification</td>
+<td><code>verify</code> puis <code>smoke</code> (Contraintes du
+SDV)</td>
+<td><code>smoke</code> via <code>scripts/smoke.sh</code> ;
+<code>verify</code> sans recette (<code>Makefile:5,16-17</code>)</td>
+</tr>
+<tr class="odd">
+<td>Déploiement</td>
+<td>Docker, port 5050 (§ 12.1, § 12.2)</td>
+<td>Dockerfile + compose, port 5000 sur 127.0.0.1
+(<code>docker-compose.yml:5</code>)</td>
+</tr>
+<tr class="even">
+<td>Persistance</td>
+<td>Base persistante en conteneur</td>
+<td>Volume <code>sqlite_data</code> sur <code>/app/data</code>,
+DATABASE_URL absolu (<code>docker-compose.yml:7-10</code>)</td>
+</tr>
+<tr class="odd">
+<td>Exports</td>
+<td>JSONL.gz, rapport MD, bruts ; local ou Samba (§ 4.1, OF14→OF16)</td>
+<td>JSONL.gz, report.md, JSON.gz ; SMB chiffré
+(<code>collector/exports.py</code>)</td>
+</tr>
+<tr class="even">
+<td>Notifications</td>
+<td>SMTP + webhook (§ 8.9, OF12→OF13)</td>
+<td><code>notify_email</code>, <code>notify_webhook</code>, bandeau
+navbar (<code>app/notifications.py</code>)</td>
+</tr>
+</tbody>
+</table>
+<h3 data-number="9.1.6" id="glossaire-8"><span
+class="header-section-number">9.1.6</span> Glossaire</h3>
+<ul>
+<li><strong>pytest</strong> : framework de test exécuté par
+<code>make test</code> (<code>Makefile:13-14</code>).</li>
+<li><strong>SQLite</strong> : base en mémoire par test
+(<code>tests/conftest.py</code>), base persistante en conteneur via
+volume (<code>docker-compose.yml:7-10</code>).</li>
+<li><strong>gunicorn</strong> : serveur WSGI de production, 4 workers,
+factory <code>app:create_app()</code>
+(<code>Dockerfile:29-30</code>).</li>
+<li><strong>healthcheck</strong> : contrôle <code>curl /healthz</code>
+toutes les 30 s dans le Dockerfile (<code>Dockerfile:32-34</code>).</li>
+<li><strong>JSONL.gz</strong> : export consolidé compressé, une ligne
+JSON par VM, rétention 30 jours
+(<code>collector/exports.py:4</code>).</li>
+<li><strong>SMB</strong> : partage réseau alternatif au dossier local,
+session chiffrée, chemin UNC validé
+(<code>collector/exports.py:312-352</code>).</li>
+<li><strong>SMTP</strong> : canal email facultatif activé par
+<code>SMTP_ENABLED</code>, TLS par défaut
+(<code>app/notifications.py:95-114</code>).</li>
+<li><strong>webhook</strong> : POST JSON de synthèse du run vers
+<code>WEBHOOK_URL</code>, réponse 2xx exigée
+(<code>app/notifications.py:117-141</code>).</li>
+<li><strong>JWT</strong> : (employé sans définition dans cette section)
+; tests API dans <code>tests/test_api.py</code>.</li>
+<li><strong>NetBox</strong> : (employé sans définition dans cette
+section) ; client testé sans réseau
+(<code>tests/test_netbox_sources.py</code>).</li>
+</ul>
+<h3 data-number="9.1.7" id="carte-mentale-8"><span
+class="header-section-number">9.1.7</span> Carte mentale</h3>
+<pre class="mermaid"><code>mindmap
+  root((Tests déploiement exports notifications))
+    Tests
+      437 fonctions
+      make test
+      make smoke
+    Docker
+      gunicorn non-root
+      healthcheck healthz
+      volume sqlite_data
+    Exports
+      JSONL gz
+      report md
+      SMB chiffré
+    Notifications
+      SMTP échappé
+      webhook JSON
+      après commit SUCCESS</code></pre>
+<p>Provenances : cahier des charges § 4.1, § 5.1, § 8.9, § 12, § 14,
+OF12→OF16 ; <code>Dockerfile</code> ; <code>docker-compose.yml</code> ;
+<code>Makefile</code> ; <code>README.md</code> ; <code>tests/</code> ;
+<code>collector/exports.py</code> ;
+<code>collector/inventory_runner.py:136-149</code> ;
+<code>app/notifications.py</code>.</p>
+<h3 data-number="9.1.8" id="pièges-dexamen-8"><span
+class="header-section-number">9.1.8</span> Pièges d’examen</h3>
+<ul>
+<li>Confondre <code>make test</code> et <code>make verify</code> :
+<code>test</code> exécute pytest et tolère le code 5 ;
+<code>verify</code> est déclaré <code>.PHONY</code> sans recette
+(<code>Makefile:5,13-14</code>).</li>
+<li>Confondre port 5050 et port 5000 : le cahier cite 5050 ; le compose
+publie <code>127.0.0.1:5000:5000</code>
+(<code>docker-compose.yml:5</code>).</li>
+<li>Confondre exports et notifications : les exports s’appellent après
+<code>notify_run</code> dans le runner ; les deux confinent leurs
+erreurs sans faire échouer le SUCCESS
+(<code>collector/inventory_runner.py:136-149</code>).</li>
+<li>Confondre chemin relatif et absolu de base : un
+<code>DATABASE_URL</code> relatif irait dans <code>instance/</code> non
+inscriptible ; le compose impose <code>sqlite:////app/data/…</code>
+(<code>docker-compose.yml:10</code>).</li>
+<li>Confondre activation SMTP et envoi : <code>SMTP_ENABLED=true</code>
+ne suffit pas ; <code>SMTP_TO</code> doit être non vide, sinon la
+fonction retourne sans envoyer
+(<code>app/notifications.py:98</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — Les quatre thèmes se déclenchent après
+un run SUCCESS : notifications d’abord, exports ensuite, erreurs
+confinées de part et d’autre
+(<code>collector/inventory_runner.py:136-149</code>).</p>
+</blockquote>
+<h2 data-number="9.2" id="questions-réponses-8"><span
+class="header-section-number">9.2</span> Questions-réponses</h2>
+<ul>
+<li><strong>Q1. Comment lancez-vous les tests et interprétez-vous le
+résultat ?</strong> <strong>IMPLÉMENTATION</strong> —
+<code>make test</code> exécute pytest avec
+<code>--ignore=reference</code> et accepte le code 5 (aucune collecte).
+Vérifiez le nombre de tests collectés, pas seulement le code retour de
+Make (<code>Makefile:12-14</code>).</li>
+<li><strong>Q2. Combien de tests présentez-vous au jury ?</strong>
+<strong>IMPLÉMENTATION</strong> — La suite actuelle compte 437 fonctions
+de test dans 24 fichiers, plus <code>conftest.py</code> pour les
+fixtures. Le cahier § 14.1 en attendait 58 dans 2 fichiers : l’écart est
+en surcouverture (<code>tests/</code>, cahier des charges § 14.1). Aucun
+résultat d’exécution n’est affirmé ici.</li>
+<li><strong>Q3. Que contient le Dockerfile et pourquoi l’utilisateur
+non-root ?</strong> <strong>IMPLÉMENTATION</strong> — Image Python
+3.11-slim, dépendances installées avant le code pour le cache de couche,
+utilisateur <code>app</code> créé et <code>/app/data</code> chowné pour
+que SQLite y écrive, gunicorn en production et healthcheck
+<code>/healthz</code> (<code>Dockerfile:1-34</code>).</li>
+<li><strong>Q4. Comment la base SQLite persiste-t-elle dans le conteneur
+?</strong> <strong>IMPLÉMENTATION</strong> — Le volume nommé
+<code>sqlite_data</code> est monté sur <code>/app/data</code> ;
+<code>DATABASE_URL</code> est absolu
+(<code>sqlite:////app/data/cloudinventory.db</code>) pour éviter le
+dossier <code>instance/</code> non inscriptible en utilisateur non-root
+(<code>docker-compose.yml:7-11</code>).</li>
+<li><strong>Q5. Quels formats d’export un run produit-il ?</strong>
+<strong>IMPLÉMENTATION</strong> — Un JSONL.gz consolidé (une ligne par
+VM, rétention 30 j), un <code>report.md</code> écrasé à chaque run, et
+si <code>EXPORT_RAW_ENABLED</code> deux JSON.gz bruts (rétention 7 j).
+La publication SMB chiffrée remplace le dossier local si
+<code>EXPORT_SMB_PATH</code> est renseigné
+(<code>collector/exports.py:1-9,355-390</code>).</li>
+<li><strong>Q6. Quand et comment les notifications partent-elles
+?</strong> <strong>IMPLÉMENTATION</strong> — Après le commit d’un run
+SUCCESS, le runner appelle <code>notify_run</code> puis
+<code>run_exports</code>. L’email SMTP (HTML échappé, TLS par défaut)
+part si <code>SMTP_ENABLED</code> et <code>SMTP_TO</code> ; le webhook
+reçoit un POST JSON si <code>WEBHOOK_URL</code> et anomalies non nulles
+; chaque échec est confiné en warning
+(<code>collector/inventory_runner.py:136-141</code>,
+<code>app/notifications.py:95-158</code>).</li>
+</ul>
+<blockquote>
+<p><strong>À retenir</strong> — Une suite plus nombreuse que le cahier
+ne prouve pas la couverture exigée ; séparez le décompte (437 fonctions)
+des comportements validés (<code>tests/</code>, cahier des charges §
+14.2).</p>
+</blockquote>
+</body>
+</html>
