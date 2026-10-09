@@ -1,0 +1,223 @@
+/* CloudInventory — styles applicatifs, servis par l'application.
+   La CSP impose `style-src 'self'` : aucun <style> ni attribut style= n'est
+   admis dans les gabarits, tout vit donc dans cette feuille.
+   Sections : coquille (base.html), barres de progression (asset_detail.html),
+   connexion (login.html). */
+
+/* ——— Coquille (base.html) ——— */
+:root {
+  --ci-primary: #2563eb;
+  --ci-primary-hover: #1d4ed8;
+  --ci-gradient: linear-gradient(135deg, #0f172a, #1e293b);
+}
+body { font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif; }
+[data-bs-theme="light"] body { background-color: #f0f2f5; color: #212529; }
+[data-bs-theme="dark"] body { background-color: #0f1117; color: #dee2e6; }
+
+/* Navbar */
+.navbar { box-shadow: 0 2px 12px rgba(0,0,0,0.18); padding: 0.6rem 0; }
+.navbar-brand { font-weight: 700; letter-spacing: 0.5px; font-size: 1.15rem; }
+.nav-link { font-weight: 500; font-size: 0.9rem; padding: 0.5rem 0.85rem !important; border-radius: 6px; transition: background 0.15s; }
+.nav-link:hover { background: rgba(255,255,255,0.1); }
+.nav-link.active { background: rgba(255,255,255,0.15); }
+
+/* Badges de statut (cahier §11.4) */
+.badge-success { background-color: #198754; color: #fff; }
+.badge-fail { background-color: #dc3545; color: #fff; }
+.badge-running { background-color: #ffc107; color: #000; }
+
+/* Cartes */
+.card { border: none; box-shadow: 0 1px 6px rgba(0,0,0,0.07); border-radius: 10px; transition: box-shadow 0.2s; }
+.card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); }
+.card-header { font-weight: 600; font-size: 0.9rem; }
+
+/* Tableaux */
+.table { vertical-align: middle; font-size: 0.88rem; }
+.table-responsive { border-radius: 10px; overflow: hidden; }
+.table th { font-weight: 600; white-space: nowrap; }
+
+/* Boutons — hors connexion : btn-login garde le bleu Bootstrap d'origine */
+.btn-primary:not(.btn-login) { background: var(--ci-primary); border-color: var(--ci-primary); }
+.btn-primary:not(.btn-login):hover { background: var(--ci-primary-hover); border-color: var(--ci-primary-hover); }
+
+/* Bascule de thème */
+.theme-toggle { cursor: pointer; font-size: 1.15rem; padding: 0.3rem 0.55rem; border-radius: 8px; transition: background 0.2s; display: inline-flex; align-items: center; }
+.theme-toggle:hover { background: rgba(255,255,255,0.15); }
+
+/* Utilitaires */
+.fade-in { animation: fadeIn 0.3s ease-in; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+.ci-gradient-bg { background: var(--ci-gradient); }
+.ci-main-container { max-width: 1400px; margin: 0 auto; }
+.ci-cyan { color: #0dcaf0; }
+.ci-footer { font-size: 0.78rem; opacity: 0.6; }
+.ci-purple { color: #6f42c1; }
+.ci-badge-orange { background: #fd7e14; color: #fff; }
+.ci-badge-purple { background: #6f42c1; color: #fff; }
+
+/* Bandeau d'anomalies */
+.ci-alert-anomalies { border-left: 4px solid #dc3545; }
+.ci-alert-anomalies .ci-anomaly-type { display: inline-block; margin: 2px 4px 2px 0; font-size: 0.78rem; }
+
+/* Inventaire et détail asset (T009) */
+.ci-progress-sm { height: 0.45rem; }
+.ci-sort-link:hover { text-decoration: underline; }
+
+@media (max-width: 767.98px) {
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.15rem; }
+  .card { border-radius: 8px; }
+  .nav-link { font-size: 0.85rem; padding: 0.4rem 0.6rem !important; }
+}
+
+/* ——— Largeurs des barres de progression (asset_detail.html) ——— */
+.ci-w-0 { width: 0%; }
+.ci-w-1 { width: 1%; }
+.ci-w-2 { width: 2%; }
+.ci-w-3 { width: 3%; }
+.ci-w-4 { width: 4%; }
+.ci-w-5 { width: 5%; }
+.ci-w-6 { width: 6%; }
+.ci-w-7 { width: 7%; }
+.ci-w-8 { width: 8%; }
+.ci-w-9 { width: 9%; }
+.ci-w-10 { width: 10%; }
+.ci-w-11 { width: 11%; }
+.ci-w-12 { width: 12%; }
+.ci-w-13 { width: 13%; }
+.ci-w-14 { width: 14%; }
+.ci-w-15 { width: 15%; }
+.ci-w-16 { width: 16%; }
+.ci-w-17 { width: 17%; }
+.ci-w-18 { width: 18%; }
+.ci-w-19 { width: 19%; }
+.ci-w-20 { width: 20%; }
+.ci-w-21 { width: 21%; }
+.ci-w-22 { width: 22%; }
+.ci-w-23 { width: 23%; }
+.ci-w-24 { width: 24%; }
+.ci-w-25 { width: 25%; }
+.ci-w-26 { width: 26%; }
+.ci-w-27 { width: 27%; }
+.ci-w-28 { width: 28%; }
+.ci-w-29 { width: 29%; }
+.ci-w-30 { width: 30%; }
+.ci-w-31 { width: 31%; }
+.ci-w-32 { width: 32%; }
+.ci-w-33 { width: 33%; }
+.ci-w-34 { width: 34%; }
+.ci-w-35 { width: 35%; }
+.ci-w-36 { width: 36%; }
+.ci-w-37 { width: 37%; }
+.ci-w-38 { width: 38%; }
+.ci-w-39 { width: 39%; }
+.ci-w-40 { width: 40%; }
+.ci-w-41 { width: 41%; }
+.ci-w-42 { width: 42%; }
+.ci-w-43 { width: 43%; }
+.ci-w-44 { width: 44%; }
+.ci-w-45 { width: 45%; }
+.ci-w-46 { width: 46%; }
+.ci-w-47 { width: 47%; }
+.ci-w-48 { width: 48%; }
+.ci-w-49 { width: 49%; }
+.ci-w-50 { width: 50%; }
+.ci-w-51 { width: 51%; }
+.ci-w-52 { width: 52%; }
+.ci-w-53 { width: 53%; }
+.ci-w-54 { width: 54%; }
+.ci-w-55 { width: 55%; }
+.ci-w-56 { width: 56%; }
+.ci-w-57 { width: 57%; }
+.ci-w-58 { width: 58%; }
+.ci-w-59 { width: 59%; }
+.ci-w-60 { width: 60%; }
+.ci-w-61 { width: 61%; }
+.ci-w-62 { width: 62%; }
+.ci-w-63 { width: 63%; }
+.ci-w-64 { width: 64%; }
+.ci-w-65 { width: 65%; }
+.ci-w-66 { width: 66%; }
+.ci-w-67 { width: 67%; }
+.ci-w-68 { width: 68%; }
+.ci-w-69 { width: 69%; }
+.ci-w-70 { width: 70%; }
+.ci-w-71 { width: 71%; }
+.ci-w-72 { width: 72%; }
+.ci-w-73 { width: 73%; }
+.ci-w-74 { width: 74%; }
+.ci-w-75 { width: 75%; }
+.ci-w-76 { width: 76%; }
+.ci-w-77 { width: 77%; }
+.ci-w-78 { width: 78%; }
+.ci-w-79 { width: 79%; }
+.ci-w-80 { width: 80%; }
+.ci-w-81 { width: 81%; }
+.ci-w-82 { width: 82%; }
+.ci-w-83 { width: 83%; }
+.ci-w-84 { width: 84%; }
+.ci-w-85 { width: 85%; }
+.ci-w-86 { width: 86%; }
+.ci-w-87 { width: 87%; }
+.ci-w-88 { width: 88%; }
+.ci-w-89 { width: 89%; }
+.ci-w-90 { width: 90%; }
+.ci-w-91 { width: 91%; }
+.ci-w-92 { width: 92%; }
+.ci-w-93 { width: 93%; }
+.ci-w-94 { width: 94%; }
+.ci-w-95 { width: 95%; }
+.ci-w-96 { width: 96%; }
+.ci-w-97 { width: 97%; }
+.ci-w-98 { width: 98%; }
+.ci-w-99 { width: 99%; }
+.ci-w-100 { width: 100%; }
+
+/* ——— Page de connexion (login.html) ——— */
+body {
+  font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+}
+.login-card {
+  width: 100%;
+  max-width: 420px;
+  border: none;
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
+  overflow: hidden;
+  animation: slideUp 0.4s ease-out;
+}
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.login-header {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  padding: 2rem 2rem 1.5rem;
+  text-align: center;
+}
+.login-header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
+.login-header p { opacity: 0.85; margin-bottom: 0; font-size: 0.88rem; }
+.login-body { padding: 2rem; }
+.form-control { border-radius: 8px; padding: 0.6rem 0.85rem; }
+.form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25); }
+.btn-login { border: none; padding: 0.65rem; font-weight: 600; border-radius: 8px; }
+.ci-login-icon { font-size: 2rem; }
+.theme-toggle-login {
+  position: fixed; top: 1rem; right: 1rem;
+  font-size: 1.3rem; color: #fff; opacity: 0.6;
+  transition: opacity 0.2s; background: transparent;
+  border: 0; padding: 0.3rem 0.55rem; border-radius: 8px; cursor: pointer;
+}
+.theme-toggle-login:hover, .theme-toggle-login:focus-visible { opacity: 1; }
+@media (max-width: 480px) {
+  .login-header { padding: 1.5rem 1.25rem 1.25rem; }
+  .login-header h1 { font-size: 1.3rem; }
+  .login-body { padding: 1.5rem 1.25rem; }
+}

@@ -27,6 +27,14 @@ if [ "$SMOKE_PROFILE" = "docker" ]; then
     # system Python, stdlib only: no venv on the acceptance host), the same HTTP checks, no secret in argv.
     PYTHON="${SMOKE_PYTHON_BIN:-python3}"
     APP_URL="${SMOKE_APP_URL:-127.0.0.1:5000}"
+    # CODE-05: local target only (127.0.0.1 or localhost, optional port). Any scheme, userinfo, path, other
+    # host or junk would let curl reach another host: refused here, before any call, before the password is read.
+    TARGET="${APP_URL,,}"
+    if [[ ! "$TARGET" =~ ^(127\.0\.0\.1|localhost)(:[0-9]{1,5})?$ ]]; then
+        echo "FAIL: SMOKE_APP_URL must be 127.0.0.1 or localhost with an optional port, refused: ${APP_URL}"
+        exit 1
+    fi
+    APP_URL="$TARGET"
     "$PYTHON" - "${SMOKE_ENV_FILE:-.env}" > "$SMOKE_TMP/password" <<'PY'
 import sys
 for line in open(sys.argv[1], encoding="utf-8"):

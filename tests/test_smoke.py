@@ -5,6 +5,7 @@ C2 : Permissions 0600 pour fichiers, 0700 pour répertoire temporaire
 C3 : Nettoyage garanti sur EXIT/INT/TERM
 C4 : Encodage JSON/form correct (--data-binary @fichier, --header @fichier)
 C5 : Aucun secret dans stdout/stderr
+C6 : Profil docker — cible locale uniquement, refus avant tout appel curl (T038)
 """
 import os
 import stat
@@ -489,3 +490,56 @@ def test_smoke_docker_profile_requires_admin_password(smoke_env, tmp_path):
                             capture_output=True, text=True, timeout=10)
     assert result.returncode == 1 and "ADMIN_PASSWORD missing" in result.stdout
     assert not list(tmp_path.glob("tmp*")), "Répertoire privé non nettoyé"
+
+
+# --- T038 C6 — cible du profil docker : locale uniquement --------------------
+
+# Cibles refusées : hôte distant, IP privée, schéma, chemin, userinfo, suffixe
+# trompeur, query — toute URL qui ferait partir le mot de passe ailleurs.
+_DOCKER_REMOTE_TARGETS = [
+    "evil.example.com",
+    "evil.example.com:8443",
+    "http://127.0.0.1:5000",
+    "127.0.0.1:5000/admin",
+    "admin@evil.example.com",
+    "192.168.1.10:8080",
+    "127.0.0.1.evil.example.com",
+    "127.0.0.1:5000?next=evil",
+]
+
+# Cibles acceptées : 127.0.0.1 et localhost, avec ou sans port.
+_DOCKER_LOCAL_TARGETS = ["127.0.0.1", "127.0.0.1:5000", "localhost", "localhost:8080"]
+
+
+@pytest.mark.parametrize("target", _DOCKER_REMOTE_TARGETS)
+def test_smoke_docker_profile_rejects_remote_target_without_any_curl(smoke_env, tmp_path, run_smoke, target):
+    """Cible non locale : refus code 1 avant le moindre appel curl, mot de passe jamais exposé."""
+    smoke_env.update({
+        "SMOKE_PROFILE": "docker",
+        "SMOKE_APP_URL": target,
+        "SMOKE_ENV_FILE": str(tmp_path / ".env"),
+        "SMOKE_PYTHON_BIN": sys.executable,
+    })
+    (tmp_path / "records").touch()  # fixture run_smoke : aucun enregistrement attendu
+    result, calls = run_smoke()
+    assert result.returncode == 1, result.stdout + result.stderr
+    assert "FAIL: SMOKE_APP_URL" in result.stdout
+    assert calls == []
+    assert not (tmp_path / "calls").exists(), f"curl appelé pour la cible {target}"
+    assert smoke_env["ADMIN_PASSWORD"] not in result.stdout + result.stderr
+
+
+@pytest.mark.parametrize("target", _DOCKER_LOCAL_TARGETS)
+def test_smoke_docker_profile_accepts_local_targets(smoke_env, tmp_path, run_smoke, target):
+    """Cible locale (avec ou sans port) : le déroulé complet se poursuit vers elle."""
+    smoke_env.update({
+        "SMOKE_PROFILE": "docker",
+        "SMOKE_APP_URL": target,
+        "SMOKE_ENV_FILE": str(tmp_path / ".env"),
+        "SMOKE_PYTHON_BIN": sys.executable,
+    })
+    result, records = run_smoke()
+    assert result.returncode == 0 and "SMOKE TEST PASSED" in result.stdout, result.stdout + result.stderr
+    assert records and all(r["host"] == target for r in records)
+    assert all(r["safe_argv"] and r["files_private"] and r["private"] for r in records)
+    assert smoke_env["ADMIN_PASSWORD"] not in result.stdout + result.stderr

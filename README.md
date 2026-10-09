@@ -4,8 +4,7 @@ Dockerised Flask application (Python 3.11, Flask-SQLAlchemy, SQLite) with gunico
 
 ## Prérequis
 
-- Docker + Docker Compose installés
-- `make` disponible (optionnel, pour les cibles Makefile)
+- Docker + Docker Compose installés ; `make` optionnel (cibles Makefile)
 - Versions : Python 3.11, Flask 3.1, Flask-SQLAlchemy, pytest
 
 ## Lancement
@@ -15,13 +14,20 @@ cp .env.example .env
 docker compose up -d --wait
 ```
 
-L'application est disponible sur http://127.0.0.1:5000
+L'application est disponible sur http://127.0.0.1:5000 ; arrêt : `docker compose down`
 
-## Arrêt
+## Déploiement derrière un proxy TLS
 
-```bash
-docker compose down
-```
+La terminaison TLS est attendue sur le reverse proxy : l'application sert en HTTP clair et n'émet
+`Strict-Transport-Security` que si la requête est perçue en HTTPS (`app/__init__.py:190`, `request.is_secure`).
+
+- **HSTS au terminateur** : le proxy ajoute lui-même `Strict-Transport-Security: max-age=31536000` sur ses
+  réponses, indépendamment de l'application.
+- **Ou ProxyFix** : `werkzeug.middleware.proxy_fix.ProxyFix` doit compter le nombre exact de proxys de confiance
+  (un seul proxy devant l'application ⇒ `x_proto=1`), jamais plus. Ce réglage n'est pas branché dans le dépôt :
+  à activer soi-même selon l'architecture.
+- **Jamais de confiance aveugle en `X-Forwarded-Proto`** : l'application ne lit pas cet en-tête aujourd'hui ; un
+  compteur supérieur au nombre réel de proxys laisserait un client forcer le schéma perçu.
 
 ## Variables d'environnement
 

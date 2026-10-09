@@ -77,8 +77,8 @@
         <tr class="{% if ca.match_status == 'NO_MATCH' %}table-danger{% elif ca.match_status == 'MATCHED_IP' %}table-info{% elif ca.match_status == 'MATCHED_FQDN' %}table-warning{% elif ca.match_status == 'MATCHED_NAME' %}table-success{% endif %}">
           <td><a href="{{ url_for('main.asset_detail', asset_id=asset.id) }}" class="fw-semibold text-decoration-none">{{ asset.vm_name }}</a></td>
           <td>
-            {% if asset.status == 'running' %}<span class="badge bg-success">running</span>
-            {% else %}<span class="badge bg-secondary">{{ asset.status or '—' }}</span>{% endif %}
+            {% if ca.vm_status == 'running' %}<span class="badge bg-success">running</span>
+            {% else %}<span class="badge bg-secondary">{{ ca.vm_status or '—' }}</span>{% endif %}
           </td>
           <td><code class="small">{{ ca.ip_final or '—' }}</code></td>
           <td class="d-none d-lg-table-cell">{{ ca.dns_final or '—' }}</td>

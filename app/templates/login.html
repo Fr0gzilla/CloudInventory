@@ -8,55 +8,7 @@
   <title>Connexion — CloudInventory</title>
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap.min.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons.min.css') }}">
-  <style>
-    body {
-      font-family: 'Inter', system-ui, -apple-system, "Segoe UI", sans-serif;
-      background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
-      min-height: 100vh;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 1rem;
-    }
-    .login-card {
-      width: 100%;
-      max-width: 420px;
-      border: none;
-      border-radius: 14px;
-      box-shadow: 0 12px 40px rgba(0, 0, 0, 0.45);
-      overflow: hidden;
-      animation: slideUp 0.4s ease-out;
-    }
-    @keyframes slideUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .login-header {
-      background: linear-gradient(135deg, #2563eb, #1d4ed8);
-      color: #fff;
-      padding: 2rem 2rem 1.5rem;
-      text-align: center;
-    }
-    .login-header h1 { font-size: 1.5rem; font-weight: 700; margin-bottom: 0.25rem; }
-    .login-header p { opacity: 0.85; margin-bottom: 0; font-size: 0.88rem; }
-    .login-body { padding: 2rem; }
-    .form-control { border-radius: 8px; padding: 0.6rem 0.85rem; }
-    .form-control:focus { border-color: #2563eb; box-shadow: 0 0 0 0.2rem rgba(37, 99, 235, 0.25); }
-    .btn-login { border: none; padding: 0.65rem; font-weight: 600; border-radius: 8px; }
-    .ci-login-icon { font-size: 2rem; }
-    .theme-toggle-login {
-      position: fixed; top: 1rem; right: 1rem;
-      font-size: 1.3rem; color: #fff; opacity: 0.6;
-      transition: opacity 0.2s; background: transparent;
-      border: 0; padding: 0.3rem 0.55rem; border-radius: 8px; cursor: pointer;
-    }
-    .theme-toggle-login:hover, .theme-toggle-login:focus-visible { opacity: 1; }
-    @media (max-width: 480px) {
-      .login-header { padding: 1.5rem 1.25rem 1.25rem; }
-      .login-header h1 { font-size: 1.3rem; }
-      .login-body { padding: 1.5rem 1.25rem; }
-    }
-  </style>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
 </head>
 <body>
   <button type="button" class="theme-toggle-login" id="themeToggle" title="Mode sombre / clair" aria-label="Basculer entre le thème clair et le thème sombre">

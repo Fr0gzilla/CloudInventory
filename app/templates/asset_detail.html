@@ -9,6 +9,9 @@
 {%- elif status == 'NO_MATCH' -%}<span class="badge bg-danger">NO MATCH</span>
 {%- else -%}<span class="badge bg-secondary">{{ status or '—' }}</span>{% endif -%}
 {%- endmacro %}
+{% macro width_class(pct) -%}
+{%- if pct is none -%}ci-w-0{%- else -%}ci-w-{{ ([0, [pct, 100]|min]|max)|round|int }}{%- endif -%}
+{%- endmacro %}
 
 <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
   <a href="{{ url_for('main.inventory') }}" class="btn btn-sm btn-outline-secondary"
@@ -88,8 +91,7 @@
         <div class="progress mt-1 ci-progress-sm" role="progressbar"
              aria-valuenow="{{ metrics.cpu }}" aria-valuemin="0" aria-valuemax="100"
              aria-label="Utilisation CPU">
-          <div class="progress-bar {% if metrics.cpu > 80 %}bg-danger{% elif metrics.cpu > 50 %}bg-warning{% else %}bg-success{% endif %}"
-               style="width: {{ metrics.cpu }}%"></div>
+          <div class="progress-bar {% if metrics.cpu > 80 %}bg-danger{% elif metrics.cpu > 50 %}bg-warning{% else %}bg-success{% endif %} {{ width_class(metrics.cpu) }}"></div>
         </div>
         <small class="text-muted">{{ metrics.cpu }}%</small>
         {% endif %}
@@ -101,8 +103,7 @@
         <div class="progress mt-1 ci-progress-sm" role="progressbar"
              aria-valuenow="{{ metrics.ram_pct }}" aria-valuemin="0" aria-valuemax="100"
              aria-label="Utilisation RAM">
-          <div class="progress-bar {% if metrics.ram_pct > 85 %}bg-danger{% elif metrics.ram_pct > 60 %}bg-warning{% else %}bg-success{% endif %}"
-               style="width: {{ metrics.ram_pct }}%"></div>
+          <div class="progress-bar {% if metrics.ram_pct > 85 %}bg-danger{% elif metrics.ram_pct > 60 %}bg-warning{% else %}bg-success{% endif %} {{ width_class(metrics.ram_pct) }}"></div>
         </div>
         <small class="text-muted">{{ metrics.ram_pct }}%</small>
         {% else %}
@@ -116,8 +117,7 @@
         <div class="progress mt-1 ci-progress-sm" role="progressbar"
              aria-valuenow="{{ metrics.disk_pct }}" aria-valuemin="0" aria-valuemax="100"
              aria-label="Utilisation disque">
-          <div class="progress-bar {% if metrics.disk_pct > 90 %}bg-danger{% elif metrics.disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %}"
-               style="width: {{ metrics.disk_pct }}%"></div>
+          <div class="progress-bar {% if metrics.disk_pct > 90 %}bg-danger{% elif metrics.disk_pct > 70 %}bg-warning{% else %}bg-success{% endif %} {{ width_class(metrics.disk_pct) }}"></div>
         </div>
         <small class="text-muted">{{ metrics.disk_pct }}%</small>
         {% else %}
