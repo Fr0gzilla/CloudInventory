@@ -383,11 +383,11 @@ documentée (cahier des charges § 2.3).</li>
 des charges et de la documentation du projet, avec fidélité obligatoire
 (cahier des charges § Mission, point 4).</li>
 <li><strong>Q6. Quelles contraintes l’emportent en cas de conflit
-?</strong> Les contraintes du SDV priment : Python 3.11/3.12,
+?</strong> Les contraintes d'exécution priment : Python 3.11/3.12,
 <code>make install</code> / <code>make verify</code> /
 <code>make smoke</code>, sources simulées seules, aucun secret,
 bibliothèques d’interface copiées localement sans CDN, Docker non root
-(cahier des charges § Contraintes du SDV).</li>
+(cahier des charges § Contraintes d'exécution).</li>
 </ul>
 <blockquote>
 <p><strong>À retenir</strong> — À chaque réponse, citer la provenance :
@@ -907,12 +907,12 @@ Proxmox VE + API NetBox) ; les sources sont interchangeables par
 variables d’environnement (OT4) ; les jeux simulés sont décrits en §
 13.1 (virtualisation) et § 13.2 (IPAM) (cahier des charges § 4.1, §
 3.2).</li>
-<li><strong>EXIGENCE (contrainte SDV)</strong> — Seules les sources
+<li><strong>EXIGENCE (contrainte d'exécution)</strong> — Seules les sources
 simulées sont exécutées (<code>USE_MOCK_VIRT=true</code>,
 <code>USE_MOCK_IPAM=true</code>) ; les clients Proxmox et NetBox réels
 sont écrits avec la même interface, mais aucun test ne les appelle :
 aucun appel réseau sortant dans les tests ni au démarrage (rubrique «
-Contraintes du SDV » du cahier des charges).</li>
+Contraintes d'exécution » du cahier des charges).</li>
 <li><strong>EXIGENCE</strong> — Le pipeline d’un run comporte sept
 étapes : initialisation <code>Run</code> RUNNING, collecte
 virtualisation, collecte IPAM, upsert <code>Asset</code> par
@@ -994,12 +994,12 @@ class="header-section-number">4.1.2</span> Définitions</h3>
 <p><strong>Périmètre du cahier</strong> : collecte à partir de sources
 simulées (mock Proxmox + mock NetBox) ou réelles (API Proxmox VE + API
 NetBox), avec sources interchangeables par variables d’environnement
-(OT4) (cahier des charges § 4.1, § 3.2). <strong>Contrainte SDV</strong>
+(OT4) (cahier des charges § 4.1, § 3.2). <strong>Contrainte d'exécution</strong>
 : seules les sources simulées sont exécutées
 (<code>USE_MOCK_VIRT=true</code>, <code>USE_MOCK_IPAM=true</code>) ; les
 clients réels sont écrits avec la même interface, mais aucun test ne les
 appelle : aucun appel réseau sortant dans les tests ni au démarrage
-(rubrique « Contraintes du SDV » du cahier des charges). <strong>Bascule
+(rubrique « Contraintes d'exécution » du cahier des charges). <strong>Bascule
 simulé / réel</strong> : <code>Config.use_mock_virt()</code> et
 <code>Config.use_mock_ipam()</code> lisent <code>USE_MOCK_VIRT</code> et
 <code>USE_MOCK_IPAM</code>, tous deux <code>true</code> par défaut
@@ -1091,7 +1091,7 @@ DNS et IP) ; 7. finalisation SUCCESS avec compteurs.</p>
 class="header-section-number">4.1.4</span> Étiquettes</h3>
 <p><strong>EXIGENCE</strong> : collecte simulée ou réelle
 interchangeable par variables d’environnement (OT4) (cahier des charges
-§ 4.1, § 3.2), jeux décrits en § 13.1 et § 13.2, contrainte du SDV,
+§ 4.1, § 3.2), jeux décrits en § 13.1 et § 13.2, contrainte d'exécution,
 pipeline en sept étapes et gestion d’erreur du § 8.2, orchestrateur du §
 5.2. <strong>IMPLÉMENTATION</strong> : paquet <code>collector/</code>
 complet (deux jeux, deux clients, orchestrateur, consolidation), bascule
@@ -1155,7 +1155,7 @@ class="header-section-number">4.1.6</span> Carte mentale</h3>
     Périmètre v2.0
       Simulé ou réel
       Interchangeable OT4
-    Contrainte SDV
+    Contrainte d'exécution
       Mocks seuls exécutés
       Aucun appel réseau
     Deux collecteurs
@@ -1177,8 +1177,8 @@ class="header-section-number">4.1.6</span> Carte mentale</h3>
 class="header-section-number">4.1.7</span> Pièges d’examen</h3>
 <ol type="1">
 <li>Confondre exigence du cahier et appels réels des tests : la
-contrainte SDV interdit tout appel réseau sortant dans les tests ni au
-démarrage (rubrique « Contraintes du SDV » du cahier des charges), alors
+contrainte d'exécution interdit tout appel réseau sortant dans les tests ni au
+démarrage (rubrique « Contraintes d'exécution » du cahier des charges), alors
 que les fonctions réelles sont appelées avec un transport de
 remplacement, sans réseau
 (<code>tests/test_virtualisation_sources.py:267</code>,
@@ -1207,7 +1207,7 @@ les doublons volontaires.</li>
 </ol>
 <blockquote>
 <p><strong>À retenir</strong> — Le périmètre prévoit simulé et réel, la
-contrainte SDV n’exécute que les mocks. Les deux collecteurs remontent
+contrainte d'exécution n’exécute que les mocks. Les deux collecteurs remontent
 des formats identiques simulé comme réel, onze clés de plus côté VM.
 <code>run_inventory()</code> enchaîne sept étapes et rend SUCCESS ou
 FAIL sans lever.</p>
@@ -1222,7 +1222,7 @@ class="header-section-number">4.2</span> Questions-réponses</h2>
 des charges § 4.1).</li>
 <li><strong>Q2. Les tests font-ils des appels réseau ?</strong> Non :
 aucun appel réseau sortant dans les tests ni au démarrage (rubrique «
-Contraintes du SDV » du cahier des charges) ; le réseau y est même rendu
+Contraintes d'exécution » du cahier des charges) ; le réseau y est même rendu
 impossible (<code>tests/test_virtualisation_sources.py:52-60</code>,
 <code>tests/test_collector_security.py:34</code>).</li>
 <li><strong>Q3. Combien de VM et d’enregistrements IPAM le jeu simulé
@@ -2332,8 +2332,7 @@ tolérance code 5 (<code>Makefile:13-14</code>)</td>
 </tr>
 <tr class="even">
 <td>Vérification</td>
-<td><code>verify</code> puis <code>smoke</code> (Contraintes du
-SDV)</td>
+<td><code>verify</code> puis <code>smoke</code> (Contraintes d’exécution)</td>
 <td><code>smoke</code> via <code>scripts/smoke.sh</code> ;
 <code>verify</code> sans recette (<code>Makefile:5,16-17</code>)</td>
 </tr>

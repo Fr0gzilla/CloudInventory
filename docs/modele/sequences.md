@@ -13,7 +13,7 @@ Entrées : `GET /login`, `POST /login` (`username`, `password`, `csrf_token`). S
 `200` (formulaire + message d'erreur), `302` (session créée ou redirection vers `/login`), `200` (route protégée rendue).
 Formes Mermaid : `->>` appel synchrone, `-->>` retour, `alt/else/end` choix (imbriqués), `Note over` remarque.
 RG citées : **RG25** (session signée par `SECRET_KEY`), **RG26** (toutes les routes web sous `@login_required`).
-Jeton CSRF et limitation des essais : contraintes du SDV (`cahier des charges`, « Sécurité ») — **sans numéro de RG**,
+Jeton CSRF et limitation des essais : contraintes d'exécution (`cahier des charges`, « Sécurité ») — **sans numéro de RG**,
 `regles.md` ne contenant aucune RG pour ces deux mesures.
 
 ### Diagramme
@@ -62,8 +62,8 @@ sequenceDiagram
 |---|---|
 | Création de session signée avec `SECRET_KEY` | RG25 |
 | Routes rendues ou redirigées selon la session (`@login_required`) | RG26 |
-| Vérification du jeton CSRF | Contraintes SDV, `cahier des charges` « Sécurité » (aucune RG) |
-| Limitation des essais de connexion | Contraintes SDV, `cahier des charges` « Sécurité » (aucune RG) |
+| Vérification du jeton CSRF | Contraintes d'exécution, `cahier des charges` « Sécurité » (aucune RG) |
+| Limitation des essais de connexion | Contraintes d'exécution, `cahier des charges` « Sécurité » (aucune RG) |
 | Comparaison `ADMIN_USERNAME` / `ADMIN_PASSWORD` haché | `cahier des charges` §10.1, §10.3 |
 | Participants (route, session) | Composants Flask/Flask-Login, `cahier des charges` §5.2, §10.1 — hors `classes.md` |
 
@@ -71,7 +71,7 @@ sequenceDiagram
 
 - Authentification API JWT (RG27, RG28) et routes `@jwt_required()` : hors périmètre (§10.2).
 - Refus de démarrage sur secrets absents ou par défaut (RG29, RG30) : préalable au lancement, pas un message de séquence.
-- `next` non sûr (open redirect), en-têtes de sécurité, `127.0.0.1` : contraintes SDV non figurables comme message ici.
+- `next` non sûr (open redirect), en-têtes de sécurité, `127.0.0.1` : contraintes d'exécution non figurables comme message ici.
 - Compteur d'essais et jeton CSRF n'ont aucune entité dans `classes.md` : représentés en auto-appels sur la route.
 
 ---
@@ -168,4 +168,4 @@ sequenceDiagram
 - Déduction du rôle (RG15, RG16) et normalisation (RG14) : inclus dans les messages de matching, non dépliés.
 - Exports et retentions (RG21→RG24), notifications (§8.9), comparaison de runs (§8.6) : hors périmètre.
 - Le cumul des compteurs est montré en auto-appel local : `RG19` impose l'écriture à la finalisation, pas pendant la boucle.
-- Collecteurs réels Proxmox/NetBox : seules les sources simulées sont exécutées (contraintes SDV).
+- Collecteurs réels Proxmox/NetBox : seules les sources simulées sont exécutées (contraintes d'exécution).
