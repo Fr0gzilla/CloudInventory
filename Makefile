@@ -13,6 +13,10 @@ install:
 test:
 	$(PY) -m pytest -v --ignore=reference || [ $$? -eq 5 ]
 
+# verify : le nom attendu par la documentation et les outils ; déclarée sans recette, elle ne lançait rien et rendait
+# 0 (« Nothing to be done ») — vu le 10 oct.
+verify: test
+
 smoke:
 	@bash scripts/smoke.sh
 

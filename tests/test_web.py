@@ -1134,6 +1134,15 @@ def test_run_detail_displays_snapshot_fields(app, db):
     assert "vm-001.internal" in body  # dns_final depuis consolidated_asset
 
 
+def _statut_vm(body, vm_name):
+    """Le statut affiché dans la ligne de la VM (la case « Statut » du détail d'un run), pas un mot cherché dans toute la
+    page : « running » se trouvait aussi dans du CSS en ligne, et le test passait sans regarder le statut (vu le 9 oct.)."""
+    m = re.search(r"<td><a [^>]*>\s*" + re.escape(vm_name) + r"\s*</a></td>\s*<td>\s*<span class=\"badge[^\"]*\">([^<]*)</span>",
+                  body)
+    assert m, f"ligne de {vm_name} introuvable dans le détail du run"
+    return m.group(1).strip()
+
+
 def test_run_detail_different_vm_between_two_runs(app, db):
     """Deux runs avec VM modifiée entre les deux : le détail affiche l'instantané
     du run concerné, pas la valeur actuelle de asset (RG « instantané »)."""
@@ -1189,14 +1198,17 @@ def test_run_detail_different_vm_between_two_runs(app, db):
     client = app.test_client()
     _login(client)
 
-    # Détail du run ancien : doit afficher l'instantané ancien
+    # Détail du run ancien : doit afficher l'instantané ancien (statut courant « stopped », instantané « running »)
     body_old = _body(client, f"/runs/{run_old.id}")
     assert "10.0.0.5" in body_old  # ip_final de l'instantané ancien
     assert "vm-old-01.old.lan" in body_old  # dns_final de l'instantané ancien
-    assert "running" in body_old  # vm_status de l'instantané ancien
+    assert _statut_vm(body_old, "vm-old-01") == "running"  # vm_status de l'instantané ancien, pas le courant
 
-    # Détail du run nouveau : doit afficher l'instantané nouveau
+    # Détail du run nouveau : doit afficher l'instantané nouveau ; le statut courant repasse à « running » pour que la
+    # case ne puisse pas venir de lui
+    asset_old.status = "running"
+    db.session.commit()
     body_new = _body(client, f"/runs/{run_new.id}")
     assert "10.0.0.99" in body_new  # ip_final de l'instantané nouveau (pas la valeur old)
     assert "vm-old-01.new.lan" in body_new  # dns_final de l'instantané nouveau
-    assert "stopped" in body_new  # vm_status de l'instantané nouveau (pas running)
+    assert _statut_vm(body_new, "vm-old-01") == "stopped"  # vm_status de l'instantané nouveau, pas le courant

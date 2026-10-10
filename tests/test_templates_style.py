@@ -95,3 +95,18 @@ def test_page_du_tableau_de_bord_sans_classe_de_connexion(app):
     page = client.get("/").get_data(as_text=True)
     assert "page-login" not in page
 
+
+def test_aucun_gabarit_ne_porte_de_style_ni_de_script_en_ligne():
+    """La CSP interdit styles et scripts en ligne : chaque gabarit est lu, pas seulement les pages que les tests rendent
+    (critère de T038, vérifié jusque-là sur les seules pages testées)."""
+    from pathlib import Path
+    racine = Path(__file__).resolve().parent.parent / "app" / "templates"
+    fautes = []
+    for g in sorted(racine.rglob("*.html")):
+        texte = g.read_text(encoding="utf-8")
+        for n, ligne in enumerate(texte.splitlines(), 1):
+            if (re.search(r"<style\b|\sstyle\s*=", ligne, re.I) or re.search(r"<script\b(?![^>]*\bsrc\s*=)", ligne, re.I)
+                    or re.search(r"\son[a-z]+\s*=", ligne, re.I)):
+                fautes.append(f"{g.relative_to(racine)}:{n}: {ligne.strip()[:80]}")
+    assert not fautes, "styles ou scripts en ligne :\n" + "\n".join(fautes)
+
