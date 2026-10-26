@@ -1,0 +1,112 @@
+# CloudInventory v2.0 — règles de gestion
+
+## Règles de gestion
+RG1 [structure] — Un run doit conserver son statut, ses dates, ses quatre compteurs de correspondance et son éventuel message d’erreur. (§6.1)
+RG2 [structure] — Chaque observation d’une VM ou d’un CT doit conserver son identité, ses attributs et ses métriques pour son run. (§6.1, §6.3)
+RG3 [structure] — Chaque observation IPAM doit conserver ses attributs, son statut et sa zone pour son run, même en l’absence de VM correspondante. (§6.1, §6.3, §13.2)
+RG4 [structure] — Chaque résultat consolidé doit appartenir à un seul run et référencer une VM observée dans ce run. (§6.1, §8.5)
+RG5 [structure] — Chaque anomalie doit appartenir à un seul run et pouvoir référencer une VM et/ou un enregistrement IPAM si applicable. (§6.1)
+RG6 [contrainte] — Les six codes d’anomalie autorisés doivent être exactement NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS et DUPLICATE_IP. (§6.2)
+RG7 [contrainte] — Les résultats d’un run ne doivent jamais écraser ceux d’un autre run. (§6.3)
+RG8 [contrainte] — Des enregistrements IPAM de même IP ou de même nom DNS doivent pouvoir coexister dans un run. (§6.3, §7.4)
+RG9 [comportement] — Le rapprochement doit retenir la première correspondance dans l’ordre nom, FQDN réduit au premier composant, IP, puis aucune. (§7.1)
+RG10 [contrainte] — La comparaison des noms doit ignorer casse, espaces et suffixe de domaine. (§7.2)
+RG11 [comportement] — Une correspondance uniquement par IP doit produire l’anomalie MATCHED_IP. (§6.2, §7.1)
+RG12 [comportement] — Une VM rapprochée par IP avec un nom différent du DNS IPAM doit produire HOSTNAME_MISMATCH. (§6.2, §7.1)
+RG13 [comportement] — Une VM arrêtée associée à une IP active doit produire STATUS_MISMATCH. (§6.2, §7.1)
+RG14 [comportement] — Une VM sans correspondance doit produire NO_MATCH et conserver uniquement les données de virtualisation dans son résultat. (§7.1)
+RG15 [comportement] — Le rôle doit être déduit prioritairement de la lettre de convention de nommage selon les 21 correspondances du §7.3. (§7.3)
+RG16 [comportement] — À défaut de convention reconnue, le rôle doit être déduit du tag role:xxx, puis devenir « Indéterminé » si aucun tag exploitable n’existe. (§7.3)
+RG17 [comportement] — Plusieurs noms DNS normalisés identiques dans l’IPAM d’un run doivent produire DUPLICATE_DNS. (§7.4)
+RG18 [comportement] — Plusieurs IP identiques dans l’IPAM d’un run doivent produire DUPLICATE_IP. (§7.4)
+RG19 [comportement] — Un run déclenché doit commencer RUNNING avec sa date de début et finir SUCCESS avec sa date de fin et ses quatre compteurs en cas de réussite. (§8.2)
+RG20 [comportement] — Une erreur du pipeline doit annuler les données collectées et enregistrer FAIL avec son message d’erreur. (§8.2)
+RG21 [contrainte] — L’identité vm_id et le couple ip + dns_name doivent servir au rapprochement des observations d’une même source sans empêcher la conservation d’observations identiques issues de runs différents. (§8.2, §6.3)
+RG22 [comportement] — La comparaison de deux runs doit identifier les VM apparues, disparues et changées d’IP, DNS, statut ou correspondance à partir des instantanés de chaque run. (§8.5, §8.6)
+RG23 [comportement] — La purge doit conserver les N runs les plus récents, avec N égal à 30 par défaut. (§8.8)
+RG24 [structure] — Le statut IPAM et la zone IPAM doivent être conservés dans l’observation de chaque run. (§13.2, §6.3)
+
+## Dictionnaire des données
+Les longueurs non prescrites sont indiquées « non précisée » ; les types conceptuels n’imposent aucun format d’interface.
+
+| nom | type | longueur | contraintes | source |
+| --- | --- | --- | --- | --- |
+| run_id | entier | — | identifiant candidat du run | §6.1 |
+| run_status | énumération{RUNNING,SUCCESS,FAIL} | — | obligatoire | §6.1, §8.2 |
+| started_at | datetime | — | obligatoire | §8.2 |
+| finished_at | datetime | — | présent si SUCCESS | §8.2 |
+| matched_name_count | entier | — | compteur ≥ 0 | §6.1, §7.1 |
+| matched_fqdn_count | entier | — | compteur ≥ 0 | §6.1, §7.1 |
+| matched_ip_count | entier | — | compteur ≥ 0 | §6.1, §7.1 |
+| no_match_count | entier | — | compteur ≥ 0 | §6.1, §7.1 |
+| error_message | texte | non précisée | présent si FAIL | §8.2 |
+| asset_id | entier | — | identifiant candidat de l’observation | §6.1, §6.3 |
+| asset_run_id | entier | — | obligatoire, référence run_id | §6.3, §8.5 |
+| vm_id | texte (à confirmer) | non précisée | obligatoire, identité source par run ; Q1 | §6.1, §8.2 |
+| vm_name | texte | non précisée | recherche, export | §6.1, §8.3 |
+| fqdn | texte | non précisée | rapprochement, export | §6.1, §7.1 |
+| ip_reported | texte | non précisée | rapprochement, comparaison, export | §6.1, §8.6 |
+| node | texte | non précisée | filtre, tri, export | §6.1, §8.3 |
+| asset_type | énumération{qemu,lxc} | — | filtre, export | §13.1, §8.3 |
+| asset_status | texte (à confirmer) | non précisée | filtre, comparaison ; Q2 | §6.1, §8.6 |
+| asset_tags | texte (à confirmer) | non précisée | filtre, rôle, export ; Q3 | §6.1, §7.3 |
+| asset_role | texte | non précisée | calculé selon RG15–RG16, export | §7.3, §8.10 |
+| os | texte | non précisée | affichage, export | §6.1, §8.10 |
+| annotation | texte | non précisée | affichage | §6.1, §13.1 |
+| cpu | décimal (précision à confirmer) | — | affichage, export ; Q4 | §6.1, §8.7 |
+| ram | décimal (précision à confirmer) | — | affichage, export ; Q4 | §6.1, §8.7 |
+| disk | décimal (précision à confirmer) | — | affichage, export ; Q4 | §6.1, §8.7 |
+| uptime | décimal (précision à confirmer) | — | affichage ; Q4 | §6.1, §8.7 |
+| ipam_record_id | entier | — | identifiant candidat, sans unicité IP ni DNS | §6.3 |
+| ipam_run_id | entier | — | obligatoire, référence run_id | §6.3 |
+| ipam_ip | texte | non précisée | doublons permis | §6.1, §7.4 |
+| dns_name | texte | non précisée | doublons permis | §6.1, §7.4 |
+| ipam_status | texte (à confirmer) | non précisée | affichage, comparaison ; Q2 | §13.2 |
+| tenant | texte | non précisée | affichage, export | §6.1, §8.10 |
+| site | texte | non précisée | affichage, export | §6.1, §8.10 |
+| ipam_tags | texte (à confirmer) | non précisée | affichage, export ; Q3 | §6.1 |
+| duplicate_dns | booléen | — | calculé après consolidation | §6.1, §7.4 |
+| duplicate_ip | booléen | — | calculé après consolidation | §6.1, §7.4 |
+| meta_zone | texte | non précisée | conservée même sans VM | §13.2 |
+| consolidated_asset_id | entier | — | identifiant candidat | §6.1 |
+| consolidated_run_id | entier | — | obligatoire, référence run_id | §6.1, §8.5 |
+| consolidated_asset_ref | entier | — | obligatoire, référence asset_id du même run | §6.1, §8.5 |
+| consolidated_ipam_ref | entier | — | facultatif, référence ipam_record_id du même run | §6.3 |
+| ip_final | texte | non précisée | instantané, comparaison, export | §6.1, §8.6 |
+| dns_final | texte | non précisée | instantané, comparaison, export | §6.1, §8.6 |
+| status_final | texte (à confirmer) | non précisée | instantané, comparaison ; Q2 | §6.1, §8.6 |
+| match_status | énumération{MATCHED_NAME,MATCHED_FQDN,MATCHED_IP,NO_MATCH} | — | obligatoire, comparaison, filtre, export | §7.1, §8.6 |
+| consolidated_role | texte | non précisée | instantané, export | §7.3, §8.10 |
+| anomaly_id | entier | — | identifiant candidat | §6.1 |
+| anomaly_run_id | entier | — | obligatoire, référence run_id | §6.1 |
+| anomaly_asset_ref | entier | — | facultatif, référence asset_id du même run | §6.1 |
+| anomaly_ipam_ref | entier | — | facultatif, référence ipam_record_id du même run | §6.1 |
+| anomaly_code | énumération{NO_MATCH,MATCHED_IP,HOSTNAME_MISMATCH,STATUS_MISMATCH,DUPLICATE_DNS,DUPLICATE_IP} | — | obligatoire | §6.2 |
+| anomaly_description | texte | non précisée | obligatoire | §6.1 |
+| anomaly_date | datetime | — | obligatoire | §6.1 |
+
+## Acteurs
+- Administrateur : déclenche et consulte les inventaires, comparaisons, exports et purges (§8.1–§8.10).
+- Source de virtualisation : fournit les VM et CT (§8.2).
+- Source IPAM : fournit les enregistrements réseau (§8.2).
+- Service de notification : reçoit les alertes configurées après succès (§8.9).
+
+## Cas d'utilisation candidats
+- Lancer un inventaire — Administrateur — RG19–RG20.
+- Consulter le tableau de bord — Administrateur — RG1, RG6.
+- Explorer et exporter l’inventaire — Administrateur — RG2–RG4, RG9.
+- Consulter les runs et leurs anomalies — Administrateur — RG5–RG7.
+- Comparer deux runs — Administrateur — RG7, RG22.
+- Consulter la fiche et les métriques d’une VM — Administrateur — RG2, RG7.
+- Purger les runs anciens — Administrateur — RG23.
+- Fournir les observations VM/CT — Source de virtualisation — RG2.
+- Fournir les observations IPAM — Source IPAM — RG3, RG8.
+- Recevoir une notification de succès — Service de notification — RG19.
+
+## Questions ouvertes
+- Q1 — RG2, RG21 — Quel est le type exact de vm_id ? Par défaut, conserver sans conversion son identité textuelle source ; vérifier avant de fixer l’unicité dans un même run.
+- Q2 — RG9, RG13, RG22 — Quels vocabulaires définissent les statuts VM, IPAM et consolidé ? Par défaut, conserver les valeurs source et signaler celles qui ne permettent pas de qualifier « arrêtée » et « active ».
+- Q3 — RG16 — Quel encodage et quelle cardinalité pour les tags VM et IPAM ? Par défaut, préserver intégralement leur forme source et analyser role:xxx uniquement si présent.
+- Q4 — RG2 — Quelles unités et précisions pour CPU, RAM, disque et uptime ? Par défaut, préserver valeurs et unités sources sans conversion implicite.
+- Q5 — RG19 — Quels sont précisément les quatre compteurs si des correspondances multiples existent ? Par défaut, compter une seule catégorie de rapprochement par VM, suivant RG9.
+- Q6 — RG17, RG18 — Les anomalies de doublons portent-elles sur chaque enregistrement concerné ou une seule fois par groupe ? Par défaut, conserver tous les enregistrements et produire une anomalie par groupe, sans en perdre les membres.
