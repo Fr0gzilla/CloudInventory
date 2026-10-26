@@ -1,15 +1,15 @@
 # CloudInventory v2.0 — règles de gestion
 
 ## Règles de gestion
-RG1 [structure] — Un run doit conserver son statut, ses dates, ses quatre compteurs de correspondance et son éventuel message d’erreur. (§6.1)
-RG2 [structure] — Chaque observation d’une VM ou d’un CT doit conserver son identité, ses attributs et ses métriques pour son run. (§6.1, §6.3)
-RG3 [structure] — Chaque observation IPAM doit conserver ses attributs, son statut et sa zone pour son run, même en l’absence de VM correspondante. (§6.1, §6.3, §13.2)
-RG4 [structure] — Chaque résultat consolidé doit appartenir à un seul run et référencer une VM observée dans ce run. (§6.1, §8.5)
-RG5 [structure] — Chaque anomalie doit appartenir à un seul run et pouvoir référencer une VM et/ou un enregistrement IPAM si applicable. (§6.1)
-RG6 [contrainte] — Les six codes d’anomalie autorisés doivent être exactement NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS et DUPLICATE_IP. (§6.2)
-RG7 [contrainte] — Les résultats d’un run ne doivent jamais écraser ceux d’un autre run. (§6.3)
-RG8 [contrainte] — Des enregistrements IPAM de même IP ou de même nom DNS doivent pouvoir coexister dans un run. (§6.3, §7.4)
-RG9 [comportement] — Le rapprochement doit retenir la première correspondance dans l’ordre nom, FQDN réduit au premier composant, IP, puis aucune. (§7.1)
+RG01 [structure] — Un run doit conserver son statut, ses dates, ses quatre compteurs de correspondance et son éventuel message d’erreur. (§6.1)
+RG02 [structure] — Chaque observation d’une VM ou d’un CT doit conserver son identité, ses attributs et ses métriques pour son run. (§6.1, §6.3)
+RG03 [structure] — Chaque observation IPAM doit conserver ses attributs, son statut et sa zone pour son run, même en l’absence de VM correspondante. (§6.1, §6.3, §13.2)
+RG04 [structure] — Chaque résultat consolidé doit appartenir à un seul run et référencer une VM observée dans ce run. (§6.1, §8.5)
+RG05 [structure] — Chaque anomalie doit appartenir à un seul run et pouvoir référencer une VM et/ou un enregistrement IPAM si applicable. (§6.1)
+RG06 [contrainte] — Les six codes d’anomalie autorisés doivent être exactement NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS et DUPLICATE_IP. (§6.2)
+RG07 [contrainte] — Les résultats d’un run ne doivent jamais écraser ceux d’un autre run. (§6.3)
+RG08 [contrainte] — Des enregistrements IPAM de même IP ou de même nom DNS doivent pouvoir coexister dans un run. (§6.3, §7.4)
+RG09 [comportement] — Le rapprochement doit retenir la première correspondance dans l’ordre nom, FQDN réduit au premier composant, IP, puis aucune. (§7.1)
 RG10 [contrainte] — La comparaison des noms doit ignorer casse, espaces et suffixe de domaine. (§7.2)
 RG11 [comportement] — Une correspondance uniquement par IP doit produire l’anomalie MATCHED_IP. (§6.2, §7.1)
 RG12 [comportement] — Une VM rapprochée par IP avec un nom différent du DNS IPAM doit produire HOSTNAME_MISMATCH. (§6.2, §7.1)
@@ -25,6 +25,16 @@ RG21 [contrainte] — L’identité vm_id et le couple ip + dns_name doivent ser
 RG22 [comportement] — La comparaison de deux runs doit identifier les VM apparues, disparues et changées d’IP, DNS, statut ou correspondance à partir des instantanés de chaque run. (§8.5, §8.6)
 RG23 [comportement] — La purge doit conserver les N runs les plus récents, avec N égal à 30 par défaut. (§8.8)
 RG24 [structure] — Le statut IPAM et la zone IPAM doivent être conservés dans l’observation de chaque run. (§13.2, §6.3)
+RG25 [comportement] — Un run doit collecter les VM et CT de la virtualisation avant les enregistrements IPAM. (§8.2)
+RG26 [comportement] — Un run doit rapprocher les observations par vm_id et par couple IP + nom DNS avant de consolider les correspondances, les rôles et les anomalies associées. (§8.2)
+RG27 [comportement] — Un run doit détecter les doublons DNS et IP après la consolidation et avant sa finalisation. (§7.4, §8.2)
+RG28 [contrainte] — Les sept étapes du pipeline d’un run doivent former une seule transaction dont les données collectées sont annulées en cas d’exception. (§8.2)
+RG29 [comportement] — La connexion web doit ouvrir une session signée pour le compte administrateur unique dont le mot de passe est conservé haché. (§10.1)
+RG30 [contrainte] — Toute route web autre que la connexion doit nécessiter une session authentifiée et rediriger vers /login en son absence. (§10.1)
+RG31 [comportement] — La connexion API doit recevoir username et password et renvoyer access_token. (§9.2)
+RG32 [contrainte] — Toute route API autre que /api/login doit exiger un jeton Bearer valide. (§9.2, §10.2)
+RG33 [contrainte] — Les tentatives de connexion doivent être limitées. (§10, rubrique « Sécurité »)
+RG34 [contrainte] — Toute redirection next doit rester sur une URL interne. (§10, rubrique « Sécurité »)
 
 ## Dictionnaire des données
 Les longueurs non prescrites sont indiquées « non précisée » ; les types conceptuels n’imposent aucun format d’interface.
@@ -40,6 +50,9 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 | matched_ip_count | entier | — | compteur ≥ 0 | §6.1, §7.1 |
 | no_match_count | entier | — | compteur ≥ 0 | §6.1, §7.1 |
 | error_message | texte | non précisée | présent si FAIL | §8.2 |
+| username | texte | non précisée | identifiant du compte administrateur unique | §9.2, §10.1 |
+| password | texte | non précisée | reçu à la connexion, non conservé en clair | §9.2, §10.1 |
+| access_token | texte | non précisée | émis à la connexion API, requis comme Bearer | §9.2 |
 | asset_id | entier | — | identifiant candidat de l’observation | §6.1, §6.3 |
 | asset_run_id | entier | — | obligatoire, référence run_id | §6.3, §8.5 |
 | vm_id | texte (à confirmer) | non précisée | obligatoire, identité source par run ; Q1 | §6.1, §8.2 |
@@ -102,6 +115,9 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Fournir les observations VM/CT — Source de virtualisation — RG2.
 - Fournir les observations IPAM — Source IPAM — RG3, RG8.
 - Recevoir une notification de succès — Service de notification — RG19.
+- Se connecter à l’interface web — Administrateur — RG29–RG30, RG33–RG34.
+- Obtenir un jeton API — Administrateur — RG31–RG33.
+- Accéder aux routes API protégées — Administrateur — RG32.
 
 ## Questions ouvertes
 - Q1 — RG2, RG21 — Quel est le type exact de vm_id ? Par défaut, conserver sans conversion son identité textuelle source ; vérifier avant de fixer l’unicité dans un même run.
@@ -110,3 +126,4 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Q4 — RG2 — Quelles unités et précisions pour CPU, RAM, disque et uptime ? Par défaut, préserver valeurs et unités sources sans conversion implicite.
 - Q5 — RG19 — Quels sont précisément les quatre compteurs si des correspondances multiples existent ? Par défaut, compter une seule catégorie de rapprochement par VM, suivant RG9.
 - Q6 — RG17, RG18 — Les anomalies de doublons portent-elles sur chaque enregistrement concerné ou une seule fois par groupe ? Par défaut, conserver tous les enregistrements et produire une anomalie par groupe, sans en perdre les membres.
+- Q7 — RG29 — Quel mécanisme de session et de stockage du compte administrateur utiliser au-delà des exigences du §10.1 ? Par défaut, ne pas créer d’entité supplémentaire parmi les cinq entités du §6.1 et réserver l’authentification au compte unique configuré.
