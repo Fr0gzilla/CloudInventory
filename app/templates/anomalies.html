@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Anomalies — Cloud Inventory{% endblock %}
+{% block content %}
+<h1>Anomalies</h1>
+<form method="get" action="{{ url_for('web.anomalies_page') }}" class="row g-3 mb-4">
+  <div class="col-md-4"><label for="run_id" class="form-label">Run</label><select id="run_id" name="run_id" class="form-select" required{% if error %} aria-describedby="anomaly-error" aria-invalid="true"{% endif %}><option value="">Choisir un run</option>{% for run in runs %}<option value="{{ run.id }}" {% if selected_id == run.id %}selected{% endif %}>Run {{ run.id }} — {{ run.started_at }}</option>{% endfor %}</select></div>
+  <div class="col-md-4"><label for="code" class="form-label">Code d'anomalie</label><select id="code" name="code" class="form-select"{% if error %} aria-describedby="anomaly-error" aria-invalid="true"{% endif %}><option value="">Tous les codes</option>{% for code in codes %}<option value="{{ code }}" {% if selected_code == code %}selected{% endif %}>{{ code }}</option>{% endfor %}</select></div>
+  <div class="col-md-4 align-self-end"><button class="btn btn-primary" type="submit">Filtrer</button></div>
+</form>
+{% if error %}<p id="anomaly-error" class="alert alert-danger" role="alert">{{ error }}</p>{% elif not runs %}<p>Aucun run disponible.</p>{% elif anomalies %}
+<div class="table-responsive"><table class="table table-striped"><caption>Anomalies du run {{ selected_id }}</caption><thead><tr><th scope="col">Code</th><th scope="col">Description</th><th scope="col">Asset</th><th scope="col">IPAM</th><th scope="col">Date</th></tr></thead><tbody>{% for anomaly in anomalies %}<tr><th scope="row">{{ anomaly.code }}</th><td>{{ anomaly.description }}</td><td>{% if anomaly.asset_id is not none %}<a href="{{ url_for('web.asset_page', id=anomaly.asset_id) }}">{{ anomaly.asset_id }}</a>{% else %}—{% endif %}</td><td>{{ anomaly.ipam_record_id if anomaly.ipam_record_id is not none else '—' }}</td><td>{{ anomaly.created_at }}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<p>Aucune anomalie pour ce filtre.</p>{% endif %}
+{% endblock %}
