@@ -46,6 +46,33 @@ def test_smoke(valid_secrets):
     assert (response.status_code, response.get_json()) == (200, {"status": "ok"})
 
 
+def test_web_login_rejects_unicode_username_without_server_error(valid_secrets):
+    client = start_app().test_client()
+    client.get("/login")
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    response = client.post(
+        "/login", data={"username": "administrateuré", "password": valid_secrets["ADMIN_PASSWORD"], "csrf_token": csrf}
+    )
+    assert response.status_code == 401
+
+
+def test_unicode_web_failures_limit_api_login(valid_secrets):
+    client = start_app().test_client()
+    client.get("/login")
+    with client.session_transaction() as session:
+        csrf = session["csrf_token"]
+    for _ in range(5):
+        response = client.post(
+            "/login", data={"username": "administrateuré", "password": valid_secrets["ADMIN_PASSWORD"], "csrf_token": csrf}
+        )
+        assert response.status_code == 401
+    response = client.post(
+        "/api/login", json={"username": "admin", "password": valid_secrets["ADMIN_PASSWORD"]}
+    )
+    assert (response.status_code, response.get_json()) == (429, {"error": "Too many attempts"})
+
+
 @pytest.mark.parametrize("key", SECRETS)
 @pytest.mark.parametrize("invalid", (None, "", "change-me"), ids=("absent", "empty", "placeholder"))
 def test_rejects_each_invalid_secret(monkeypatch, valid_secrets, key, invalid):
@@ -128,5 +155,5 @@ def test_unknown_route_returns_404(valid_secrets):
 def test_no_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
-    assert all(endpoint in {"web.health", "static", "login_page.login"} or endpoint.startswith("flasgger.")
+    assert all(endpoint in {"web.health", "static", "login_page.login", "api.login"} or endpoint.startswith("flasgger.")
                for _, endpoint in routes)
