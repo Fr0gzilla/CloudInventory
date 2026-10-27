@@ -1,4 +1,5 @@
 import os
+from importlib import import_module
 from pathlib import Path
 
 from dotenv import dotenv_values
@@ -7,6 +8,7 @@ from flask import Blueprint, Flask, jsonify
 from flask_jwt_extended import JWTManager
 from flask_login import LoginManager
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import event
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -44,7 +46,20 @@ def create_app() -> Flask:
         USE_MOCK_IPAM=str(configured("USE_MOCK_IPAM", "true")).lower() != "false",
     )
 
+    import_module("app.models")
     db.init_app(app)
+    with app.app_context():
+        engine = db.engine
+        if engine.dialect.name == "sqlite":
+            def enable_foreign_keys(connection, connection_record):
+                cursor = connection.cursor()
+                try:
+                    cursor.execute("PRAGMA foreign_keys = ON")
+                finally:
+                    cursor.close()
+
+            event.listen(engine, "connect", enable_foreign_keys)
+
     login_manager.init_app(app)
     jwt.init_app(app)
     swagger.init_app(app)
