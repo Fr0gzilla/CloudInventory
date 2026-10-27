@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 from flasgger import Swagger
-from flask import Blueprint, Flask, abort, jsonify, request, session
+from flask import Blueprint, Flask, abort, jsonify, render_template, request, session
 from flask_jwt_extended import JWTManager, verify_jwt_in_request
 from flask_login import LoginManager, current_user, login_required
 from flask_sqlalchemy import SQLAlchemy
@@ -27,6 +27,12 @@ swagger = Swagger(template={
 web = Blueprint("web", __name__)
 api_blueprint = Blueprint("api", __name__)
 auth_blueprint = Blueprint("auth", __name__)
+
+
+@web.get("/")
+@login_required
+def index():
+    return render_template("index.html")
 
 
 @web.get("/health")
@@ -99,7 +105,7 @@ def create_app() -> Flask:
             if request.endpoint != "api.login":
                 verify_jwt_in_request()
             return None
-        if request.endpoint != "login_page.login" and not current_user.is_authenticated:
+        if request.endpoint not in ("login_page.login", "static") and not current_user.is_authenticated:
             return login_manager.unauthorized()
         if request.method == "POST" and request.endpoint != "login_page.login":
             token = request.form.get("csrf_token", "")

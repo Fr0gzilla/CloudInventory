@@ -4,7 +4,7 @@ import time
 from urllib.parse import urlsplit
 
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
-from flask_login import UserMixin, login_user
+from flask_login import UserMixin, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from . import login_manager
@@ -35,6 +35,10 @@ def configure_auth(app, username, password):
     limit = 5
     window = 900
     login_manager.login_view = "login_page.login"
+
+    @app.context_processor
+    def csrf_context():
+        return {"csrf_token": session.get("csrf_token", "")}
 
     @login_manager.unauthorized_handler
     def unauthorized():
@@ -86,7 +90,15 @@ def configure_auth(app, username, password):
             return render_template("login.html", next=destination, csrf_token=expected, error=True), 401
         session.clear()
         login_user(Admin())
+        session["csrf_token"] = secrets.token_urlsafe(32)
         return redirect(destination)
+
+    @login_page.post("/logout")
+    @login_required
+    def logout():
+        logout_user()
+        session.clear()
+        return redirect(url_for("login_page.login"))
 
     app.register_blueprint(login_page)
     return authenticate

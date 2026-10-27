@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Cloud Inventory{% endblock %}</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='vendor/bootstrap-icons/bootstrap-icons.css') }}">
+</head>
+<body>
+  {% if current_user.is_authenticated %}
+  <header>
+    <nav class="navbar navbar-expand-lg bg-dark" data-bs-theme="dark" aria-label="Navigation principale">
+      <div class="container-fluid">
+        <a class="navbar-brand" href="/">Cloud Inventory</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#main-navigation" aria-controls="main-navigation" aria-expanded="false" aria-label="Afficher le menu"><span class="navbar-toggler-icon"></span></button>
+        <div class="collapse navbar-collapse" id="main-navigation">
+          <ul class="navbar-nav me-auto">
+            <li class="nav-item"><a class="nav-link" href="/">Tableau de bord</a></li>
+            <li class="nav-item"><a class="nav-link" href="/inventory">Inventaire</a></li>
+            <li class="nav-item"><a class="nav-link" href="/runs">Runs</a></li>
+            <li class="nav-item"><a class="nav-link" href="/runs/compare">Comparer</a></li>
+            <li class="nav-item"><a class="nav-link" href="/anomalies">Anomalies</a></li>
+          </ul>
+          <form method="post" action="/logout">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}">
+            <button class="btn btn-outline-light" type="submit">Déconnexion</button>
+          </form>
+        </div>
+      </div>
+    </nav>
+  </header>
+  {% endif %}
+  <main class="container py-4">{% block content %}{% endblock %}</main>
+  <script defer src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
+</body>
+</html>
