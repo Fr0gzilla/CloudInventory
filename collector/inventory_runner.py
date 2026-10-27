@@ -7,6 +7,7 @@ from datetime import UTC, datetime
 from app import db
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 from collector.anomalies import duplicate_anomalies, match_anomalies
+from collector.exports import export_run
 from collector.matching import consolidate_asset
 from collector.mock_ipam import MockIpamSource
 from collector.mock_proxmox import MockProxmoxSource
@@ -134,7 +135,10 @@ def run_inventory(
             run.matched_ip_count = counts["MATCHED_IP"]
             run.no_match_count = counts["NO_MATCH"]
             completed(7)
+            run_id = run.id
+            finished_at = run.finished_at
         result = run
+        succeeded = True
     except Exception as error:  # noqa: BLE001 - all pipeline failures must leave a FAIL run
         db.session.rollback()
         with db.session.begin():
@@ -142,5 +146,15 @@ def run_inventory(
                          error_message=str(error))
             db.session.add(failed)
         result = failed
+        succeeded = False
+    if succeeded:
+        export_run(run_id, {
+            "finished_at": finished_at,
+            "matched_name_count": counts["MATCHED_NAME"],
+            "matched_fqdn_count": counts["MATCHED_FQDN"],
+            "matched_ip_count": counts["MATCHED_IP"],
+            "no_match_count": counts["NO_MATCH"],
+        })
+        db.session.rollback()
     purge_old_runs()
     return result
