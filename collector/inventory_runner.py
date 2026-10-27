@@ -12,6 +12,7 @@ from collector.matching import consolidate_asset
 from collector.mock_ipam import MockIpamSource
 from collector.mock_proxmox import MockProxmoxSource
 from collector.normalization import normalize
+from collector.purge import purge_old_runs
 from collector.source import AssetRecord, Source
 from collector.source import IpamRecord as IpamObservation
 
@@ -136,18 +137,24 @@ def run_inventory(
             completed(7)
             run_id = run.id
             finished_at = run.finished_at
+        result = run
+        succeeded = True
     except Exception as error:  # noqa: BLE001 - all pipeline failures must leave a FAIL run
         db.session.rollback()
         with db.session.begin():
             failed = Run(status="FAIL", started_at=started_at, finished_at=_now(),
                          error_message=str(error))
             db.session.add(failed)
-        return failed
-    export_run(run_id, {
-        "finished_at": finished_at,
-        "matched_name_count": counts["MATCHED_NAME"],
-        "matched_fqdn_count": counts["MATCHED_FQDN"],
-        "matched_ip_count": counts["MATCHED_IP"],
-        "no_match_count": counts["NO_MATCH"],
-    })
-    return run
+        result = failed
+        succeeded = False
+    if succeeded:
+        export_run(run_id, {
+            "finished_at": finished_at,
+            "matched_name_count": counts["MATCHED_NAME"],
+            "matched_fqdn_count": counts["MATCHED_FQDN"],
+            "matched_ip_count": counts["MATCHED_IP"],
+            "no_match_count": counts["NO_MATCH"],
+        })
+        db.session.rollback()
+    purge_old_runs()
+    return result
