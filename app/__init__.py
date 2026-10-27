@@ -118,6 +118,69 @@ def run_page(id):
     return render_template("run_detail.html", run=run, anomalies=anomalies)
 
 
+@web.get("/runs/compare")
+@login_required
+def run_compare_page():
+    from .api import _positive_integer
+    from .models import Anomaly, Run
+
+    runs = Run.query.order_by(Run.id.desc()).all()
+    comparison = None
+    error = None
+    old_id = new_id = None
+    if request.args:
+        if (set(request.args) != {"from", "to"} or
+                any(len(request.args.getlist(key)) != 1 for key in request.args)):
+            error = "Sélection invalide : choisissez deux runs distincts."
+        else:
+            old_id = _positive_integer(request.args.get("from"))
+            new_id = _positive_integer(request.args.get("to"))
+            if old_id is None or new_id is None or old_id == new_id:
+                error = "Sélection invalide : choisissez deux runs distincts."
+            elif db.session.get(Run, old_id) is None or db.session.get(Run, new_id) is None:
+                error = "Run inconnu : choisissez un run disponible."
+            else:
+                comparison = current_app.view_functions["api.compare_runs"]().get_json()
+                counts = dict(db.session.query(Anomaly.run_id, db.func.count(Anomaly.id))
+                              .filter(Anomaly.run_id.in_((old_id, new_id)))
+                              .group_by(Anomaly.run_id).all())
+                comparison["anomaly_delta"] = counts.get(new_id, 0) - counts.get(old_id, 0)
+                comparison["old_anomalies"] = counts.get(old_id, 0)
+                comparison["new_anomalies"] = counts.get(new_id, 0)
+    return render_template("run_compare.html", runs=runs, comparison=comparison,
+                           error=error, old_id=old_id, new_id=new_id)
+
+
+@web.get("/anomalies")
+@login_required
+def anomalies_page():
+    from .inventory_api import ANOMALY_CODES, _integer
+    from .models import Anomaly, Run
+
+    runs = Run.query.order_by(Run.id.desc()).all()
+    selected_id = runs[0].id if runs else None
+    selected_code = request.args.get("code", "")
+    error = None
+    if (any(key not in ("run_id", "code") or len(request.args.getlist(key)) != 1
+            for key in request.args) or
+            (selected_code and selected_code not in ANOMALY_CODES)):
+        error = "Filtre d'anomalies invalide."
+    elif "run_id" in request.args:
+        selected_id = _integer(request.args["run_id"])
+        if selected_id is None:
+            error = "Filtre d'anomalies invalide."
+        elif db.session.get(Run, selected_id) is None:
+            error = "Run inconnu : choisissez un run disponible."
+    query = (Anomaly.query.filter_by(run_id=selected_id) if selected_id is not None
+             else Anomaly.query.filter(False))
+    if selected_code in ANOMALY_CODES:
+        query = query.filter_by(code=selected_code)
+    anomalies = query.order_by(Anomaly.id).all() if error is None else []
+    return render_template("anomalies.html", runs=runs, selected_id=selected_id,
+                           selected_code=selected_code if not error else "",
+                           codes=sorted(ANOMALY_CODES), anomalies=anomalies, error=error)
+
+
 @web.get("/assets/<int:id>")
 @login_required
 def asset_page(id):
