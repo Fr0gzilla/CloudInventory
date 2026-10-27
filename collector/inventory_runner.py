@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 
 from app import db
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
+from app.notifications import notify_anomalies
 from collector.anomalies import duplicate_anomalies, match_anomalies
 from collector.exports import export_run
 from collector.matching import consolidate_asset
@@ -86,6 +87,7 @@ def run_inventory(
 
             unique_ipam = list(ipam_snapshots.values())
             counts = Counter()
+            anomaly_count = 0
             for observation in asset_snapshots.values():
                 asset = stored_assets[observation["vm_id"]]
                 result = consolidate_asset(observation, unique_ipam)
@@ -102,6 +104,7 @@ def run_inventory(
                 db.session.flush()
                 counts[result["match_status"]] += 1
                 for anomaly in match_anomalies(result):
+                    anomaly_count += 1
                     db.session.add(Anomaly(
                         run_id=run.id, asset_id=asset.id,
                         ipam_record_id=ipam.id if ipam else None,
@@ -118,6 +121,7 @@ def run_inventory(
                 row.duplicate_dns = int(bool(key[1]) and dns_counts[normalize(key[1])] > 1)
                 row.duplicate_ip = int(bool(key[0]) and ip_counts[key[0]] > 1)
             for anomaly in duplicate_anomalies(unique_ipam):
+                anomaly_count += 1
                 observation = anomaly["ipam_record"]
                 ipam = stored_ipam[(observation.get("ip"), observation.get("dns_name"))]
                 db.session.add(Anomaly(
@@ -156,5 +160,6 @@ def run_inventory(
             "no_match_count": counts["NO_MATCH"],
         })
         db.session.rollback()
+        notify_anomalies(run_id, anomaly_count, finished_at)
     purge_old_runs()
     return result
