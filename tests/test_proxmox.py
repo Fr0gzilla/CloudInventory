@@ -88,4 +88,10 @@ def test_import_construction_and_app_start_do_not_connect(monkeypatch):
     monkeypatch.setenv("JWT_SECRET_KEY", "local-test-value")
     monkeypatch.setenv("ADMIN_PASSWORD", "local-test-value")
     from app import create_app
-    assert proxmox.ProxmoxSource() and create_app().test_client().get("/health").status_code == 200
+    client = create_app().test_client()
+    client.get("/login")
+    with client.session_transaction() as session:
+        token = session["csrf_token"]
+    login = client.post("/login", data={"username": "admin", "password": "local-test-value", "csrf_token": token})
+    assert login.status_code == 302
+    assert proxmox.ProxmoxSource() and client.get("/health").status_code == 200
