@@ -37,7 +37,14 @@
         const row = document.createElement('tr');
         for (const field of columns) {
           const cell = document.createElement('td');
-          cell.textContent = item[field] == null ? '' : String(item[field]);
+          if (field === 'vm_id' && item.asset_id != null) {
+            const link = document.createElement('a');
+            link.href = `/assets/${encodeURIComponent(item.asset_id)}`;
+            link.textContent = item[field] == null ? '' : String(item[field]);
+            cell.append(link);
+          } else {
+            cell.textContent = item[field] == null ? '' : String(item[field]);
+          }
           row.append(cell);
         }
         rows.append(row);
