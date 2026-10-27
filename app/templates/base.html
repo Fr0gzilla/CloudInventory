@@ -20,7 +20,7 @@
             <li class="nav-item"><a class="nav-link" href="/inventory">Inventaire</a></li>
             <li class="nav-item"><a class="nav-link" href="/runs">Runs</a></li>
             <li class="nav-item"><a class="nav-link" href="/runs/compare">Comparer</a></li>
-            <li class="nav-item"><a class="nav-link" href="/anomalies">Anomalies</a></li>
+            <li class="nav-item"><a class="nav-link" href="/anomalies">Anomalies{% if latest_anomaly_count %} <span class="badge text-bg-danger">{{ latest_anomaly_count }}</span>{% endif %}</a></li>
           </ul>
           <form method="post" action="/logout">
             <input type="hidden" name="csrf_token" value="{{ csrf_token|default('') }}">
@@ -31,7 +31,12 @@
     </nav>
   </header>
   {% endif %}
-  <main class="container py-4">{% block content %}{% endblock %}</main>
+  <main class="container py-4">
+    {% if current_user.is_authenticated and latest_anomaly_count %}
+    <div class="alert alert-warning" role="alert">{{ latest_anomaly_count }} anomalie(s) détectée(s) lors du dernier run réussi. <a class="alert-link" href="{{ url_for('web.run_page', id=latest_anomaly_run.id) }}">Voir le run</a></div>
+    {% endif %}
+    {% block content %}{% endblock %}
+  </main>
   <script defer src="{{ url_for('static', filename='vendor/bootstrap/js/bootstrap.bundle.min.js') }}"></script>
 </body>
 </html>

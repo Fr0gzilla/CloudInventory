@@ -9,7 +9,7 @@ from flask import Blueprint, Flask, abort, current_app, jsonify, render_template
 from flask_jwt_extended import JWTManager, verify_jwt_in_request
 from flask_login import LoginManager, current_user, login_required
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event
+from sqlalchemy import event, inspect
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -189,6 +189,18 @@ def create_app() -> Flask:
     from .api import configure_api
 
     configure_api(app, authenticate)
+
+    @app.context_processor
+    def latest_anomaly_context():
+        if not current_user.is_authenticated:
+            return {}
+        from .models import Anomaly, Run
+
+        if not inspect(db.engine).has_table("run"):
+            return {"latest_anomaly_run": None, "latest_anomaly_count": 0}
+        latest_run = Run.query.filter_by(status="SUCCESS").order_by(Run.id.desc()).first()
+        anomaly_count = Anomaly.query.filter_by(run_id=latest_run.id).count() if latest_run else 0
+        return {"latest_anomaly_run": latest_run, "latest_anomaly_count": anomaly_count}
 
     @app.before_request
     def protect_web():
