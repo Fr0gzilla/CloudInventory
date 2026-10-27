@@ -1,0 +1,20 @@
+{% extends "base.html" %}
+{% block title %}Runs — Cloud Inventory{% endblock %}
+{% block content %}
+<h1>Historique des runs</h1>
+{% if runs.items %}
+<div class="table-responsive"><table class="table table-striped">
+  <caption>Runs, du plus récent au plus ancien</caption>
+  <thead><tr><th scope="col">Run</th><th scope="col">Statut</th><th scope="col">Début</th><th scope="col">Fin</th></tr></thead>
+  <tbody>{% for run in runs.items %}<tr>
+    <th scope="row"><a href="{{ url_for('web.run_page', id=run.id) }}">Run {{ run.id }}</a></th>
+    <td>{{ run.status }}</td><td>{{ run.started_at }}</td><td>{{ run.finished_at or '—' }}</td>
+  </tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<p>Aucun run sur cette page.</p>{% endif %}
+<nav aria-label="Pagination des runs" class="d-flex align-items-center gap-3">
+  {% if runs.has_prev %}<a class="btn btn-outline-secondary" href="{{ url_for('web.runs_page', page=runs.prev_num) }}">Précédent</a>{% endif %}
+  <span>Page {{ runs.page }}{% if runs.pages %} sur {{ runs.pages }}{% endif %} ({{ runs.total }} runs)</span>
+  {% if runs.has_next %}<a class="btn btn-outline-secondary" href="{{ url_for('web.runs_page', page=runs.next_num) }}">Suivant</a>{% endif %}
+</nav>
+{% endblock %}

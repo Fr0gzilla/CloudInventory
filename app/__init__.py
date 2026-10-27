@@ -53,6 +53,29 @@ def inventory_export():
     return current_app.view_functions["api.inventory_export"]()
 
 
+@web.get("/runs")
+@login_required
+def runs_page():
+    from .api import _positive_integer
+    from .models import Run
+
+    page = _positive_integer(request.args.get("page", "1"))
+    if page is None:
+        abort(400)
+    runs = Run.query.order_by(Run.id.desc()).paginate(page=page, per_page=20, error_out=False)
+    return render_template("runs.html", runs=runs)
+
+
+@web.get("/runs/<int:id>")
+@login_required
+def run_page(id):
+    from .models import Anomaly, Run
+
+    run = db.get_or_404(Run, id)
+    anomalies = Anomaly.query.filter_by(run_id=id).order_by(Anomaly.id).all()
+    return render_template("run_detail.html", run=run, anomalies=anomalies)
+
+
 @web.get("/health")
 @login_required
 def health():
