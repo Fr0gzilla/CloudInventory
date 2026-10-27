@@ -36,7 +36,13 @@ def start_app():
 
 
 def test_smoke(valid_secrets):
-    response = start_app().test_client().get("/health")
+    app = start_app()
+    client = app.test_client()
+    client.get("/login")
+    with client.session_transaction() as session:
+        token = session["csrf_token"]
+    client.post("/login", data={"username": "admin", "password": valid_secrets["ADMIN_PASSWORD"], "csrf_token": token})
+    response = client.get("/health")
     assert (response.status_code, response.get_json()) == (200, {"status": "ok"})
 
 
@@ -54,7 +60,8 @@ def test_rejects_each_invalid_secret(monkeypatch, valid_secrets, key, invalid):
 
 def test_accepts_secrets_without_dotenv(valid_secrets):
     app = start_app()
-    assert all(app.config[key] == value for key, value in valid_secrets.items())
+    assert all(app.config[key] == value for key, value in valid_secrets.items() if key != "ADMIN_PASSWORD")
+    assert "ADMIN_PASSWORD" not in app.config
 
 
 def test_loads_secrets_from_dotenv(tmp_path):
@@ -63,7 +70,8 @@ def test_loads_secrets_from_dotenv(tmp_path):
         "".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8"
     )
     app = start_app()
-    assert all(app.config[key] == value for key, value in values.items())
+    assert all(app.config[key] == value for key, value in values.items() if key != "ADMIN_PASSWORD")
+    assert "ADMIN_PASSWORD" not in app.config
 
 
 def test_environment_takes_priority_over_dotenv(valid_secrets, tmp_path):
@@ -73,7 +81,8 @@ def test_environment_takes_priority_over_dotenv(valid_secrets, tmp_path):
         encoding="utf-8",
     )
     app = start_app()
-    assert all(app.config[key] == value for key, value in valid_secrets.items())
+    assert all(app.config[key] == value for key, value in valid_secrets.items() if key != "ADMIN_PASSWORD")
+    assert "ADMIN_PASSWORD" not in app.config
 
 
 def test_mock_flags_default_to_true(valid_secrets):
@@ -107,11 +116,17 @@ def test_registers_blueprints_at_expected_prefixes(valid_secrets):
 
 
 def test_unknown_route_returns_404(valid_secrets):
-    assert start_app().test_client().get("/unregistered-path").status_code == 404
+    app = start_app()
+    client = app.test_client()
+    client.get("/login")
+    with client.session_transaction() as session:
+        token = session["csrf_token"]
+    client.post("/login", data={"username": "admin", "password": valid_secrets["ADMIN_PASSWORD"], "csrf_token": token})
+    assert client.get("/unregistered-path").status_code == 404
 
 
 def test_no_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
-    assert all(endpoint in {"web.health", "static"} or endpoint.startswith("flasgger.")
+    assert all(endpoint in {"web.health", "static", "login_page.login"} or endpoint.startswith("flasgger.")
                for _, endpoint in routes)

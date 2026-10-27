@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="fr">
+<meta charset="utf-8">
+<title>Connexion</title>
+<h1>Connexion</h1>
+{% if error %}<p>Identifiants invalides.</p>{% endif %}
+<form method="post" action="{{ url_for('login_page.login') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="next" value="{{ next }}">
+  <label>Utilisateur <input name="username" required maxlength="128"></label>
+  <label>Mot de passe <input type="password" name="password" required></label>
+  <button type="submit">Connexion</button>
+</form>
+</html>
