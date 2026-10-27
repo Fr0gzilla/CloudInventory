@@ -2,5 +2,27 @@
 {% block title %}Tableau de bord — Cloud Inventory{% endblock %}
 {% block content %}
 <h1>Tableau de bord</h1>
-<p>Bienvenue dans Cloud Inventory.</p>
+<form action="{{ url_for('web.dashboard_run') }}" method="post" id="dashboard-run-form" class="mb-4">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <button type="submit" class="btn btn-primary">Lancer un inventaire</button>
+  <span id="dashboard-run-message" role="status" aria-live="polite"></span>
+</form>
+{% if latest %}
+<p>Dernier run : <a href="{{ url_for('web.run_page', id=latest.id) }}">#{{ latest.id }}</a> — {{ latest.status }}</p>
+{% else %}
+<p>Aucun inventaire effectué.</p>
+{% endif %}
+<section aria-label="Indicateurs du dernier run" class="row row-cols-2 row-cols-md-3 g-3 mb-4">
+  {% for label, count in [('VM', stats.total_assets), ('Correspondance par nom', stats.matches.MATCHED_NAME), ('Correspondance par FQDN', stats.matches.MATCHED_FQDN), ('Correspondance par IP', stats.matches.MATCHED_IP), ('Sans correspondance', stats.matches.NO_MATCH), ('Anomalies', anomaly_total)] %}
+  <div class="col"><div class="card h-100"><div class="card-body"><h2 class="h6 card-title">{{ label }}</h2><p class="fs-3 mb-0">{{ count }}</p></div></div></div>
+  {% endfor %}
+</section>
+<section class="row g-4" aria-label="Graphiques du tableau de bord">
+  <div class="col-lg-6"><h2 class="h5">Correspondances</h2><canvas id="dashboard-matches" role="img" aria-label="Répartition des correspondances"></canvas></div>
+  <div class="col-lg-6"><h2 class="h5">Anomalies par type</h2><canvas id="dashboard-anomalies" role="img" aria-label="Répartition des anomalies par type"></canvas></div>
+  <div class="col-12"><h2 class="h5">Évolution des dix derniers runs</h2><canvas id="dashboard-history" role="img" aria-label="Évolution du nombre de correspondances par run"></canvas></div>
+</section>
+<p id="dashboard-message" role="status" aria-live="polite">Chargement des graphiques…</p>
+<script defer src="{{ url_for('static', filename='vendor/chart.js/chart.umd.js') }}"></script>
+<script defer src="{{ url_for('static', filename='dashboard.js') }}"></script>
 {% endblock %}

@@ -32,7 +32,37 @@ auth_blueprint = Blueprint("auth", __name__)
 @web.get("/")
 @login_required
 def index():
-    return render_template("index.html")
+    from .models import Run
+
+    if inspect(db.engine).has_table("run"):
+        latest = Run.query.order_by(Run.id.desc()).first()
+        stats = current_app.view_functions["api.stats"]().get_json()
+    else:
+        latest = None
+        stats = {"total_assets": 0, "matches": {code: 0 for code in
+                 ("MATCHED_NAME", "MATCHED_FQDN", "MATCHED_IP", "NO_MATCH")}, "anomalies": {}}
+    return render_template("index.html", latest=latest, stats=stats,
+                           anomaly_total=sum(stats["anomalies"].values()))
+
+
+@web.get("/dashboard/data")
+@login_required
+def dashboard_data():
+    if not inspect(db.engine).has_table("run"):
+        return jsonify(stats={"run": None, "total_assets": 0,
+                              "matches": {code: 0 for code in
+                                          ("MATCHED_NAME", "MATCHED_FQDN", "MATCHED_IP", "NO_MATCH")},
+                              "anomalies": {}}, runs=[])
+    stats = current_app.view_functions["api.stats"]().get_json()
+    runs = current_app.view_functions["api.runs"]().get_json()
+    return jsonify(stats=stats, runs=runs["items"])
+
+
+@web.post("/dashboard/run")
+@login_required
+def dashboard_run():
+    result, status = current_app.view_functions["api.create_run"]()
+    return result, status
 
 
 @web.get("/inventory")
