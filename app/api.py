@@ -279,3 +279,7 @@ def configure_api(app, authenticate):
     app.add_url_rule("/api/runs", endpoint="api.create_run", view_func=create_run, methods=["POST"])
     app.add_url_rule("/api/runs/compare", endpoint="api.compare_runs", view_func=compare_runs, methods=["GET"])
     app.add_url_rule("/api/runs/<int:id>", endpoint="api.run_detail", view_func=run_detail, methods=["GET"])
+
+    from .inventory_api import configure_inventory_api
+
+    configure_inventory_api(app)
