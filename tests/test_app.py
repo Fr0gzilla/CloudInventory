@@ -156,6 +156,7 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
     assert all(endpoint in {"web.health", "static", "login_page.login", "api.login", "api.stats",
-                            "api.runs", "api.create_run", "api.run_detail", "api.compare_runs"}
+                            "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
+                            "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies"}
                or endpoint.startswith("flasgger.")
                for _, endpoint in routes)
