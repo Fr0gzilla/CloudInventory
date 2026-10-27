@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Run {{ run.id }} — Cloud Inventory{% endblock %}
+{% block content %}
+<h1>Run {{ run.id }}</h1>
+<p><a href="{{ url_for('web.runs_page') }}">Retour aux runs</a></p>
+<section aria-label="Métadonnées du run">
+  <h2>Métadonnées</h2>
+  <dl class="row">
+    <dt class="col-sm-4">Statut</dt><dd class="col-sm-8">{{ run.status }}</dd>
+    <dt class="col-sm-4">Début</dt><dd class="col-sm-8">{{ run.started_at }}</dd>
+    <dt class="col-sm-4">Fin</dt><dd class="col-sm-8">{{ run.finished_at or '—' }}</dd>
+    {% if run.error_message %}<dt class="col-sm-4">Erreur</dt><dd class="col-sm-8">{{ run.error_message }}</dd>{% endif %}
+  </dl>
+</section>
+<section aria-label="Compteurs de correspondance">
+  <h2>Correspondances</h2>
+  <dl class="row">
+    <dt class="col-sm-4">Par nom</dt><dd class="col-sm-8">{{ run.matched_name_count if run.matched_name_count is not none else '—' }}</dd>
+    <dt class="col-sm-4">Par FQDN</dt><dd class="col-sm-8">{{ run.matched_fqdn_count if run.matched_fqdn_count is not none else '—' }}</dd>
+    <dt class="col-sm-4">Par IP</dt><dd class="col-sm-8">{{ run.matched_ip_count if run.matched_ip_count is not none else '—' }}</dd>
+    <dt class="col-sm-4">Sans correspondance</dt><dd class="col-sm-8">{{ run.no_match_count if run.no_match_count is not none else '—' }}</dd>
+  </dl>
+</section>
+<section aria-label="Anomalies du run">
+  <h2>Anomalies</h2>
+  {% if anomalies %}
+  <div class="table-responsive"><table class="table table-striped">
+    <caption>Anomalies du run {{ run.id }}</caption>
+    <thead><tr><th scope="col">Code</th><th scope="col">Description</th><th scope="col">Asset</th><th scope="col">IPAM</th><th scope="col">Date</th></tr></thead>
+    <tbody>{% for anomaly in anomalies %}<tr><td>{{ anomaly.code }}</td><td>{{ anomaly.description }}</td><td>{{ anomaly.asset_id if anomaly.asset_id is not none else '—' }}</td><td>{{ anomaly.ipam_record_id if anomaly.ipam_record_id is not none else '—' }}</td><td>{{ anomaly.created_at }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p>Aucune anomalie pour ce run.</p>{% endif %}
+</section>
+{% endblock %}
