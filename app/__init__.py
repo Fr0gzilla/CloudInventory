@@ -5,7 +5,7 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 from flasgger import Swagger
-from flask import Blueprint, Flask, abort, jsonify, render_template, request, session
+from flask import Blueprint, Flask, abort, current_app, jsonify, render_template, request, session
 from flask_jwt_extended import JWTManager, verify_jwt_in_request
 from flask_login import LoginManager, current_user, login_required
 from flask_sqlalchemy import SQLAlchemy
@@ -33,6 +33,24 @@ auth_blueprint = Blueprint("auth", __name__)
 @login_required
 def index():
     return render_template("index.html")
+
+
+@web.get("/inventory")
+@login_required
+def inventory_page():
+    return render_template("inventory.html")
+
+
+@web.get("/inventory/data")
+@login_required
+def inventory_data():
+    return current_app.view_functions["api.inventory"]()
+
+
+@web.get("/inventory/export")
+@login_required
+def inventory_export():
+    return current_app.view_functions["api.inventory_export"]()
 
 
 @web.get("/health")

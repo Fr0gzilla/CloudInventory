@@ -175,7 +175,12 @@ def test_registers_blueprints_at_expected_prefixes(valid_secrets):
     app = start_app()
     assert {"web", "api", "auth"} <= set(app.blueprints)
     assert {(rule.endpoint, rule.rule) for rule in app.url_map.iter_rules()
-            if rule.endpoint.startswith("web.")} == {("web.health", "/health"), ("web.index", "/")}
+            if rule.endpoint.startswith("web.")} == {
+                ("web.health", "/health"), ("web.index", "/"),
+                ("web.inventory_page", "/inventory"),
+                ("web.inventory_data", "/inventory/data"),
+                ("web.inventory_export", "/inventory/export"),
+            }
 
 
 def test_unknown_route_returns_404(valid_secrets):
@@ -191,7 +196,8 @@ def test_unknown_route_returns_404(valid_secrets):
 def test_only_expected_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
-    assert all(endpoint in {"web.health", "web.index", "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
+    assert all(endpoint in {"web.health", "web.index", "web.inventory_page", "web.inventory_data", "web.inventory_export",
+                            "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
                             "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies"}
                or endpoint.startswith("flasgger.")
