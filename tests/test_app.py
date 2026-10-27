@@ -182,6 +182,7 @@ def test_registers_blueprints_at_expected_prefixes(valid_secrets):
                 ("web.inventory_export", "/inventory/export"),
                 ("web.runs_page", "/runs"),
                 ("web.run_page", "/runs/<int:id>"),
+                ("web.asset_page", "/assets/<int:id>"),
             }
 
 
@@ -199,7 +200,7 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
     assert all(endpoint in {"web.health", "web.index", "web.inventory_page", "web.inventory_data", "web.inventory_export",
-                            "web.runs_page", "web.run_page",
+                            "web.runs_page", "web.run_page", "web.asset_page",
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
                             "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies"}

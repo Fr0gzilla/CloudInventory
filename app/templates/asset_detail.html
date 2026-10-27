@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Asset {{ asset.vm_id }} — Cloud Inventory{% endblock %}
+{% block content %}
+<h1>Asset {{ asset.vm_id }}</h1>
+<p><a href="{{ url_for('web.inventory_page') }}">Retour à l’inventaire</a></p>
+<section aria-labelledby="asset-details-title">
+  <h2 id="asset-details-title">Identité et métriques</h2>
+  <dl class="row">
+    <dt class="col-sm-4">Nom</dt><dd class="col-sm-8">{{ asset.vm_name if asset.vm_name is not none else '—' }}</dd>
+    <dt class="col-sm-4">Type</dt><dd class="col-sm-8">{{ asset.type if asset.type is not none else '—' }}</dd>
+    <dt class="col-sm-4">Nœud</dt><dd class="col-sm-8">{{ asset.node if asset.node is not none else '—' }}</dd>
+    <dt class="col-sm-4">Statut</dt><dd class="col-sm-8">{{ asset.status_final if asset.status_final is not none else (asset.status if asset.status is not none else '—') }}</dd>
+    <dt class="col-sm-4">IP finale</dt><dd class="col-sm-8">{{ asset.ip_final if asset.ip_final is not none else '—' }}</dd>
+    <dt class="col-sm-4">DNS final</dt><dd class="col-sm-8">{{ asset.dns_final if asset.dns_final is not none else '—' }}</dd>
+    <dt class="col-sm-4">Correspondance</dt><dd class="col-sm-8">{{ asset.match_status if asset.match_status is not none else '—' }}</dd>
+    <dt class="col-sm-4">Rôle</dt><dd class="col-sm-8">{{ asset.role if asset.role is not none else '—' }}</dd>
+    <dt class="col-sm-4">CPU</dt><dd class="col-sm-8">{{ asset.cpu if asset.cpu is not none else '—' }}</dd>
+    <dt class="col-sm-4">RAM</dt><dd class="col-sm-8">{{ asset.ram if asset.ram is not none else '—' }}</dd>
+    <dt class="col-sm-4">Disque</dt><dd class="col-sm-8">{{ asset.disk if asset.disk is not none else '—' }}</dd>
+    <dt class="col-sm-4">Disponibilité</dt><dd class="col-sm-8">{{ asset.uptime if asset.uptime is not none else '—' }}</dd>
+  </dl>
+</section>
+<section aria-labelledby="asset-history-title">
+  <h2 id="asset-history-title">Historique des 30 derniers runs</h2>
+  {% if history %}
+  <div class="table-responsive"><table class="table table-striped">
+    <caption>Observations de {{ asset.vm_id }} dans les 30 derniers runs</caption>
+    <thead><tr><th scope="col">Run</th><th scope="col">Nom</th><th scope="col">Statut</th><th scope="col">IP</th><th scope="col">DNS</th><th scope="col">Correspondance</th></tr></thead>
+    <tbody>{% for item in history %}<tr><td><a href="{{ url_for('web.run_page', id=item.run_id) }}">{{ item.run_id }}</a></td><td>{{ item.vm_name if item.vm_name is not none else '—' }}</td><td>{{ item.status_final if item.status_final is not none else '—' }}</td><td>{{ item.ip_final if item.ip_final is not none else '—' }}</td><td>{{ item.dns_final if item.dns_final is not none else '—' }}</td><td>{{ item.match_status if item.match_status is not none else '—' }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p>Aucune observation dans les 30 derniers runs.</p>{% endif %}
+</section>
+<section aria-labelledby="asset-anomalies-title">
+  <h2 id="asset-anomalies-title">Anomalies</h2>
+  {% if anomalies %}
+  <div class="table-responsive"><table class="table table-striped">
+    <caption>Anomalies associées à cet asset et à son historique</caption>
+    <thead><tr><th scope="col">Run</th><th scope="col">Code</th><th scope="col">Description</th><th scope="col">Date</th></tr></thead>
+    <tbody>{% for anomaly in anomalies %}<tr><td>{{ anomaly.run_id }}</td><td>{{ anomaly.code }}</td><td>{{ anomaly.description }}</td><td>{{ anomaly.created_at }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+  {% else %}<p>Aucune anomalie associée.</p>{% endif %}
+</section>
+{% endblock %}

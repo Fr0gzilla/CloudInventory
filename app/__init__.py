@@ -44,7 +44,19 @@ def inventory_page():
 @web.get("/inventory/data")
 @login_required
 def inventory_data():
-    return current_app.view_functions["api.inventory"]()
+    from .inventory_api import _integer, _inventory_query, _row
+    from .models import Run
+
+    page = _integer(request.args.get("page", "1"))
+    per_page = _integer(request.args.get("per_page", "20"))
+    run = Run.query.order_by(Run.id.desc()).first()
+    query = _inventory_query(run.id if run else -1, request.args)
+    if query is None or page is None or per_page is None or per_page > 100:
+        return jsonify(error="Invalid inventory query"), 400
+    result = query.paginate(page=page, per_page=per_page, error_out=False)
+    return jsonify(run_id=run.id if run else None,
+                   items=[dict(_row(*row), asset_id=row[0].id) for row in result.items],
+                   page=page, per_page=per_page, total=result.total)
 
 
 @web.get("/inventory/export")
@@ -74,6 +86,44 @@ def run_page(id):
     run = db.get_or_404(Run, id)
     anomalies = Anomaly.query.filter_by(run_id=id).order_by(Anomaly.id).all()
     return render_template("run_detail.html", run=run, anomalies=anomalies)
+
+
+@web.get("/assets/<int:id>")
+@login_required
+def asset_page(id):
+    from .inventory_api import FIELDS, _row
+    from .models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
+
+    asset = db.get_or_404(Asset, id)
+    latest_runs = db.session.query(Run.id).order_by(Run.id.desc()).limit(30).subquery()
+    rows = (db.session.query(Asset, ConsolidatedAsset, IpamRecord)
+            .outerjoin(ConsolidatedAsset, (ConsolidatedAsset.asset_id == Asset.id) &
+                       (ConsolidatedAsset.run_id == Asset.run_id))
+            .outerjoin(IpamRecord, (IpamRecord.id == ConsolidatedAsset.ipam_record_id) &
+                       (IpamRecord.run_id == Asset.run_id))
+            .filter(Asset.vm_id == asset.vm_id,
+                    Asset.run_id.in_(db.session.query(latest_runs.c.id)))
+            .order_by(Asset.run_id.desc(), Asset.id.desc()).all())
+
+    def entry(observed, consolidated, ipam):
+        values = (_row(observed, consolidated, ipam) if consolidated else
+                  {field: getattr(observed, field, None) for field in FIELDS})
+        return dict(values, asset_id=observed.id, run_id=observed.run_id)
+
+    history = [entry(*row) for row in rows]
+    selected = next((item for item in history if item["asset_id"] == id), None)
+    if selected is None:
+        current = (db.session.query(Asset, ConsolidatedAsset, IpamRecord)
+                   .outerjoin(ConsolidatedAsset, (ConsolidatedAsset.asset_id == Asset.id) &
+                              (ConsolidatedAsset.run_id == Asset.run_id))
+                   .outerjoin(IpamRecord, (IpamRecord.id == ConsolidatedAsset.ipam_record_id) &
+                              (IpamRecord.run_id == Asset.run_id))
+                   .filter(Asset.id == id).one())
+        selected = entry(*current)
+    anomalies = (Anomaly.query.filter(Anomaly.asset_id.in_({id, *(a.id for a, _, _ in rows)}))
+                 .order_by(Anomaly.run_id.desc(), Anomaly.id).all())
+    return render_template("asset_detail.html", asset=selected, history=history,
+                           anomalies=anomalies)
 
 
 @web.get("/health")
