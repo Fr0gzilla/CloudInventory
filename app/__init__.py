@@ -44,6 +44,11 @@ def create_app() -> Flask:
     password = secrets.pop("ADMIN_PASSWORD")
     app.config.update(
         secrets,
+        EXPORT_DIRECTORY=configured("EXPORT_DIRECTORY", "exports"),
+        EXPORT_DESTINATION=configured("EXPORT_DESTINATION", "local"),
+        EXPORT_RAW_ENABLED=str(configured("EXPORT_RAW_ENABLED", "false")).lower() == "true",
+        EXPORT_RETENTION_CONSOLIDATED=int(configured("EXPORT_RETENTION_CONSOLIDATED", "30")),
+        EXPORT_RETENTION_RAW=int(configured("EXPORT_RETENTION_RAW", "7")),
         SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
         USE_MOCK_VIRT=str(configured("USE_MOCK_VIRT", "true")).lower() != "false",
         USE_MOCK_IPAM=str(configured("USE_MOCK_IPAM", "true")).lower() != "false",
@@ -51,6 +56,10 @@ def create_app() -> Flask:
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=str(configured("SESSION_COOKIE_SECURE", "true")).lower() != "false",
     )
+    if app.config["EXPORT_DESTINATION"] not in ("local", "samba") or any(
+        app.config[key] < 0 for key in ("EXPORT_RETENTION_CONSOLIDATED", "EXPORT_RETENTION_RAW")
+    ):
+        raise ValueError("invalid export configuration")
 
     import_module("app.models")
     db.init_app(app)
