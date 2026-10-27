@@ -45,6 +45,23 @@ def configure_auth(app, username, password):
     def load_user(user_id):
         return Admin() if user_id == "admin" else None
 
+    def authenticate(supplied_user, supplied_password):
+        key = request.remote_addr or "unknown"
+        now = time.monotonic()
+        for ip, state in list(attempts.items()):
+            if now - state[0] >= window:
+                del attempts[ip]
+        started, count = attempts.get(key, (now, 0))
+        if count >= limit:
+            return "limited"
+        if not (hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
+                                    username.encode("utf-8", errors="surrogatepass")) and
+                check_password_hash(password_hash, supplied_password)):
+            attempts[key] = (started, count + 1)
+            return "invalid"
+        attempts.pop(key, None)
+        return None
+
     @login_page.route("/login", methods=["GET", "POST"])
     def login():
         destination = internal_next(request.values.get("next")) or url_for("web.health")
@@ -62,20 +79,14 @@ def configure_auth(app, username, password):
             abort(400)
         if len(supplied_user) > 128 or len(supplied_password) > 4096:
             abort(400)
-        key = request.remote_addr or "unknown"
-        now = time.monotonic()
-        for ip, state in list(attempts.items()):
-            if now - state[0] >= window:
-                del attempts[ip]
-        started, count = attempts.get(key, (now, 0))
-        if count >= limit:
+        result = authenticate(supplied_user, supplied_password)
+        if result == "limited":
             abort(429)
-        if not (supplied_user == username and check_password_hash(password_hash, supplied_password)):
-            attempts[key] = (started, count + 1)
+        if result == "invalid":
             return render_template("login.html", next=destination, csrf_token=expected, error=True), 401
-        attempts.pop(key, None)
         session.clear()
         login_user(Admin())
         return redirect(destination)
 
     app.register_blueprint(login_page)
+    return authenticate
