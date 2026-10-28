@@ -5,11 +5,20 @@ from pathlib import Path
 
 from dotenv import dotenv_values
 from flasgger import Swagger
-from flask import Blueprint, Flask, abort, current_app, jsonify, render_template, request, session
+from flask import (
+    Blueprint,
+    Flask,
+    abort,
+    current_app,
+    jsonify,
+    render_template,
+    request,
+    session,
+)
 from flask_jwt_extended import JWTManager, verify_jwt_in_request
 from flask_login import LoginManager, current_user, login_required
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import event, inspect
+from sqlalchemy import event
 
 db = SQLAlchemy()
 login_manager = LoginManager()
@@ -34,13 +43,8 @@ auth_blueprint = Blueprint("auth", __name__)
 def index():
     from .models import Run
 
-    if inspect(db.engine).has_table("run"):
-        latest = Run.query.order_by(Run.id.desc()).first()
-        stats = current_app.view_functions["api.stats"]().get_json()
-    else:
-        latest = None
-        stats = {"total_assets": 0, "matches": {code: 0 for code in
-                 ("MATCHED_NAME", "MATCHED_FQDN", "MATCHED_IP", "NO_MATCH")}, "anomalies": {}}
+    latest = Run.query.order_by(Run.id.desc()).first()
+    stats = current_app.view_functions["api.stats"]().get_json()
     return render_template("index.html", latest=latest, stats=stats,
                            anomaly_total=sum(stats["anomalies"].values()))
 
@@ -48,11 +52,6 @@ def index():
 @web.get("/dashboard/data")
 @login_required
 def dashboard_data():
-    if not inspect(db.engine).has_table("run"):
-        return jsonify(stats={"run": None, "total_assets": 0,
-                              "matches": {code: 0 for code in
-                                          ("MATCHED_NAME", "MATCHED_FQDN", "MATCHED_IP", "NO_MATCH")},
-                              "anomalies": {}}, runs=[])
     stats = current_app.view_functions["api.stats"]().get_json()
     runs = current_app.view_functions["api.runs"]().get_json()
     return jsonify(stats=stats, runs=runs["items"])
@@ -225,7 +224,7 @@ def health():
     return jsonify(status="ok")
 
 
-def create_app() -> Flask:
+def create_app(database_uri: str | None = None) -> Flask:
     dotenv_config = dotenv_values(Path.cwd() / ".env")
 
     def configured(name, default=None):
@@ -240,6 +239,14 @@ def create_app() -> Flask:
 
     app = Flask(__name__)
     password = secrets.pop("ADMIN_PASSWORD")
+    if database_uri is None:
+        database_uri = configured("DATABASE_URL")
+    if database_uri is None:
+        data_directory = Path(app.root_path).parent / "data"
+        data_directory.mkdir(parents=True, exist_ok=True)
+        database_uri = f"sqlite:///{data_directory / 'cloudinventory.sqlite3'}"
+    if not isinstance(database_uri, str) or not database_uri.strip():
+        raise ValueError("DATABASE_URL must be a non-empty database URI")
     app.config.update(
         secrets,
         EXPORT_DIRECTORY=configured("EXPORT_DIRECTORY", "exports"),
@@ -247,7 +254,7 @@ def create_app() -> Flask:
         EXPORT_RAW_ENABLED=str(configured("EXPORT_RAW_ENABLED", "false")).lower() == "true",
         EXPORT_RETENTION_CONSOLIDATED=int(configured("EXPORT_RETENTION_CONSOLIDATED", "30")),
         EXPORT_RETENTION_RAW=int(configured("EXPORT_RETENTION_RAW", "7")),
-        SQLALCHEMY_DATABASE_URI="sqlite:///:memory:",
+        SQLALCHEMY_DATABASE_URI=database_uri,
         USE_MOCK_VIRT=str(configured("USE_MOCK_VIRT", "true")).lower() != "false",
         USE_MOCK_IPAM=str(configured("USE_MOCK_IPAM", "true")).lower() != "false",
         SESSION_COOKIE_HTTPONLY=True,
@@ -272,6 +279,7 @@ def create_app() -> Flask:
                     cursor.close()
 
             event.listen(engine, "connect", enable_foreign_keys)
+        db.create_all()
 
     login_manager.init_app(app)
     from .auth import configure_auth
@@ -289,8 +297,6 @@ def create_app() -> Flask:
             return {}
         from .models import Anomaly, Run
 
-        if not inspect(db.engine).has_table("run"):
-            return {"latest_anomaly_run": None, "latest_anomaly_count": 0}
         latest_run = Run.query.filter_by(status="SUCCESS").order_by(Run.id.desc()).first()
         anomaly_count = Anomaly.query.filter_by(run_id=latest_run.id).count() if latest_run else 0
         return {"latest_anomaly_run": latest_run, "latest_anomaly_count": anomaly_count}
