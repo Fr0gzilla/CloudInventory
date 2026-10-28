@@ -4,7 +4,7 @@ from flask import g, jsonify, request
 from flask_jwt_extended import create_access_token
 
 from app.models import Anomaly, Asset, ConsolidatedAsset, Run
-from collector.inventory_runner import run_inventory
+from collector.async_runner import start_inventory
 from collector.run_lock import RunAlreadyActive
 
 from . import db, jwt
@@ -177,27 +177,24 @@ def configure_api(app, authenticate):
         security:
           - Bearer: []
         responses:
-          201:
-            description: Persisted run (SUCCESS or FAIL)
+          202:
+            description: Admitted inventory run (poll status_url until terminal status)
             schema:
               type: object
               properties:
                 id: {type: integer}
-                status: {type: string, enum: [SUCCESS, FAIL]}
-                started_at: {type: string}
-                finished_at: {type: string}
-                matched_name_count: {type: integer}
-                matched_fqdn_count: {type: integer}
-                matched_ip_count: {type: integer}
-                no_match_count: {type: integer}
-                error_message: {type: string}
+                status: {type: string, enum: [RUNNING]}
+                status_url: {type: string}
+                redirect_url: {type: string}
           401:
             description: Missing or invalid Bearer token
           409:
             description: An inventory run is already in progress
         """
         try:
-            return jsonify(_run_json(run_inventory())), 201
+            identifier = start_inventory()
+            return jsonify(id=identifier, status="RUNNING", status_url=f"/runs/{identifier}/status",
+                           redirect_url=f"/runs/{identifier}"), 202
         except RunAlreadyActive as error:
             return jsonify(error=str(error)), 409
 

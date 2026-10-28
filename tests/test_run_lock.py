@@ -77,7 +77,7 @@ def test_concurrent_api_run_returns_conflict_without_persisting_run(file_app, lo
         holder.stdin.flush()
         assert holder.wait(timeout=5) == 0
         next_response = client.post("/api/runs", headers=headers)
-        assert (next_response.status_code, db.session.query(Run).count()) == (201, 1)
+        assert (next_response.status_code, db.session.query(Run).count()) == (202, 1)
 
 
 def test_lock_survives_competing_process_and_releases_after_abrupt_death(file_app, lock_holder):

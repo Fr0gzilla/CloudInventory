@@ -69,6 +69,22 @@ def dashboard_run():
     return result, status
 
 
+@web.get("/runs/<int:id>/status")
+@login_required
+def run_status(id):
+    from .models import Run
+
+    if id < 1:
+        return jsonify(error="Run not found"), 404
+    db.session.expire_all()
+    run = db.session.get(Run, id)
+    if run is None:
+        return jsonify(error="Run not found"), 404
+    return jsonify(id=run.id, status=run.status, current_step=run.current_step,
+                   completed_steps=run.completed_steps, total_steps=7,
+                   redirect_url=f"/runs/{id}" if run.status != "RUNNING" else None)
+
+
 @web.get("/inventory")
 @login_required
 def inventory_page():
@@ -311,6 +327,9 @@ def create_app(database_uri: str | None = None) -> Flask:
 
             event.listen(engine, "connect", enable_foreign_keys)
         db.create_all()
+        from collector.async_runner import recover_interrupted_runs
+
+        recover_interrupted_runs()
 
     login_manager.init_app(app)
     from .auth import configure_auth

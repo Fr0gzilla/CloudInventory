@@ -7,6 +7,13 @@
   <button type="submit" class="btn btn-primary">Lancer un inventaire</button>
   <span id="dashboard-run-message" role="status" aria-live="polite"></span>
 </form>
+<section id="dashboard-run-progress" aria-label="Progression de l’inventaire" class="mb-4" hidden>
+  <h2 class="h5">Progression de l’inventaire</h2>
+  <progress id="dashboard-run-bar" max="7" value="0" aria-label="Étapes terminées sur sept" class="w-100"></progress>
+  <p id="dashboard-run-step" role="status" aria-live="polite"></p>
+  <ol id="dashboard-run-steps"></ol>
+  <p id="dashboard-run-result" role="status" aria-live="polite"></p>
+</section>
 {% if latest %}
 <p>Dernier run : <a href="{{ url_for('web.run_page', id=latest.id) }}">#{{ latest.id }}</a> — {{ latest.status }}</p>
 {% else %}

@@ -89,10 +89,41 @@ def test_create_run_executes_real_pipeline(authorized, monkeypatch):
     monkeypatch.setattr(pipeline, "MockProxmoxSource", MockProxmoxSource)
     monkeypatch.setattr(pipeline, "MockIpamSource", MockIpamSource)
     client, headers = authorized
-    response = client.post("/api/runs", headers=headers)
-    data = response.get_json()
-    assert (response.status_code, db.session.get(Run, data["id"]).status,
-            Asset.query.filter_by(run_id=data["id"]).count()) == (201, "SUCCESS", len(MockProxmoxSource().collect()))
+    from threading import Event
+    import collector.async_runner as async_runner
+
+    original = async_runner._run_inventory
+    entered, release = Event(), Event()
+    threads = []
+    original_start = async_runner.threading.Thread.start
+
+    def capture_start(thread):
+        threads.append(thread)
+        original_start(thread)
+
+    def blocked(*args, **kwargs):
+        def after_step(step):
+            if step == 1:
+                entered.set()
+                assert release.wait(10)
+        return original(*args, after_step=after_step, **kwargs)
+
+    monkeypatch.setattr(async_runner, "_run_inventory", blocked)
+    monkeypatch.setattr(async_runner.threading.Thread, "start", capture_start)
+    try:
+        response = client.post("/api/runs", headers=headers)
+        data = response.get_json()
+        assert response.status_code == 202
+        assert entered.wait(10)
+        assert client.get(data["status_url"]).status_code == 302
+    finally:
+        release.set()
+        for thread in threads:
+            thread.join(timeout=10)
+            assert not thread.is_alive()
+    db.session.expire_all()
+    assert (db.session.get(Run, data["id"]).status,
+            Asset.query.filter_by(run_id=data["id"]).count()) == ("SUCCESS", len(MockProxmoxSource().collect()))
 
 
 def test_compare_persisted_appearances_disappearances_and_changes(authorized):

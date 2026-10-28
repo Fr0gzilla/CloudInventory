@@ -178,7 +178,8 @@ def test_registers_blueprints_at_expected_prefixes(valid_secrets):
             if rule.endpoint.startswith("web.")} == {
                  ("web.health", "/health"), ("web.index", "/"),
                  ("web.dashboard_data", "/dashboard/data"),
-                 ("web.dashboard_run", "/dashboard/run"),
+                  ("web.dashboard_run", "/dashboard/run"),
+                 ("web.run_status", "/runs/<int:id>/status"),
                 ("web.inventory_page", "/inventory"),
                 ("web.inventory_data", "/inventory/data"),
                 ("web.inventory_export", "/inventory/export"),
@@ -203,7 +204,7 @@ def test_unknown_route_returns_404(valid_secrets):
 def test_only_expected_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
-    assert all(endpoint in {"web.health", "web.index", "web.dashboard_data", "web.dashboard_run", "web.inventory_page", "web.inventory_data", "web.inventory_export",
+    assert all(endpoint in {"web.health", "web.index", "web.dashboard_data", "web.dashboard_run", "web.run_status", "web.inventory_page", "web.inventory_data", "web.inventory_export",
                              "web.runs_page", "web.run_page", "web.run_compare_page", "web.anomalies_page", "web.asset_page",
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
