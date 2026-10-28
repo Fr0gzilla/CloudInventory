@@ -5,7 +5,7 @@ PYTHON ?= python3
 
 install:
 	$(PYTHON) -m venv $(VENV)
-	$(VENV)/bin/python -m pip install -r requirements.txt
+	$(VENV)/bin/python -m pip install -r requirements-dev.txt
 
 verify:
 	$(VENV)/bin/python -m pytest tests/ -v
