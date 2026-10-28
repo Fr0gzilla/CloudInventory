@@ -1,6 +1,7 @@
 """Retain only the most recent inventory runs and their observations."""
 
 import os
+from collections.abc import Sequence
 
 from sqlalchemy import delete, select
 
@@ -24,7 +25,7 @@ def purge_old_runs(keep: int | None = None) -> int:
         raise ValueError("run retention must be a positive integer")
 
     with db.session.begin():
-        old_ids = db.session.scalars(
+        old_ids: Sequence[int] = db.session.scalars(
             select(Run.id).order_by(Run.started_at.desc(), Run.id.desc()).offset(keep)
         ).all()
         if old_ids:

@@ -1,7 +1,7 @@
 """Pure, globally prioritized matching of virtualization and IPAM records."""
 
 from collections.abc import Iterable
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from collector.normalization import normalize
 from collector.roles import infer_role
@@ -31,7 +31,7 @@ def match_asset(asset: AssetRecord, ipam_records: Iterable[IpamRecord]) -> tuple
     ):
         if wanted:
             for record in records:
-                candidate = record.get(field)
+                candidate = cast(str | None, record.get(field))
                 if candidate and (normalize(candidate) if normalized else candidate) == wanted:
                     return status, record
     return "NO_MATCH", None

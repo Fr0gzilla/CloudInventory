@@ -1,0 +1,19 @@
+[tool.ruff]
+target-version = "py311"
+
+[tool.mypy]
+python_version = "3.11"
+files = ["app", "collector"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = "collector.mock_ipam"
+disable_error_code = ["typeddict-unknown-key"]
+
+[[tool.mypy.overrides]]
+module = "collector.netbox"
+disable_error_code = ["typeddict-unknown-key"]
+
+[[tool.mypy.overrides]]
+module = "app.models"
+disable_error_code = ["name-defined"]

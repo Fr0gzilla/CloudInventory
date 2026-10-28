@@ -6,6 +6,7 @@ from importlib import import_module
 from pathlib import Path
 from secrets import token_urlsafe
 from tempfile import TemporaryDirectory
+from typing import cast
 
 from dotenv import dotenv_values
 from flasgger import Swagger
@@ -299,7 +300,7 @@ def create_app(database_uri: str | None = None) -> Flask:
                 app.extensions["run_lock_directory"] = temporary_directory
                 app.config["RUN_LOCK_PATH"] = str(Path(temporary_directory.name) / "run.lock")
             else:
-                app.config["RUN_LOCK_PATH"] = str(Path(engine.url.database).with_suffix(".run.lock"))
+                app.config["RUN_LOCK_PATH"] = str(Path(cast(str, engine.url.database)).with_suffix(".run.lock"))
         if engine.dialect.name == "sqlite":
             def enable_foreign_keys(connection, connection_record):
                 cursor = connection.cursor()

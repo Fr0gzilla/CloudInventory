@@ -4,6 +4,7 @@ import json
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
+from typing import cast
 
 from app import db
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
@@ -82,26 +83,26 @@ def _run_inventory(
 
             stored_ipam: dict[tuple[str | None, str | None], IpamRecord] = {}
             ipam_snapshots: dict[tuple[str | None, str | None], IpamObservation] = {}
-            for observation in ipam_records:
-                key = (observation.get("ip"), observation.get("dns_name"))
-                ipam_snapshots[key] = observation.copy()
-                if key not in stored_ipam:
-                    stored_ipam[key] = IpamRecord(run_id=run.id)
-                    db.session.add(stored_ipam[key])
-                row = stored_ipam[key]
+            for ipam_observation in ipam_records:
+                ipam_key: tuple[str | None, str | None] = (ipam_observation.get("ip"), ipam_observation.get("dns_name"))
+                ipam_snapshots[ipam_key] = ipam_observation.copy()
+                if ipam_key not in stored_ipam:
+                    stored_ipam[ipam_key] = IpamRecord(run_id=run.id)
+                    db.session.add(stored_ipam[ipam_key])
+                ipam_row = stored_ipam[ipam_key]
                 for field in ("ip", "dns_name", "status", "tenant", "site", "tags", "meta_zone"):
-                    setattr(row, field, observation.get(field))
-                custom = observation.get("custom_fields")
+                    setattr(ipam_row, field, ipam_observation.get(field))
+                custom = ipam_observation.get("custom_fields")
                 if custom is not None and not isinstance(custom, dict):
                     raise TypeError("Invalid IPAM custom fields")
-                row.custom_fields = json.dumps(custom) if custom is not None else None
-                if row.id is None:
+                ipam_row.custom_fields = json.dumps(custom) if custom is not None else None
+                if ipam_row.id is None:
                     db.session.flush()
             db.session.flush()
             completed(4)
 
             unique_ipam = list(ipam_snapshots.values())
-            counts = Counter()
+            counts: Counter[str] = Counter()
             anomaly_count = 0
             for observation in asset_snapshots.values():
                 asset = stored_assets[observation["vm_id"]]
@@ -132,13 +133,13 @@ def _run_inventory(
             dns_counts = Counter(normalize(record.get("dns_name")) for record in unique_ipam
                                  if record.get("dns_name"))
             ip_counts = Counter(record.get("ip") for record in unique_ipam if record.get("ip"))
-            for key, row in stored_ipam.items():
-                row.duplicate_dns = int(bool(key[1]) and dns_counts[normalize(key[1])] > 1)
-                row.duplicate_ip = int(bool(key[0]) and ip_counts[key[0]] > 1)
+            for ipam_key, ipam_row in stored_ipam.items():
+                ipam_row.duplicate_dns = int(bool(ipam_key[1]) and dns_counts[normalize(ipam_key[1])] > 1)
+                ipam_row.duplicate_ip = int(bool(ipam_key[0]) and ip_counts[cast(str, ipam_key[0])] > 1)
             for anomaly in duplicate_anomalies(unique_ipam):
                 anomaly_count += 1
-                observation = anomaly["ipam_record"]
-                ipam = stored_ipam[(observation.get("ip"), observation.get("dns_name"))]
+                ipam_observation = cast(IpamObservation, anomaly["ipam_record"])
+                ipam = stored_ipam[(ipam_observation.get("ip"), ipam_observation.get("dns_name"))]
                 db.session.add(Anomaly(
                     run_id=run.id, ipam_record_id=ipam.id,
                     code=anomaly["code"], description=anomaly["description"],

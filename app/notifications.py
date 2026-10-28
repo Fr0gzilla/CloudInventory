@@ -48,7 +48,8 @@ def _webhook(payload: dict[str, object]) -> None:
         raise ValueError("invalid webhook configuration")
     request = Request(url, data=json.dumps(payload).encode("utf-8"),
                       headers={"Content-Type": "application/json"}, method="POST")
-    with urlopen(request, timeout=_TIMEOUT) as response:
+    # HTTPS scheme and host are validated above before the request is made.
+    with urlopen(request, timeout=_TIMEOUT) as response:  # nosec B310
         response.read()
 
 

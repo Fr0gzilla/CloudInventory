@@ -2,7 +2,7 @@
 
 from collections import Counter
 from collections.abc import Iterable
-from typing import TypedDict
+from typing import TypedDict, cast
 
 from collector.matching import ConsolidatedResult
 from collector.normalization import normalize
@@ -50,10 +50,10 @@ def duplicate_anomalies(ipam_records: Iterable[IpamRecord]) -> list[AnomalyResul
         ("DUPLICATE_DNS", "dns_name", normalize),
         ("DUPLICATE_IP", "ip", lambda value: value),
     ):
-        counts = Counter(key_of(record.get(field)) for record in records if record.get(field))
+        counts = Counter(key_of(cast(str | None, record.get(field))) for record in records if record.get(field))
         seen: set[str] = set()
         for record in records:
-            key = key_of(record.get(field)) if record.get(field) else ""
+            key = key_of(cast(str | None, record.get(field))) if record.get(field) else ""
             if key and counts[key] > 1 and key not in seen:
                 seen.add(key)
                 entries.append({"code": code, "description": f"{counts[key]} IPAM records share {field}: {key}",
