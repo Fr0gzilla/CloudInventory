@@ -1,5 +1,6 @@
 """Persist one seven-step inventory run as a single atomic collection."""
 
+import json
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -90,6 +91,10 @@ def _run_inventory(
                 row = stored_ipam[key]
                 for field in ("ip", "dns_name", "status", "tenant", "site", "tags", "meta_zone"):
                     setattr(row, field, observation.get(field))
+                custom = observation.get("custom_fields")
+                if custom is not None and not isinstance(custom, dict):
+                    raise TypeError("Invalid IPAM custom fields")
+                row.custom_fields = json.dumps(custom) if custom is not None else None
                 if row.id is None:
                     db.session.flush()
             db.session.flush()

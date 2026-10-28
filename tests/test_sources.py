@@ -50,7 +50,7 @@ def test_proxmox_exposes_source_fields_without_persistence_ids():
 def test_ipam_has_44_records_and_source_fields_without_persistence_ids():
     records = MockIpamSource().collect()
     assert len(records) == 44
-    assert all(set(record) == set(IpamRecord.__annotations__) for record in records)
+    assert all(set(record) == set(IpamRecord.__annotations__) | {"custom_fields"} for record in records)
 
 
 def test_ipam_contains_40_named_assets_and_two_orphans():
@@ -76,6 +76,13 @@ def test_ipam_covers_tenants_sites_and_zones():
     }
     assert {r["site"] for r in records} == {"DC1", "DC2"}
     assert all(r["meta_zone"] for r in records)
+
+
+def test_mock_ipam_exposes_custom_fields_for_every_observation_including_orphans():
+    records = MockIpamSource().collect()
+    orphan = next(row for row in records if row["dns_name"] == "decom-server")
+    assert orphan["custom_fields"] is not None
+    assert all("custom_fields" in row for row in records)
 
 
 def test_four_unmatched_block_vms_have_no_matching_name_fqdn_or_ip():

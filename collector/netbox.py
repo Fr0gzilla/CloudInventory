@@ -46,8 +46,8 @@ class NetBoxSource:
                 tags = row.get("tags") or []
                 if not isinstance(tags, list):
                     raise TypeError("Invalid NetBox tags")
-                custom = row.get("custom_fields") or {}
-                if not isinstance(custom, dict):
+                custom = row.get("custom_fields")
+                if custom is not None and not isinstance(custom, dict):
                     raise TypeError("Invalid NetBox custom fields")
                 records.append({
                     "ip": str(row.get("address") or "").split("/", 1)[0],
@@ -57,7 +57,8 @@ class NetBoxSource:
                     "site": _label(row.get("site") or (row.get("assigned_object") or {}).get("site")),
                     "tags": ",".join(_label(tag) for tag in tags),
                     "duplicate_dns": 0, "duplicate_ip": 0,
-                    "meta_zone": _label(custom.get("meta_zone")),
+                    "meta_zone": _label((custom or {}).get("meta_zone")),
+                    "custom_fields": custom,
                 })
             next_url = page.get("next")
             if next_url is not None and (not isinstance(next_url, str) or not next_url):

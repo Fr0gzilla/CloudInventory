@@ -27,11 +27,25 @@ def test_paginates_maps_duplicates_and_returns_fresh_records():
     source = NetBoxSource(transport=transport, timeout=5)
     rows = source.collect()
     assert len(rows) == 2
-    assert rows[0] == {"ip": "192.0.2.10", "dns_name": "host.example", "status": "active", "tenant": "team", "site": "paris", "tags": "prod", "duplicate_dns": 1, "duplicate_ip": 1, "meta_zone": "dmz"}
-    assert all(set(row) == set(IpamRecord.__annotations__) for row in rows)
+    assert rows[0] == {"ip": "192.0.2.10", "dns_name": "host.example", "status": "active", "tenant": "team", "site": "paris", "tags": "prod", "duplicate_dns": 1, "duplicate_ip": 1, "meta_zone": "dmz", "custom_fields": {"meta_zone": "dmz"}}
+    assert all(set(row) == set(IpamRecord.__annotations__) | {"custom_fields"} for row in rows)
     assert len(urls) == 2 and all(auth == "Token test-placeholder" and timeout == 5 for _, auth, timeout in urls)
     rows[0]["ip"] = "changed"
     assert source.collect()[0]["ip"] == "192.0.2.10"
+
+
+def test_netbox_preserves_nested_unicode_custom_fields_and_missing_fields():
+    custom = {"meta_zone": "Étage", "nested": {"flags": [True, None, 2, 3.5], "label": "été"}}
+    payload = [{"address": "192.0.2.1/24", "custom_fields": custom},
+               {"address": "192.0.2.2/24", "custom_fields": None},
+               {"address": "192.0.2.3/24", "custom_fields": {}},
+               {"address": "192.0.2.4/24"}]
+    source = NetBoxSource(transport=lambda request, timeout: json.dumps(
+        {"results": payload, "next": None}).encode())
+    rows = source.collect()
+    assert [row["custom_fields"] for row in rows] == [custom, None, {}, None]
+    rows[0]["custom_fields"]["nested"]["flags"].append("modified")
+    assert source.collect()[0]["custom_fields"] == custom
 
 
 @pytest.mark.parametrize("failure", [HTTPError("https://netbox.example", 403, "test-placeholder", {}, None), TimeoutError("test-placeholder"), ssl.SSLError("test-placeholder")])

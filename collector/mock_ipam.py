@@ -22,27 +22,32 @@ class MockIpamSource:
                 "duplicate_dns": 1 if asset["vm_name"] == "monitoring" else 0,
                 "duplicate_ip": 1 if asset["ip_reported"] == "10.0.4.16" else 0,
                 "meta_zone": "production" if node <= 3 else "staging",
+                "custom_fields": {"meta_zone": "production" if node <= 3 else "staging"},
             })
         records.extend((
             {
                 "ip": "10.0.5.200", "dns_name": "decom-server", "status": "reserved",
                 "tenant": "Infra", "site": "DC2", "tags": "reserved",
                 "duplicate_dns": 0, "duplicate_ip": 0, "meta_zone": "decommissioned",
+                "custom_fields": {"meta_zone": "decommissioned"},
             },
             {
                 "ip": "10.0.5.201", "dns_name": "orphan-lab", "status": "reserved",
                 "tenant": "DevOps", "site": "DC2", "tags": "",
                 "duplicate_dns": 0, "duplicate_ip": 0, "meta_zone": "lab",
+                "custom_fields": {"meta_zone": "lab"},
             },
             {
                 "ip": "10.0.5.50", "dns_name": "monitoring", "status": "active",
                 "tenant": "Supervision", "site": "DC2", "tags": "",
                 "duplicate_dns": 1, "duplicate_ip": 0, "meta_zone": "staging",
+                "custom_fields": {"meta_zone": "staging"},
             },
             {
                 "ip": "10.0.4.16", "dns_name": "shared-address", "status": "active",
                 "tenant": "Staging", "site": "DC2", "tags": "",
                 "duplicate_dns": 0, "duplicate_ip": 1, "meta_zone": "staging",
+                "custom_fields": {"meta_zone": "staging"},
             },
         ))
         return records

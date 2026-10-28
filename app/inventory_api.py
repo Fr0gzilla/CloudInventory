@@ -49,14 +49,14 @@ def _row(asset, consolidated, ipam):
 
 def _inventory_query(run_id, args):
     if (any(len(args.getlist(key)) != 1 for key in args) or
-            any(key not in ("q", "status", "node", "type", "match", "tag",
+            any(key not in ("q", "status", "node", "type", "match", "tag", "meta_zone",
                             "sort", "order", "page", "per_page") for key in args)):
         return None
     sort = args.get("sort", "vm_id")
     order = args.get("order", "asc")
     if sort not in SORT_COLUMNS or order not in ("asc", "desc"):
         return None
-    for key in ("q", "status", "node", "type", "match", "tag"):
+    for key in ("q", "status", "node", "type", "match", "tag", "meta_zone"):
         value = args.get(key, "")
         if len(value) > 255 or "\x00" in value:
             return None
@@ -82,6 +82,8 @@ def _inventory_query(run_id, args):
     if args.get("tag"):
         pattern = _pattern(args["tag"])
         query = query.filter(Asset.tags.ilike(pattern, escape="\\"))
+    if args.get("meta_zone"):
+        query = query.filter(IpamRecord.meta_zone == args["meta_zone"])
     column = SORT_COLUMNS[sort]
     return query.order_by(column.desc() if order == "desc" else column.asc(), Asset.id.asc())
 
@@ -106,6 +108,7 @@ def configure_inventory_api(app):
           - {in: query, name: type, type: string, enum: [qemu, lxc]}
           - {in: query, name: match, type: string, enum: [MATCHED_NAME, MATCHED_FQDN, MATCHED_IP, NO_MATCH]}
           - {in: query, name: tag, type: string}
+          - {in: query, name: meta_zone, type: string, description: Exact IPAM zone}
           - {in: query, name: sort, type: string, description: One of vm_id vm_name type node status ip_final dns_final match_status role cpu ram disk uptime}
           - {in: query, name: order, type: string, enum: [asc, desc], default: asc}
           - {in: query, name: page, type: integer, minimum: 1, default: 1}
@@ -148,6 +151,7 @@ def configure_inventory_api(app):
           - {in: query, name: type, type: string, enum: [qemu, lxc]}
           - {in: query, name: match, type: string, enum: [MATCHED_NAME, MATCHED_FQDN, MATCHED_IP, NO_MATCH]}
           - {in: query, name: tag, type: string}
+          - {in: query, name: meta_zone, type: string, description: Exact IPAM zone}
           - {in: query, name: sort, type: string, description: Same whitelist as inventory}
           - {in: query, name: order, type: string, enum: [asc, desc]}
         responses:
