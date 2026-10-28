@@ -43,7 +43,7 @@ def test_stats_latest_run_counts_only_latest(authorized):
     snapshot(old, "old", "10.0.0.1")
     latest = run()
     snapshot(latest, "new", "10.0.0.2", "NO_MATCH")
-    db.session.add(Anomaly(run_id=latest.id, code="NO_MATCH", description="unmatched", created_at="2026-01-01"))
+    db.session.add(Anomaly(run_id=latest.id, code="NO_MATCH", severity="info", description="unmatched", created_at="2026-01-01"))
     db.session.commit()
     data = client.get("/api/stats", headers=headers).get_json()
     assert (data["run"]["id"], data["total_assets"], data["matches"]["NO_MATCH"],
@@ -68,7 +68,7 @@ def test_run_detail_contains_persisted_assets_and_anomalies(authorized):
     client, headers = authorized
     item = run()
     snapshot(item, "vm-1", "10.0.0.1")
-    db.session.add(Anomaly(run_id=item.id, code="MATCHED_IP", description="ip match", created_at="2026-01-01"))
+    db.session.add(Anomaly(run_id=item.id, code="MATCHED_IP", severity="info", description="ip match", created_at="2026-01-01"))
     db.session.commit()
     data = client.get(f"/api/runs/{item.id}", headers=headers).get_json()
     assert (data["id"], data["assets"][0]["vm_id"], data["assets"][0]["ip_final"],

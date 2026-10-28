@@ -129,7 +129,7 @@ def test_anomalies_belong_only_to_observed_asset(client):
     other = observation(db.session.get(Run, first.run_id), vm_id="other")
     later = observation(new_run())
     for asset, code, description, date in ((first, "NO_MATCH", "first only", "2026-01-01"), (later, "MATCHED_IP", "later only", "2026-01-02"), (other, "NO_MATCH", "unrelated", "2026-01-03")):
-        db.session.add(Anomaly(run_id=asset.run_id, asset_id=asset.id, code=code, description=description, created_at=date))
+        db.session.add(Anomaly(run_id=asset.run_id, asset_id=asset.id, code=code, severity="info", description=description, created_at=date))
         db.session.flush()
     db.session.commit()
     assert [row[2] for row in page(client.get(f"/assets/{later.id}")).tables[1][1:]] == ["later only", "first only"]

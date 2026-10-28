@@ -74,7 +74,7 @@ def test_removes_all_children_with_restrict_references_and_preserves_survivors(o
             ConsolidatedAsset(run_id=run_id, asset_id=asset.id,
                               ipam_record_id=ipam.id, match_status="MATCHED_IP"),
             Anomaly(run_id=run_id, asset_id=asset.id, ipam_record_id=ipam.id,
-                    code="MATCHED_IP", description="test", created_at="2024-01-01"),
+                    code="MATCHED_IP", severity="info", description="test", created_at="2024-01-01"),
         ])
     db.session.commit()
     assert purge_old_runs(1) == 1

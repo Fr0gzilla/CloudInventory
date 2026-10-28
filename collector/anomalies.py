@@ -61,6 +61,18 @@ def duplicate_anomalies(ipam_records: Iterable[IpamRecord]) -> list[AnomalyResul
     return entries
 
 
+def renamed_anomalies(current: Iterable[AssetRecord], previous: Iterable[AssetRecord]) -> list[AnomalyResult]:
+    """Compare stable VM identifiers across successive successful inventories."""
+    old_names = {asset["vm_id"]: asset.get("vm_name") for asset in previous}
+    return [
+        {"code": "RENAMED", "description": f"VM renamed from {old_names[asset['vm_id']]} to {asset['vm_name']}",
+         "asset": asset.copy(), "ipam_record": None}
+        for asset in current
+        if asset["vm_id"] in old_names and old_names[asset["vm_id"]] != asset.get("vm_name")
+        and old_names[asset["vm_id"]] is not None and asset.get("vm_name") is not None
+    ]
+
+
 def collect_anomalies(consolidated: Iterable[ConsolidatedResult],
                       ipam_records: Iterable[IpamRecord]) -> list[AnomalyResult]:
     """Emit matching anomalies first, then scan the complete IPAM run for duplicates."""

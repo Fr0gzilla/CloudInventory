@@ -4,7 +4,8 @@ from pathlib import Path
 import pytest
 from alembic import command
 from alembic.config import Config
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import StaticPool
 
 from app import db
@@ -30,7 +31,7 @@ def test_baseline_matches_published_sql_and_orm(orm_app):
             config = migration_config(connection)
             command.upgrade(config, "head")
             migrated = connection.connection.driver_connection
-            assert migrated.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0001_baseline"
+            assert migrated.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0002_model_v22"
             migrated_schema = inspect_schema(migrated)
             migrated_schema.pop("alembic_version")
             with db.engine.connect() as orm_connection:
@@ -60,3 +61,23 @@ def test_schema_comparison_rejects_missing_ipam_fields(difference):
     finally:
         changed.close()
         reference.close()
+
+
+def test_upgrade_preserves_baseline_rows_and_accepts_renamed(monkeypatch):
+    monkeypatch.setenv("ANOMALY_SEVERITIES", '{"NO_MATCH": "mineure"}')
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    try:
+        with engine.begin() as connection:
+            config = migration_config(connection)
+            command.upgrade(config, "0001_baseline")
+            connection.execute(text("INSERT INTO run (id, status, started_at) VALUES (1, 'SUCCESS', '2026-01-01')"))
+            connection.execute(text("INSERT INTO asset (id, run_id, vm_id, vm_name) VALUES (1, 1, 'vm-1', 'old')"))
+            connection.execute(text("INSERT INTO anomaly (id, run_id, asset_id, code, description, created_at) VALUES (1, 1, 1, 'NO_MATCH', 'old event', '2026-01-01')"))
+            command.upgrade(config, "head")
+            assert connection.execute(text("SELECT vm_name FROM asset WHERE id=1")).scalar_one() == "old"
+            assert connection.execute(text("SELECT code, description, severity FROM anomaly WHERE id=1")).one() == ("NO_MATCH", "old event", "mineure")
+            connection.execute(text("INSERT INTO anomaly (run_id, asset_id, code, description, created_at, severity) VALUES (1, 1, 'RENAMED', 'old → new', '2026-01-02', 'info')"))
+            with pytest.raises(IntegrityError):
+                connection.execute(text("INSERT INTO anomaly (run_id, code, description, created_at, severity) VALUES (1, 'INVALID', 'bad', '2026-01-02', 'info')"))
+    finally:
+        engine.dispose()

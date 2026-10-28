@@ -41,6 +41,18 @@ def test_proxmox_has_45_unique_assets_nine_per_node_and_both_types():
     assert {asset["type"] for asset in assets} == {"qemu", "lxc"}
 
 
+@pytest.mark.parametrize("scenario,changed,created", [
+    ("unchanged", 0, set()),
+    ("renamed", 1, set()),
+    ("renamed_with_creation", 1, {"new-100"}),
+])
+def test_proxmox_scenarios_keep_ids_and_distinguish_renames_from_creations(scenario, changed, created):
+    previous = {item["vm_id"]: item["vm_name"] for item in MockProxmoxSource().collect()}
+    current = {item["vm_id"]: item["vm_name"] for item in MockProxmoxSource(scenario).collect()}
+    assert len([key for key in previous.keys() & current.keys() if previous[key] != current[key]]) == changed
+    assert current.keys() - previous.keys() == created
+
+
 def test_proxmox_exposes_source_fields_without_persistence_ids():
     expected = set(AssetRecord.__annotations__)
     assets = MockProxmoxSource().collect()

@@ -10,7 +10,7 @@ from app import db
 
 
 SCHEMA = Path(__file__).resolve().parents[1] / "docs/modele/schema.sql"
-TABLES = {"run", "asset", "ipam_record", "consolidated_asset", "anomaly"}
+TABLES = {"run_schedule", "run", "asset", "ipam_record", "consolidated_asset", "anomaly", "anomaly_exception"}
 
 
 def inspect_schema(connection):
@@ -41,7 +41,7 @@ def inspect_schema(connection):
         checks = sorted(
             re.sub(r"\s+", "", match).lower()
             for match in re.findall(
-                r"CHECK\s*\(\s*\w+\s*(?:IN\s*\([^)]*\)|>=\s*\d+)\s*\)",
+                r"CHECK\s*\(\s*(?:\w+\s*(?:IN\s*\([^)]*\)|>=\s*\d+|BETWEEN\s+\d+\s+AND\s+\d+)|length\s*\(\s*trim\s*\(\s*\w+\s*\)\s*\)\s*>\s*0)\s*\)",
                 sql,
                 re.IGNORECASE,
             )
@@ -67,7 +67,7 @@ def run(identifier=1):
     insert("run", id=identifier, status="RUNNING", started_at="2026-01-01")
 
 
-def test_five_tables_match_reference_schema(orm_app):
+def test_seven_tables_match_reference_schema(orm_app):
     reference = sqlite3.connect(":memory:")
     try:
         reference.executescript(SCHEMA.read_text(encoding="utf-8"))
@@ -92,6 +92,8 @@ def test_foreign_keys_enabled_on_each_connection(orm_app):
     ("asset", {"id": 1, "run_id": 1, "vm_id": "vm", "type": "bad"}),
     ("consolidated_asset", {"id": 1, "run_id": 1, "asset_id": 1, "match_status": "bad"}),
     ("anomaly", {"id": 1, "run_id": 1, "code": "bad", "description": "x", "created_at": "now"}),
+    ("run_schedule", {"id": 1, "frequency": "bad"}),
+    ("anomaly_exception", {"id": 1, "code": "bad", "target": "vm", "justification": "reason", "expires_at": "now", "author": "tester"}),
 ])
 def test_invalid_check_rejected(orm_app, table, values):
     if table != "run":
@@ -132,7 +134,7 @@ def test_cross_run_composite_reference_rejected(orm_app, table, field):
         values.update(asset_id=1, match_status="NO_MATCH")
         values[field] = 2 if field == "asset_id" else 1
     else:
-        values.update(code="NO_MATCH", description="x", created_at="now")
+        values.update(code="NO_MATCH", description="x", created_at="now", severity="info")
     rejected(table, **values)
 
 
@@ -145,7 +147,7 @@ def test_referenced_parent_delete_restricted(orm_app, parent, child):
     insert("ipam_record", id=1, run_id=1)
     if child == "anomaly":
         insert(child, id=1, run_id=1, **{parent + "_id": 1},
-               code="NO_MATCH", description="x", created_at="now")
+                code="NO_MATCH", description="x", created_at="now", severity="info")
     else:
         insert(child, id=1, run_id=1, asset_id=1, ipam_record_id=1,
                match_status="NO_MATCH")
@@ -160,7 +162,7 @@ def test_unblocked_run_delete_cascades_children(orm_app):
     insert("asset", id=1, run_id=1, vm_id="vm")
     insert("ipam_record", id=1, run_id=1)
     insert("consolidated_asset", id=1, run_id=1, asset_id=1, match_status="NO_MATCH")
-    insert("anomaly", id=1, run_id=1, code="NO_MATCH", description="x", created_at="now")
+    insert("anomaly", id=1, run_id=1, code="NO_MATCH", description="x", created_at="now", severity="info")
     db.session.execute(text("DELETE FROM run WHERE id=1"))
     db.session.commit()
     assert all(db.session.execute(text(f"SELECT count(*) FROM {table}")).scalar() == 0

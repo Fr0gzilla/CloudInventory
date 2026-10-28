@@ -4,6 +4,11 @@ from collector.source import AssetRecord
 
 
 class MockProxmoxSource:
+    def __init__(self, scenario: str = "default") -> None:
+        if scenario not in ("default", "renamed", "unchanged", "renamed_with_creation"):
+            raise ValueError("Unknown mock scenario")
+        self.scenario = scenario
+
     def collect(self) -> list[AssetRecord]:
         assets: list[AssetRecord] = []
         themes = (
@@ -46,4 +51,12 @@ class MockProxmoxSource:
                     "disk": 32.0,
                     "uptime": 0.0 if stopped else 86400.0,
                 })
+        if self.scenario in ("renamed", "renamed_with_creation"):
+            assets[0]["vm_name"] = "web-a500-renamed"
+            assets[0]["fqdn"] = "web-a500-renamed.prod.local"
+        if self.scenario == "renamed_with_creation":
+            created = assets[0].copy()
+            created.update(vm_id="new-100", vm_name="new-vm", fqdn="new-vm.prod.local",
+                           ip_reported="10.0.9.200")
+            assets.append(created)
         return assets

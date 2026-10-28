@@ -150,7 +150,7 @@ def test_asset_detail_contains_metrics_history_and_linked_anomalies(inventory_da
     old = new_run()
     old_alpha = observation(old, "alpha", ip="10.0.0.7")
     db.session.add(Anomaly(run_id=latest.id, asset_id=alpha.id, code="MATCHED_IP",
-                           description="linked", created_at="2026-01-01"))
+                            description="linked", created_at="2026-01-01", severity="info"))
     db.session.commit()
     data = client.get(f"/api/assets/{alpha.id}", headers=headers).get_json()
     assert (data["asset"]["asset_id"], data["asset"]["cpu"], data["asset"]["ipam_site"],
@@ -170,9 +170,9 @@ def test_anomalies_filter_by_run_and_code(inventory_data):
     (client, headers), latest, (alpha, _, _) = inventory_data
     old = new_run()
     anomalies = [
-        Anomaly(run_id=latest.id, asset_id=alpha.id, code="NO_MATCH", description="one", created_at="2026-01-01"),
-        Anomaly(run_id=latest.id, code="DUPLICATE_IP", description="two", created_at="2026-01-01"),
-        Anomaly(run_id=old.id, code="NO_MATCH", description="three", created_at="2026-01-01"),
+        Anomaly(run_id=latest.id, asset_id=alpha.id, code="NO_MATCH", description="one", created_at="2026-01-01", severity="info"),
+        Anomaly(run_id=latest.id, code="DUPLICATE_IP", description="two", created_at="2026-01-01", severity="info"),
+        Anomaly(run_id=old.id, code="NO_MATCH", description="three", created_at="2026-01-01", severity="info"),
     ]
     for anomaly in anomalies:
         db.session.add(anomaly)
@@ -188,10 +188,10 @@ def test_anomalies_default_to_latest_run_and_support_all_codes(authorized):
     old = new_run()
     latest = new_run()
     codes = ("NO_MATCH", "MATCHED_IP", "HOSTNAME_MISMATCH", "STATUS_MISMATCH", "DUPLICATE_DNS", "DUPLICATE_IP")
-    db.session.add(Anomaly(run_id=old.id, code="NO_MATCH", description="old", created_at="2026-01-01"))
+    db.session.add(Anomaly(run_id=old.id, code="NO_MATCH", description="old", created_at="2026-01-01", severity="info"))
     db.session.flush()
     for code in codes:
-        db.session.add(Anomaly(run_id=latest.id, code=code, description=code, created_at="2026-01-01"))
+        db.session.add(Anomaly(run_id=latest.id, code=code, description=code, created_at="2026-01-01", severity="info"))
         db.session.flush()
     db.session.commit()
     data = client.get("/api/anomalies", headers=headers).get_json()

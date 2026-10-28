@@ -73,7 +73,7 @@ def persisted_run(status="SUCCESS", count=0):
     db.session.add(run)
     db.session.flush()
     for _ in range(count):
-        db.session.add(Anomaly(run_id=run.id, code="NO_MATCH", description="test",
+        db.session.add(Anomaly(run_id=run.id, code="NO_MATCH", severity="info", description="test",
                                created_at="2026-01-01T00:01:00"))
         db.session.flush()
     db.session.commit()
