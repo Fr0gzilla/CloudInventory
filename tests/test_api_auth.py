@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 
 import pytest
@@ -179,5 +180,30 @@ def test_apidocs_served_to_authenticated_web_user_with_scoped_csp(api_app):
     client.post("/login", data={"username": "admin", "password": credentials["ADMIN_PASSWORD"], "csrf_token": csrf})
     response = client.get("/apidocs/")
     csp = response.headers["Content-Security-Policy"]
-    assert response.status_code == 200 and b"swagger" in response.data.lower() and "script-src" in csp and "style-src" in csp and "'unsafe-inline'" in csp
-    assert "script-src" not in client.get("/health").headers["Content-Security-Policy"]
+    second = client.get("/apidocs/")
+    assert response.status_code == second.status_code == 200
+    assert b"swagger" in response.data.lower()
+    for page in (response, second):
+        policy = page.headers["Content-Security-Policy"]
+        assert "unsafe-inline" not in policy
+        script_nonce = re.search(r"script-src [^;]*'nonce-([A-Za-z0-9_-]+)'", policy)
+        style_nonce = re.search(r"style-src [^;]*'nonce-([A-Za-z0-9_-]+)'", policy)
+        assert script_nonce and style_nonce and script_nonce.group(1) == style_nonce.group(1)
+        html = page.get_data(as_text=True)
+        for tag in ("script", "style"):
+            inline = re.findall(rf"<{tag}\b[^>]*>(.*?)</{tag}>", html, re.DOTALL | re.IGNORECASE)
+            assert inline
+            for match in re.finditer(rf"<{tag}\b([^>]*)>(.*?)</{tag}>", html, re.DOTALL | re.IGNORECASE):
+                if tag == "script" and re.search(r"\bsrc=", match.group(1)):
+                    continue
+                assert f'nonce="{script_nonce.group(1)}"' in match.group(1)
+        assert not re.search(r"\s(?:style|onload)=", html)
+    assert csp != second.headers["Content-Security-Policy"]
+    redirect = client.get("/oauth2-redirect.html")
+    assert redirect.status_code == 200
+    assert "unsafe-inline" not in redirect.headers["Content-Security-Policy"]
+    assert "nonce=" in redirect.get_data(as_text=True)
+    assert " onload=" not in redirect.get_data(as_text=True)
+    assert client.get("/health").headers["Content-Security-Policy"] == (
+        "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    )

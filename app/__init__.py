@@ -1,7 +1,9 @@
 import hmac
 import os
+import re
 from importlib import import_module
 from pathlib import Path
+from secrets import token_urlsafe
 
 from dotenv import dotenv_values
 from flasgger import Swagger
@@ -322,11 +324,23 @@ def create_app(database_uri: str | None = None) -> Flask:
         response.headers["Content-Security-Policy"] = (
             "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
         )
-        if request.path == "/apidocs" or request.path.startswith(("/apidocs/", "/flasgger_static/")):
+        if (request.path == "/apidocs" or request.path.startswith(("/apidocs/", "/flasgger_static/"))
+                or request.endpoint == "flasgger.oauth_redirect"):
+            nonce = token_urlsafe(24)
+            if request.endpoint in ("flasgger.apidocs", "flasgger.oauth_redirect") and response.mimetype == "text/html":
+                html = response.get_data(as_text=True)
+                if request.endpoint == "flasgger.apidocs":
+                    html = html.replace('style="float: right;"', 'class="flasgger-footer-right"')
+                    html = html.replace("</style>", ".flasgger-footer-right { float: right; }\n</style>", 1)
+                else:
+                    html = html.replace(' onload="run()"', '')
+                    html = html.replace("</script>", 'window.addEventListener("load", run);\n</script>', 1)
+                html = re.sub(r"<(script|style)(?=[\s>])", lambda match: f'<{match.group(1)} nonce="{nonce}"', html, flags=re.IGNORECASE)
+                response.set_data(html)
             response.headers["Content-Security-Policy"] = (
                 "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; "
-                "script-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://unpkg.com; "
-                "style-src 'self' 'unsafe-inline' https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
+                f"script-src 'self' 'nonce-{nonce}' https://cdnjs.cloudflare.com https://unpkg.com; "
+                f"style-src 'self' 'nonce-{nonce}' https://cdnjs.cloudflare.com https://fonts.googleapis.com; "
                 "font-src 'self' https://fonts.gstatic.com https://cdnjs.cloudflare.com; "
                 "img-src 'self' data:"
             )
