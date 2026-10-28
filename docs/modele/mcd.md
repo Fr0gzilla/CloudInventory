@@ -50,6 +50,7 @@ erDiagram
         boolean duplicate_dns
         boolean duplicate_ip
         string meta_zone
+        string custom_fields
     }
     CONSOLIDATED_ASSET {
         int consolidated_asset_id PK
@@ -75,7 +76,7 @@ Les identifiants de liaison du dictionnaire sont représentés par les associati
 | --- | --- | --- |
 | RUN (RG1, RG7, RG19) | run_id : entier | run_status : énumération RUNNING/SUCCESS/FAIL ; started_at, finished_at : datetime ; matched_name_count, matched_fqdn_count, matched_ip_count, no_match_count : entier ; error_message : texte (non précisée). |
 | ASSET (RG2, RG7, RG21) | asset_id : entier | vm_id : texte à confirmer (non précisée) ; vm_name, fqdn, ip_reported, node : texte (non précisée) ; asset_type : énumération qemu/lxc ; asset_status, asset_tags : texte à confirmer (non précisée) ; asset_role, os, annotation : texte (non précisée) ; cpu, ram, disk, uptime : décimal, précision et unités à confirmer. |
-| IPAM_RECORD (RG3, RG8, RG24) | ipam_record_id : entier | ipam_ip, dns_name : texte (non précisée, doublons admis) ; ipam_status, ipam_tags : texte à confirmer (non précisée) ; tenant, site, meta_zone : texte (non précisée) ; duplicate_dns, duplicate_ip : booléen. |
+| IPAM_RECORD (RG3, RG8, RG24, RG35–RG36) | ipam_record_id : entier | ipam_ip, dns_name : texte (non précisée, doublons admis) ; ipam_status, ipam_tags : texte à confirmer (non précisée) ; tenant, site, meta_zone : texte (non précisée) ; custom_fields : objet JSON source facultatif (non précisée), NULL si absent ; duplicate_dns, duplicate_ip : booléen. |
 | CONSOLIDATED_ASSET (RG4, RG7, RG14, RG22) | consolidated_asset_id : entier | ip_final, dns_final, consolidated_role : texte (non précisée) ; status_final : texte à confirmer (non précisée) ; match_status : énumération MATCHED_NAME/MATCHED_FQDN/MATCHED_IP/NO_MATCH. |
 | ANOMALY (RG5, RG6) | anomaly_id : entier | anomaly_code : énumération NO_MATCH/MATCHED_IP/HOSTNAME_MISMATCH/STATUS_MISMATCH/DUPLICATE_DNS/DUPLICATE_IP ; anomaly_description : texte (non précisée) ; anomaly_date : datetime. |
 
@@ -104,7 +105,7 @@ Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché
 | --- | --- | --- |
 | RUN | entité, statut et compteurs | RG1, RG7, RG19, RG20, RG23 |
 | ASSET | entité, observation VM/CT et identité source | RG2, RG7, RG15, RG16, RG21 |
-| IPAM_RECORD | entité, observation autonome, doublons, zone et statut | RG3, RG8, RG17, RG18, RG24 |
+| IPAM_RECORD | entité, observation autonome, doublons, zone, custom fields et statut | RG3, RG7, RG8, RG17, RG18, RG24, RG35, RG36 |
 | CONSOLIDATED_ASSET | entité, instantané par run | RG4, RG7, RG9, RG10, RG14, RG22 |
 | ANOMALY | entité, codes et constat | RG5, RG6, RG11, RG12, RG13, RG17, RG18 |
 | observer_vm ; RUN (0,n), ASSET (1,1) | association et cardinalités | RG2, RG7, RG20 |
@@ -124,4 +125,5 @@ Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché
 - Q4 : unités et précision des quatre métriques à confirmer ; aucune conversion implicite (RG2).
 - Q5 : sens précis des quatre compteurs en cas de correspondances multiples ; une seule catégorie retenue par VM selon l'ordre RG9 (RG19).
 - Q6 : portée d'une anomalie de doublon par groupe ou par enregistrement à confirmer ; toutes les lignes IPAM sont conservées (RG17, RG18).
+- Q8 : forme et clés des custom fields NetBox à confirmer ; conserver l'objet complet de chaque observation, y compris sans VM correspondante (RG35). `meta_zone` reste l'attribut de zone existant, utilisé pour le filtre par run (RG36) ; aucune association nouvelle.
 - La contrainte « référence du même run » (RG4, RG5) traverse deux associations et doit être contrôlée au niveau logique ; le MCD ne lui attribue aucun champ supplémentaire.

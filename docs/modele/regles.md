@@ -35,6 +35,10 @@ RG31 [comportement] — La connexion API doit recevoir username et password et r
 RG32 [contrainte] — Toute route API autre que /api/login doit exiger un jeton Bearer valide. (§9.2, §10.2)
 RG33 [contrainte] — Les tentatives de connexion doivent être limitées. (§10, rubrique « Sécurité »)
 RG34 [contrainte] — Toute redirection next doit rester sur une URL interne. (§10, rubrique « Sécurité »)
+RG35 [structure] — Chaque observation IPAM doit conserver les custom fields NetBox reçus pour son run, y compris lorsqu’aucune VM ne lui correspond. (§16, EV07 ; RG03, RG07)
+RG36 [comportement] — L’exploration des observations IPAM doit permettre de filtrer par meta_zone sans confondre les runs. (§16, EV07 ; RG03, RG07)
+RG37 [contrainte] — Une évolution de la base doit préserver les données existantes sans recréer la base. (§23, EV59)
+RG38 [contrainte] — La description SQL du schéma et le modèle ORM doivent rester cohérents à chaque évolution du schéma. (§23, EV59)
 
 ## Dictionnaire des données
 Les longueurs non prescrites sont indiquées « non précisée » ; les types conceptuels n’imposent aucun format d’interface.
@@ -81,6 +85,7 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 | duplicate_dns | booléen | — | calculé après consolidation | §6.1, §7.4 |
 | duplicate_ip | booléen | — | calculé après consolidation | §6.1, §7.4 |
 | meta_zone | texte | non précisée | conservée même sans VM | §13.2 |
+| netbox_custom_fields | objet de valeurs (forme à confirmer) | non précisée | facultatif, instantané intégral par observation et par run ; Q8 | §16, EV07 ; RG35 |
 | consolidated_asset_id | entier | — | identifiant candidat | §6.1 |
 | consolidated_run_id | entier | — | obligatoire, référence run_id | §6.1, §8.5 |
 | consolidated_asset_ref | entier | — | obligatoire, référence asset_id du même run | §6.1, §8.5 |
@@ -108,6 +113,7 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Lancer un inventaire — Administrateur — RG19–RG20.
 - Consulter le tableau de bord — Administrateur — RG1, RG6.
 - Explorer et exporter l’inventaire — Administrateur — RG2–RG4, RG9.
+- Filtrer les observations IPAM par zone — Administrateur — RG36.
 - Consulter les runs et leurs anomalies — Administrateur — RG5–RG7.
 - Comparer deux runs — Administrateur — RG7, RG22.
 - Consulter la fiche et les métriques d’une VM — Administrateur — RG2, RG7.
@@ -127,3 +133,4 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Q5 — RG19 — Quels sont précisément les quatre compteurs si des correspondances multiples existent ? Par défaut, compter une seule catégorie de rapprochement par VM, suivant RG9.
 - Q6 — RG17, RG18 — Les anomalies de doublons portent-elles sur chaque enregistrement concerné ou une seule fois par groupe ? Par défaut, conserver tous les enregistrements et produire une anomalie par groupe, sans en perdre les membres.
 - Q7 — RG29 — Quel mécanisme de session et de stockage du compte administrateur utiliser au-delà des exigences du §10.1 ? Par défaut, ne pas créer d’entité supplémentaire parmi les cinq entités du §6.1 et réserver l’authentification au compte unique configuré.
+- Q8 — RG35 — Quels types et quelles clés autorise NetBox pour ses custom fields ? Par défaut, conserver l’objet JSON complet sans supposer de clés supplémentaires ; une valeur absente reste absente et est signalée, sans remplacer les données sources.
