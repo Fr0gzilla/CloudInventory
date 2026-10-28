@@ -1,0 +1,21 @@
+services:
+  app:
+    build: .
+    ports:
+      - "${APP_PORT:-5050}:5050"
+    environment:
+      SECRET_KEY: ${SECRET_KEY:-}
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-}
+      USE_MOCK_VIRT: "true"
+      USE_MOCK_IPAM: "true"
+      SESSION_COOKIE_SECURE: "false"
+    volumes:
+      - sqlite_data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5050/login', timeout=3)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+volumes:
+  sqlite_data:

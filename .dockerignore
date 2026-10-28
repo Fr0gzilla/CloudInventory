@@ -1,0 +1,11 @@
+.git
+.sdv
+.env*
+.venv
+venv
+__pycache__
+*.pyc
+*.db
+*.sqlite*
+exports
+tests
