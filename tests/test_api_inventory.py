@@ -229,7 +229,7 @@ def test_swagger_documents_inventory_routes_parameters_and_security(authorized):
         "/api/inventory": {"q", "status", "node", "type", "match", "tag", "meta_zone", "sort", "order", "page", "per_page"},
         "/api/inventory/export": {"q", "status", "node", "type", "match", "tag", "meta_zone", "sort", "order"},
         "/api/assets/{id}": {"id"},
-        "/api/anomalies": {"run_id", "code"},
+        "/api/anomalies": {"run_id", "code", "severity", "state"},
     }
     assert {path: ({param["name"] for param in paths[path]["get"]["parameters"]},
                    paths[path]["get"]["security"]) for path in expected} == {

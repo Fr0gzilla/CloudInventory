@@ -27,15 +27,42 @@ def _now() -> str:
 
 
 def _severity_for(code: str) -> str:
+    from app.inventory_api import ANOMALY_CODES
+
+    if code not in ANOMALY_CODES:
+        raise ValueError(f"Unclassified anomaly code: {code}")
     configured = json.loads(os.environ.get("ANOMALY_SEVERITIES", "{}"))
     if not isinstance(configured, dict):
         raise TypeError("Invalid anomaly severities configuration")
+    if any(key not in ANOMALY_CODES for key in configured):
+        raise ValueError("Invalid anomaly severities configuration")
     severity = configured.get(code, "info")
     if severity not in (
         "info", "mineure", "majeure", "critique"
     ):
         raise ValueError(f"No valid anomaly severity configured for {code}")
     return severity
+
+
+def _tracked_anomaly(run_id: int, code: str, description: str,
+                     asset: Asset | None = None, ipam: IpamRecord | None = None) -> Anomaly:
+    if asset is not None:
+        target = asset.vm_id
+    elif code == "DUPLICATE_DNS" and ipam is not None:
+        target = normalize(ipam.dns_name)
+    elif code == "DUPLICATE_IP" and ipam is not None:
+        target = ipam.ip
+    else:
+        target = None
+    key = json.dumps([code, target]) if target else None
+    previous = (Anomaly.query.filter_by(tracking_key=key).order_by(Anomaly.id.desc()).first()
+                if key else None)
+    state = previous.state if previous and previous.state != "résolue" else "ouverte"
+    return Anomaly(run_id=run_id, asset_id=asset.id if asset else None,
+                   ipam_record_id=ipam.id if ipam else None, code=code,
+                   description=description, created_at=_now(), severity=_severity_for(code),
+                   tracking_key=key, state=state,
+                   state_changed_at=previous.state_changed_at if state == "acquittée" else None)
 
 
 def run_inventory(
@@ -145,12 +172,7 @@ def _run_inventory(
                     [renamed_by_vm[observation["vm_id"]]] if observation["vm_id"] in renamed_by_vm else []
                 ):
                     anomaly_count += 1
-                    db.session.add(Anomaly(
-                        run_id=run.id, asset_id=asset.id,
-                        ipam_record_id=ipam.id if ipam else None,
-                        code=anomaly["code"], description=anomaly["description"],
-                        created_at=_now(), severity=_severity_for(anomaly["code"]),
-                    ))
+                    db.session.add(_tracked_anomaly(run.id, anomaly["code"], anomaly["description"], asset, ipam))
                     db.session.flush()
             completed(5)
 
@@ -164,13 +186,17 @@ def _run_inventory(
                 anomaly_count += 1
                 ipam_observation = cast(IpamObservation, anomaly["ipam_record"])
                 ipam = stored_ipam[(ipam_observation.get("ip"), ipam_observation.get("dns_name"))]
-                db.session.add(Anomaly(
-                    run_id=run.id, ipam_record_id=ipam.id,
-                    code=anomaly["code"], description=anomaly["description"],
-                    created_at=_now(), severity=_severity_for(anomaly["code"]),
-                ))
+                db.session.add(_tracked_anomaly(run.id, anomaly["code"], anomaly["description"], ipam=ipam))
                 db.session.flush()
             completed(6)
+
+            if previous:
+                current_keys = {key for (key,) in db.session.query(Anomaly.tracking_key)
+                                .filter(Anomaly.run_id == run.id, Anomaly.tracking_key.is_not(None))}
+                for old in Anomaly.query.filter_by(run_id=previous.id, state="acquittée").all():
+                    if old.tracking_key and old.tracking_key not in current_keys:
+                        old.state = "résolue"
+                        old.state_changed_at = _now()
 
             run.status = "SUCCESS"
             run.finished_at = _now()

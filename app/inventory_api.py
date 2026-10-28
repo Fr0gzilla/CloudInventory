@@ -1,5 +1,6 @@
 import csv
 import io
+from datetime import UTC, datetime
 
 from flask import Response, jsonify, request
 from sqlalchemy import or_
@@ -24,7 +25,7 @@ SORT_COLUMNS = {
 MATCH_CODES = {"MATCHED_NAME", "MATCHED_FQDN", "MATCHED_IP", "NO_MATCH"}
 ANOMALY_CODES = {
     "NO_MATCH", "MATCHED_IP", "HOSTNAME_MISMATCH", "STATUS_MISMATCH",
-    "DUPLICATE_DNS", "DUPLICATE_IP",
+    "DUPLICATE_DNS", "DUPLICATE_IP", "RENAMED",
 }
 
 
@@ -232,7 +233,9 @@ def configure_inventory_api(app):
         security: [{Bearer: []}]
         parameters:
           - {in: query, name: run_id, type: integer, minimum: 1, description: Default latest run}
-          - {in: query, name: code, type: string, enum: [NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS, DUPLICATE_IP]}
+          - {in: query, name: code, type: string, enum: [NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS, DUPLICATE_IP, RENAMED]}
+          - {in: query, name: severity, type: string, enum: [info, mineure, majeure, critique]}
+          - {in: query, name: state, type: string, enum: [ouverte, acquittée, résolue]}
         responses:
           200:
             description: Anomalies of the selected run
@@ -245,8 +248,12 @@ def configure_inventory_api(app):
           401: {description: Missing or invalid Bearer token}
         """
         if (any(len(request.args.getlist(key)) != 1 for key in request.args) or
-                any(key not in ("run_id", "code") for key in request.args) or
-                (request.args.get("code") and request.args["code"] not in ANOMALY_CODES)):
+                any(key not in ("run_id", "code", "severity", "state") for key in request.args) or
+                ("code" in request.args and request.args["code"] not in ANOMALY_CODES) or
+                ("severity" in request.args and request.args["severity"] not in
+                 ("info", "mineure", "majeure", "critique")) or
+                ("state" in request.args and request.args["state"] not in
+                 ("ouverte", "acquittée", "résolue"))):
             return jsonify(error="Invalid anomaly filter"), 400
         run = Run.query.order_by(Run.id.desc()).first()
         run_id = _integer(request.args["run_id"]) if "run_id" in request.args else (run.id if run else None)
@@ -255,11 +262,49 @@ def configure_inventory_api(app):
         query = Anomaly.query.filter_by(run_id=run_id) if run_id is not None else Anomaly.query.filter(False)
         if request.args.get("code"):
             query = query.filter_by(code=request.args["code"])
+        if "severity" in request.args:
+            query = query.filter_by(severity=request.args["severity"])
+        if "state" in request.args:
+            query = query.filter_by(state=request.args["state"])
         return jsonify(run_id=run_id, items=[{key: getattr(a, key) for key in (
             "id", "run_id", "asset_id", "ipam_record_id", "code", "description", "created_at",
+            "tracking_key", "state", "state_changed_at", "severity",
         )} for a in query.order_by(Anomaly.id).all()])
+
+    def change_anomaly(id, action):
+        if request.content_length and request.content_length > 1024:
+            return jsonify(error="Invalid anomaly transition"), 400
+        if request.data or request.args:
+            return jsonify(error="Invalid anomaly transition"), 400
+        anomaly = db.session.get(Anomaly, id)
+        if anomaly is None:
+            return jsonify(error="Anomaly not found"), 404
+        if anomaly.tracking_key:
+            latest = (Anomaly.query.filter_by(tracking_key=anomaly.tracking_key)
+                      .order_by(Anomaly.id.desc()).first())
+            if latest.id != anomaly.id:
+                return jsonify(error="Invalid anomaly transition"), 409
+        expected, target = (("ouverte", "acquittée") if action == "acknowledge"
+                            else ("acquittée", "résolue"))
+        if anomaly.state != expected:
+            return jsonify(error="Invalid anomaly transition"), 409
+        anomaly.state = target
+        anomaly.state_changed_at = datetime.now(UTC).isoformat()
+        duration = None
+        if target == "résolue":
+            first = (Anomaly.query.filter_by(tracking_key=anomaly.tracking_key)
+                     .order_by(Anomaly.id).first() if anomaly.tracking_key else anomaly)
+            duration = (datetime.fromisoformat(anomaly.state_changed_at) -
+                        datetime.fromisoformat(first.created_at)).total_seconds()
+        db.session.commit()
+        return jsonify(id=anomaly.id, state=anomaly.state, state_changed_at=anomaly.state_changed_at,
+                       resolution_seconds=duration)
 
     app.add_url_rule("/api/inventory", endpoint="api.inventory", view_func=inventory)
     app.add_url_rule("/api/inventory/export", endpoint="api.inventory_export", view_func=export)
     app.add_url_rule("/api/assets/<int:id>", endpoint="api.asset_detail", view_func=asset_detail)
     app.add_url_rule("/api/anomalies", endpoint="api.anomalies", view_func=anomalies)
+    app.add_url_rule("/api/anomalies/<int:id>/acknowledge", endpoint="api.acknowledge_anomaly",
+                     view_func=lambda id: change_anomaly(id, "acknowledge"), methods=["POST"])
+    app.add_url_rule("/api/anomalies/<int:id>/resolve", endpoint="api.resolve_anomaly",
+                     view_func=lambda id: change_anomaly(id, "resolve"), methods=["POST"])
