@@ -41,7 +41,7 @@ def test_api_login_rejects_unicode_username_without_server_error(api_app, userna
     assert (response.status_code, response.get_json()) == (401, {"error": "Invalid credentials"})
 
 
-def test_unicode_api_failures_limit_web_login(api_app):
+def test_unicode_api_failures_do_not_limit_admin_web_login(api_app):
     app, credentials = api_app
     client = app.test_client()
     client.get("/login")
@@ -55,7 +55,7 @@ def test_unicode_api_failures_limit_web_login(api_app):
     response = client.post(
         "/login", data={"username": "admin", "password": credentials["ADMIN_PASSWORD"], "csrf_token": csrf}
     )
-    assert response.status_code == 429
+    assert response.status_code == 302
 
 
 @pytest.mark.parametrize("body", [None, [], {"username": "admin"}, {"username": 3, "password": "wrong"}])

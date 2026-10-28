@@ -6,24 +6,25 @@ import pytest
 from test_auth import auth_app
 
 
-@pytest.mark.parametrize("channel", ["web", "api"])
-def test_simultaneous_requests_from_one_source_admit_at_most_five(auth_app, channel):
+@pytest.mark.parametrize("channel", ["web", "api", "mixed"])
+@pytest.mark.parametrize("username", ["admin", "someone-else"])
+def test_simultaneous_requests_from_one_source_admit_at_most_five(auth_app, channel, username):
     app, _ = auth_app
     participants = 12
     gate = Barrier(participants, timeout=15)
 
     def attempt(_):
         client = app.test_client()
-        if channel == "web":
+        if channel == "web" or (channel == "mixed" and _ % 2 == 0):
             client.get("/login")
             with client.session_transaction() as session:
                 csrf = session["csrf_token"]
         gate.wait(timeout=15)
-        if channel == "web":
-            response = client.post("/login", data={"username": "admin", "password": "incorrect", "csrf_token": csrf},
+        if channel == "web" or (channel == "mixed" and _ % 2 == 0):
+            response = client.post("/login", data={"username": username, "password": "incorrect", "csrf_token": csrf},
                                    environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
         else:
-            response = client.post("/api/login", json={"username": "admin", "password": "incorrect"},
+            response = client.post("/api/login", json={"username": username, "password": "incorrect"},
                                    environ_overrides={"REMOTE_ADDR": "192.0.2.10"})
         return response.status_code
 

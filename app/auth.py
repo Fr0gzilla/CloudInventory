@@ -1,13 +1,25 @@
 import hmac
 import logging
+import math
 import secrets
 import time
+import unicodedata
 from threading import Lock
 from urllib.parse import urlsplit
 
 from argon2 import PasswordHasher
 from argon2.exceptions import InvalidHashError, VerificationError
-from flask import Blueprint, abort, redirect, render_template, request, session, url_for
+from flask import (
+    Blueprint,
+    abort,
+    g,
+    make_response,
+    redirect,
+    render_template,
+    request,
+    session,
+    url_for,
+)
 from flask_login import UserMixin, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash
 
@@ -15,7 +27,13 @@ from . import login_manager
 
 security_log = logging.getLogger("security.auth")
 security_log.setLevel(logging.INFO)
-security_log.addHandler(logging.StreamHandler())
+if not any(getattr(handler, "_cloudinventory_auth", False) for handler in security_log.handlers):
+    handler = logging.StreamHandler()
+    handler._cloudinventory_auth = True
+    formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s", "%Y-%m-%dT%H:%M:%SZ")
+    formatter.converter = time.gmtime
+    handler.setFormatter(formatter)
+    security_log.addHandler(handler)
 
 
 class Admin(UserMixin):
@@ -76,18 +94,29 @@ def configure_auth(app, username, password):
 
     def authenticate(supplied_user, supplied_password, channel="web"):
         nonlocal password_hash
-        key = request.remote_addr or "unknown"
+        ip = request.remote_addr or "unknown"
+        valid_user = hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
+                                         username.encode("utf-8", errors="surrogatepass"))
+        normalized_user = unicodedata.normalize("NFKC", supplied_user).strip().casefold()[:128]
+        bucket = (ip, "admin") if valid_user else (ip, "other", normalized_user)
+        others = (ip, "others")
         with attempts_lock:
             now = time.monotonic()
-            for ip, entry in list(attempts.items()):
-                if now - entry[0] >= window:
-                    del attempts[ip]
-            started, count = attempts.get(key, (now, 0))
-            if count >= limit:
-                security_log.warning("auth result=limited channel=%s ip=%s", channel, key)
+            for entry_key, entry in list(attempts.items()):
+                if entry_key[1] != "admin" and now - entry[0] >= window:
+                    del attempts[entry_key]
+            if valid_user:
+                started, count, next_at = attempts.get(bucket, (now, 0, now))
+                remaining = next_at - now if count >= limit else 0
+            else:
+                started, count = attempts.get(bucket, (now, 0))
+                global_started, global_count = attempts.get(others, (now, 0))
+                remaining = max((started + window - now if count >= limit else 0),
+                                (global_started + window - now if global_count >= 20 else 0))
+            if remaining > 0:
+                g.auth_retry_after = max(1, math.ceil(remaining))
+                security_log.warning("auth result=limited channel=%s ip=%s", channel, ip)
                 return "limited"
-            valid_user = hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
-                                             username.encode("utf-8", errors="surrogatepass"))
             if password_hash.startswith("$argon2"):
                 try:
                     valid_password = hasher.verify(password_hash, supplied_password)
@@ -96,13 +125,19 @@ def configure_auth(app, username, password):
             else:
                 valid_password = check_password_hash(password_hash, supplied_password)
             if not (valid_user and valid_password):
-                attempts[key] = (started, count + 1)
-                security_log.warning("auth result=invalid channel=%s ip=%s", channel, key)
+                if valid_user:
+                    failures = count + 1
+                    delay = min(900, 30 * 2 ** min(max(0, failures - limit), 5)) if failures >= limit else 0
+                    attempts[bucket] = (started, failures, now + delay)
+                else:
+                    attempts[bucket] = (started, count + 1)
+                    attempts[others] = (global_started, global_count + 1)
+                security_log.warning("auth result=invalid channel=%s ip=%s", channel, ip)
                 return "invalid"
             if not password_hash.startswith("$argon2") or hasher.check_needs_rehash(password_hash):
                 password_hash = hasher.hash(supplied_password)
-            attempts.pop(key, None)
-            security_log.info("auth result=success channel=%s ip=%s", channel, key)
+            attempts.pop(bucket, None)
+            security_log.info("auth result=success channel=%s ip=%s", channel, ip)
             return None
 
     @login_page.route("/login", methods=["GET", "POST"])
@@ -124,7 +159,9 @@ def configure_auth(app, username, password):
             abort(400)
         result = authenticate(supplied_user, supplied_password)
         if result == "limited":
-            abort(429)
+            response = make_response("Too Many Requests", 429)
+            response.headers["Retry-After"] = str(g.auth_retry_after)
+            return response
         if result == "invalid":
             return render_template("login.html", next=destination, csrf_token=expected, error=True), 401
         session.clear()
