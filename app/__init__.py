@@ -236,6 +236,8 @@ def create_app(database_uri: str | None = None) -> Flask:
         if not value or value == "change-me":
             raise ValueError(key)
         secrets[key] = value
+    if len(secrets["ADMIN_PASSWORD"]) < 12:
+        raise ValueError("ADMIN_PASSWORD must be at least 12 characters")
 
     app = Flask(__name__)
     password = secrets.pop("ADMIN_PASSWORD")

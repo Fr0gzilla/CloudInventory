@@ -3,9 +3,11 @@ import secrets
 import time
 from urllib.parse import urlsplit
 
+from argon2 import PasswordHasher
+from argon2.exceptions import InvalidHashError, VerificationError
 from flask import Blueprint, abort, redirect, render_template, request, session, url_for
 from flask_login import UserMixin, login_required, login_user, logout_user
-from werkzeug.security import check_password_hash, generate_password_hash
+from werkzeug.security import check_password_hash
 
 from . import login_manager
 
@@ -29,8 +31,11 @@ def internal_next(value):
 def configure_auth(app, username, password):
     if not isinstance(username, str) or not username or len(username) > 128:
         raise ValueError("ADMIN_USERNAME")
+    if not isinstance(password, str) or len(password) < 12:
+        raise ValueError("ADMIN_PASSWORD must be at least 12 characters")
     login_page = Blueprint("login_page", __name__)
-    password_hash = generate_password_hash(password)
+    hasher = PasswordHasher()
+    password_hash = hasher.hash(password)
     attempts = {}
     limit = 5
     window = 900
@@ -50,6 +55,7 @@ def configure_auth(app, username, password):
         return Admin() if user_id == "admin" else None
 
     def authenticate(supplied_user, supplied_password):
+        nonlocal password_hash
         key = request.remote_addr or "unknown"
         now = time.monotonic()
         for ip, state in list(attempts.items()):
@@ -58,11 +64,20 @@ def configure_auth(app, username, password):
         started, count = attempts.get(key, (now, 0))
         if count >= limit:
             return "limited"
-        if not (hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
-                                    username.encode("utf-8", errors="surrogatepass")) and
-                check_password_hash(password_hash, supplied_password)):
+        valid_user = hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
+                                         username.encode("utf-8", errors="surrogatepass"))
+        if password_hash.startswith("$argon2"):
+            try:
+                valid_password = hasher.verify(password_hash, supplied_password)
+            except (InvalidHashError, VerificationError):
+                valid_password = False
+        else:
+            valid_password = check_password_hash(password_hash, supplied_password)
+        if not (valid_user and valid_password):
             attempts[key] = (started, count + 1)
             return "invalid"
+        if not password_hash.startswith("$argon2") or hasher.check_needs_rehash(password_hash):
+            password_hash = hasher.hash(supplied_password)
         attempts.pop(key, None)
         return None
 
