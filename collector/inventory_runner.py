@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 from typing import cast
 
 from app import db
+from app.anomaly_exceptions import anomaly_coverage
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 from app.notifications import notify_anomalies
 from collector.anomalies import duplicate_anomalies, match_anomalies, renamed_anomalies
@@ -282,6 +283,9 @@ def _run_inventory(
             "no_match_count": counts["NO_MATCH"],
         })
         db.session.rollback()
-        notify_anomalies(run_id, anomaly_count, finished_at)
+        rows = Anomaly.query.filter_by(run_id=run_id).all()
+        coverage = anomaly_coverage(rows)
+        notify_anomalies(run_id, sum(coverage[row.id] is None for row in rows), finished_at)
+        db.session.rollback()
     purge_old_runs()
     return result

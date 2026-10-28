@@ -187,6 +187,9 @@ def test_registers_blueprints_at_expected_prefixes(valid_secrets):
                  ("web.run_page", "/runs/<int:id>"),
                  ("web.run_compare_page", "/runs/compare"),
                  ("web.anomalies_page", "/anomalies"),
+                 ("web.anomaly_action", "/anomalies/<int:id>/<action>"),
+                 ("web.add_anomaly_exception", "/anomaly-exceptions"),
+                 ("web.remove_anomaly_exception", "/anomaly-exceptions/<int:id>/delete"),
                  ("web.asset_page", "/assets/<int:id>"),
             }
 
@@ -205,11 +208,11 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
     assert all(endpoint in {"web.health", "web.index", "web.dashboard_data", "web.dashboard_run", "web.run_status", "web.inventory_page", "web.inventory_data", "web.inventory_export",
-                             "web.runs_page", "web.run_page", "web.run_compare_page", "web.anomalies_page", "web.asset_page",
+                             "web.runs_page", "web.run_page", "web.run_compare_page", "web.anomalies_page", "web.anomaly_action", "web.add_anomaly_exception", "web.remove_anomaly_exception", "web.asset_page",
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
                              "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
-                             "api.acknowledge_anomaly", "api.resolve_anomaly"}
+                              "api.acknowledge_anomaly", "api.resolve_anomaly", "api.anomaly_exceptions", "api.delete_anomaly_exception"}
                or endpoint.startswith("flasgger.")
                for _, endpoint in routes)
 

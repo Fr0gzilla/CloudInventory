@@ -163,7 +163,7 @@ def test_anomalies_default_to_latest_run_and_render_rows(client):
     anomaly(latest, "MATCHED_IP", "latest only")
     response = client.get("/anomalies")
     assert response.status_code == 200
-    assert page(response).rows[1:] == [["MATCHED_IP", "latest only", "—", "—", "2026-01-01"]]
+    assert page(response).rows[1:] == [["MATCHED_IPCible indisponible", "latest only", "—", "—", "2026-01-01", "ouverte ; non couverte", "Acquitter"]]
 
 
 def test_anomalies_run_and_code_filters_isolate_rows(client):
@@ -172,7 +172,7 @@ def test_anomalies_run_and_code_filters_isolate_rows(client):
     anomaly(latest, "NO_MATCH", "latest matching code")
     anomaly(latest, "MATCHED_IP", "latest other code")
     response = client.get(f"/anomalies?run_id={latest.id}&code=NO_MATCH")
-    assert page(response).rows[1:] == [["NO_MATCH", "latest matching code", "—", "—", "2026-01-01"]]
+    assert page(response).rows[1:] == [["NO_MATCHCible indisponible", "latest matching code", "—", "—", "2026-01-01", "ouverte ; non couverte", "Acquitter"]]
 
 
 def test_anomalies_unknown_run_reports_error(client):

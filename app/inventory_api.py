@@ -1,10 +1,17 @@
 import csv
 import io
+import json
 from datetime import UTC, datetime
 
 from flask import Response, jsonify, request
 from sqlalchemy import or_
 
+from app.anomaly_exceptions import (
+    anomaly_coverage,
+    create_exception,
+    delete_exception,
+    list_exceptions,
+)
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 
 from . import db
@@ -266,10 +273,36 @@ def configure_inventory_api(app):
             query = query.filter_by(severity=request.args["severity"])
         if "state" in request.args:
             query = query.filter_by(state=request.args["state"])
-        return jsonify(run_id=run_id, items=[{key: getattr(a, key) for key in (
+        rows = query.order_by(Anomaly.id).all()
+        coverage = anomaly_coverage(rows)
+        return jsonify(run_id=run_id, items=[{**{key: getattr(a, key) for key in (
             "id", "run_id", "asset_id", "ipam_record_id", "code", "description", "created_at",
             "tracking_key", "state", "state_changed_at", "severity",
-        )} for a in query.order_by(Anomaly.id).all()])
+        )}, "target": json.loads(a.tracking_key)[1] if a.tracking_key else None,
+            "covered": coverage[a.id] is not None, "exception_id": coverage[a.id]}
+            for a in rows])
+
+    def exceptions():
+        if request.method == "GET":
+            if request.args:
+                return jsonify(error="Invalid exception"), 400
+            return jsonify(items=list_exceptions())
+        if (request.content_length is not None and request.content_length > 4096 or
+                request.mimetype != "application/json" or request.args):
+            return jsonify(error="Invalid exception"), 400
+        data = request.get_json(silent=True)
+        try:
+            row = create_exception(data)
+        except ValueError:
+            return jsonify(error="Invalid exception"), 400
+        return jsonify(row), 201
+
+    def remove_exception(id):
+        if request.args or request.data:
+            return jsonify(error="Invalid exception"), 400
+        if not delete_exception(id):
+            return jsonify(error="Exception not found"), 404
+        return "", 204
 
     def change_anomaly(id, action):
         if request.content_length and request.content_length > 1024:
@@ -304,6 +337,10 @@ def configure_inventory_api(app):
     app.add_url_rule("/api/inventory/export", endpoint="api.inventory_export", view_func=export)
     app.add_url_rule("/api/assets/<int:id>", endpoint="api.asset_detail", view_func=asset_detail)
     app.add_url_rule("/api/anomalies", endpoint="api.anomalies", view_func=anomalies)
+    app.add_url_rule("/api/anomaly-exceptions", endpoint="api.anomaly_exceptions",
+                     view_func=exceptions, methods=["GET", "POST"])
+    app.add_url_rule("/api/anomaly-exceptions/<int:id>", endpoint="api.delete_anomaly_exception",
+                     view_func=remove_exception, methods=["DELETE"])
     app.add_url_rule("/api/anomalies/<int:id>/acknowledge", endpoint="api.acknowledge_anomaly",
                      view_func=lambda id: change_anomaly(id, "acknowledge"), methods=["POST"])
     app.add_url_rule("/api/anomalies/<int:id>/resolve", endpoint="api.resolve_anomaly",

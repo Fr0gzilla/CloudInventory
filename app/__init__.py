@@ -15,10 +15,13 @@ from flask import (
     Flask,
     abort,
     current_app,
+    flash,
     jsonify,
     render_template,
     request,
+    redirect,
     session,
+    url_for,
 )
 from flask_jwt_extended import JWTManager, verify_jwt_in_request
 from flask_login import LoginManager, current_user, login_required
@@ -183,6 +186,9 @@ def run_compare_page():
 @web.get("/anomalies")
 @login_required
 def anomalies_page():
+    import json
+
+    from .anomaly_exceptions import anomaly_coverage, list_exceptions
     from .inventory_api import ANOMALY_CODES, _integer
     from .models import Anomaly, Run
 
@@ -205,9 +211,63 @@ def anomalies_page():
     if selected_code in ANOMALY_CODES:
         query = query.filter_by(code=selected_code)
     anomalies = query.order_by(Anomaly.id).all() if error is None else []
+    coverage = anomaly_coverage(anomalies)
+    targets = {row.id: json.loads(row.tracking_key)[1] if row.tracking_key else None
+               for row in anomalies}
     return render_template("anomalies.html", runs=runs, selected_id=selected_id,
-                           selected_code=selected_code if not error else "",
-                           codes=sorted(ANOMALY_CODES), anomalies=anomalies, error=error)
+                            selected_code=selected_code if not error else "",
+                            codes=sorted(ANOMALY_CODES), anomalies=anomalies, error=error,
+                            coverage=coverage, targets=targets, exceptions=list_exceptions())
+
+
+def _anomalies_return():
+    from .inventory_api import ANOMALY_CODES
+    from .models import Run
+
+    run_id = request.form.get("run_id", "")
+    code = request.form.get("filter_code", "")
+    if run_id.isdecimal() and db.session.get(Run, int(run_id)) and code in ("", *ANOMALY_CODES):
+        return redirect(url_for("web.anomalies_page", run_id=run_id, code=code))
+    return redirect(url_for("web.anomalies_page"))
+
+
+@web.post("/anomalies/<int:id>/<action>")
+@login_required
+def anomaly_action(id, action):
+    if action not in ("acknowledge", "resolve"):
+        abort(404)
+    result = current_app.view_functions[f"api.{action}_anomaly"](id)
+    status = result[1] if isinstance(result, tuple) else 200
+    flash("État de l'anomalie mis à jour." if status == 200 else
+          "Transition impossible : anomalie absente, ancienne ou dans un état incompatible.",
+          "success" if status == 200 else "danger")
+    return _anomalies_return()
+
+
+@web.post("/anomaly-exceptions")
+@login_required
+def add_anomaly_exception():
+    from .anomaly_exceptions import create_exception
+
+    try:
+        create_exception({key: request.form.get(key) for key in
+                          ("code", "target", "justification", "expires_at")})
+    except ValueError:
+        flash("Exception invalide : vérifier la cible, la justification et la date future avec fuseau horaire.", "danger")
+    else:
+        flash("Exception créée.", "success")
+    return _anomalies_return()
+
+
+@web.post("/anomaly-exceptions/<int:id>/delete")
+@login_required
+def remove_anomaly_exception(id):
+    from .anomaly_exceptions import delete_exception
+
+    deleted = delete_exception(id)
+    flash("Exception supprimée." if deleted else "Exception introuvable.",
+          "success" if deleted else "danger")
+    return _anomalies_return()
 
 
 @web.get("/assets/<int:id>")
@@ -348,7 +408,11 @@ def create_app(database_uri: str | None = None) -> Flask:
         from .models import Anomaly, Run
 
         latest_run = Run.query.filter_by(status="SUCCESS").order_by(Run.id.desc()).first()
-        anomaly_count = Anomaly.query.filter_by(run_id=latest_run.id).count() if latest_run else 0
+        from .anomaly_exceptions import anomaly_coverage
+
+        rows = Anomaly.query.filter_by(run_id=latest_run.id).all() if latest_run else []
+        coverage = anomaly_coverage(rows)
+        anomaly_count = sum(row.state != "résolue" and coverage[row.id] is None for row in rows)
         return {"latest_anomaly_run": latest_run, "latest_anomaly_count": anomaly_count}
 
     @app.before_request
