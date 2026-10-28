@@ -121,9 +121,18 @@ def run_page(id):
 @login_required
 def run_compare_page():
     from .api import _positive_integer
-    from .models import Anomaly, Run
+    from .models import Anomaly
 
-    runs = Run.query.order_by(Run.id.desc()).all()
+    runs = []
+    page = 1
+    while True:
+        with current_app.test_request_context("/api/runs", query_string={"page": page, "per_page": 100}):
+            run_page_data = current_app.view_functions["api.runs"]().get_json()
+        runs.extend(run_page_data["items"])
+        if len(runs) >= run_page_data["total"]:
+            break
+        page += 1
+    run_ids = {run["id"] for run in runs}
     comparison = None
     error = None
     old_id = new_id = None
@@ -136,7 +145,7 @@ def run_compare_page():
             new_id = _positive_integer(request.args.get("to"))
             if old_id is None or new_id is None or old_id == new_id:
                 error = "Sélection invalide : choisissez deux runs distincts."
-            elif db.session.get(Run, old_id) is None or db.session.get(Run, new_id) is None:
+            elif old_id not in run_ids or new_id not in run_ids:
                 error = "Run inconnu : choisissez un run disponible."
             else:
                 comparison = current_app.view_functions["api.compare_runs"]().get_json()

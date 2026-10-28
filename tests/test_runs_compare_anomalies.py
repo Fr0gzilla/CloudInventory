@@ -218,3 +218,75 @@ def test_navigation_links_reach_both_pages(client, path):
 def test_pages_keep_csp_and_no_inline_scripts(client, path):
     response = client.get(path)
     assert response.headers.get("Content-Security-Policy") and "<script>" not in response.get_data(as_text=True)
+
+
+class RunSelectors(HTMLParser):
+    def __init__(self):
+        super().__init__()
+        self.options = {"from": [], "to": []}
+        self.current = None
+
+    def handle_starttag(self, tag, attrs):
+        attrs = dict(attrs)
+        if tag == "select":
+            self.current = attrs.get("name")
+        elif tag == "option" and self.current in self.options:
+            self.options[self.current].append((attrs.get("value"), "selected" in attrs))
+
+    def handle_endtag(self, tag):
+        if tag == "select":
+            self.current = None
+
+
+def selectors(response):
+    parsed = RunSelectors()
+    parsed.feed(response.get_data(as_text=True))
+    return parsed.options
+
+
+def test_comparison_selectors_list_every_run_beyond_first_api_page(client):
+    for _ in range(102):
+        run()
+    ids = {str(item.id) for item in db.session.query(Run.id).all()}
+    options = selectors(client.get("/runs/compare"))
+    assert {name: {value for value, _ in entries if value} for name, entries in options.items()} == {
+        "from": ids, "to": ids,
+    }
+
+
+def test_comparison_selected_runs_remain_selected_and_are_compared(client):
+    first, second, third = run(), run(), run()
+    asset(first, "removed", "before", "10.0.0.1")
+    asset(third, "added", "after", "10.0.0.3")
+    response = client.get(f"/runs/compare?from={first.id}&to={third.id}")
+    options = selectors(response)
+    assert ({value for value, selected in options["from"] if selected},
+            {value for value, selected in options["to"] if selected},
+            [row[0] for row in page(response).rows if row and row[0] in ("removed", "added")]) == (
+                {str(first.id)}, {str(third.id)}, ["added", "removed"])
+
+
+@pytest.mark.parametrize("query,expected", [
+    ("from=1&to=1", "Sélection invalide : choisissez deux runs distincts."),
+    ("from=1&to=999999", "Run inconnu : choisissez un run disponible."),
+])
+def test_comparison_invalid_selection_has_explicit_alert(client, query, expected):
+    run()
+    response = client.get(f"/runs/compare?{query}")
+    assert page(response).alerts == [expected]
+
+
+def test_comparison_run_listing_and_validation_use_api_not_run_orm(client, monkeypatch):
+    from flask import jsonify
+
+    first = run()
+    calls = []
+
+    def listed_runs():
+        calls.append(True)
+        return jsonify(items=[{"id": first.id, "started_at": first.started_at},
+                              {"id": 999999, "started_at": "2026-01-01"}], total=2)
+
+    monkeypatch.setitem(client.application.view_functions, "api.runs", listed_runs)
+    response = client.get(f"/runs/compare?from={first.id}&to=888888")
+    assert calls and {value for value, _ in selectors(response)["to"]} == {"", str(first.id), "999999"} and page(response).alerts == ["Run inconnu : choisissez un run disponible."]
