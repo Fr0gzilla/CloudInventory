@@ -41,6 +41,7 @@ Les cinq ensembles sont `run`, `asset`, `ipam_record`, `consolidated_asset` et `
 | ipam_record | duplicate_dns | INTEGER | NON NULL | indicateur calculé, 0/1 |
 | ipam_record | duplicate_ip | INTEGER | NON NULL | indicateur calculé, 0/1 |
 | ipam_record | meta_zone | TEXT | NULL | zone IPAM source |
+| ipam_record | custom_fields | TEXT (JSON) | NULL | ajout EV07 : objet NetBox complet, sérialisation JSON sans perte ; NULL si non fourni, objet vide distinct ; instantané de chaque run ; aucune clé arbitraire imposée |
 | consolidated_asset | id | INTEGER | NON NULL | identité interne du résultat |
 | consolidated_asset | run_id | INTEGER | NON NULL | exécution du résultat |
 | consolidated_asset | asset_id | INTEGER | NON NULL | VM observée dans ce run |
@@ -59,3 +60,8 @@ Les cinq ensembles sont `run`, `asset`, `ipam_record`, `consolidated_asset` et `
 | anomaly | created_at | TEXT | NON NULL | date du constat |
 
 Décisions à confirmer avant schéma SQL : format réel de vm_id et unicité intra-run, unités des métriques, vocabulaires des états, sérialisation des tags, portée des anomalies de doublons et statut final. Aucun champ source inconnu n’est remplacé par une valeur fictive.
+
+## Contrat EV07/EV59 et baseline SQL–ORM
+
+- `ipam_record.meta_zone TEXT NULL` existe dans le SQL et l’ORM ; `collector/netbox.py` extrait déjà `custom_fields.meta_zone` mais écarte les autres champs. Le SQL cible contient `ipam_record.custom_fields TEXT NULL` (JSON sérialisé) et l’index `idx_ipam_run_zone` sur `(run_id, meta_zone)` pour filtrer les observations par zone dans un run ; ces deux ajouts sont absents de l’ORM et restent à y reporter. La zone manquante reste NULL ; ni unicité ni valeur par défaut fabriquée. La forme et le vocabulaire des custom fields restent ouverts (Q8). Voir `baseline-sql-orm.md`, « Évolution additive et écart temporaire ».
+- La baseline SQL ↔ ORM avant EV07 comporte cinq tables `run`, `asset`, `ipam_record`, `consolidated_asset`, `anomaly`, avec les mêmes colonnes, nullabilités, CHECK et FK composites ; les identifiants `INTEGER PRIMARY KEY` SQL correspondent aux PK ORM `nullable=True` (SQLite attribue les identifiants). Les quatorze index conservés, les contraintes `UNIQUE(id, run_id)` d’asset et d’ipam_record, `UNIQUE(asset_id, run_id)` du consolidé et les six codes d’anomalie sont détaillés dans `baseline-sql-orm.md`, « État conservé ». Pour une base existante, ajouter la colonne nullable et l’index sans effacer les lignes ; inscrire l’état antérieur comme baseline versionnée avant les migrations suivantes (§23, EV59).

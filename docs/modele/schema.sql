@@ -45,6 +45,7 @@ CREATE TABLE ipam_record (
     duplicate_dns INTEGER NOT NULL DEFAULT 0 CHECK (duplicate_dns IN (0, 1)),
     duplicate_ip INTEGER NOT NULL DEFAULT 0 CHECK (duplicate_ip IN (0, 1)),
     meta_zone TEXT,
+    custom_fields TEXT,
     UNIQUE (id, run_id)
 );
 
@@ -83,6 +84,7 @@ CREATE INDEX idx_asset_run_ip ON asset(run_id, ip_reported);
 CREATE INDEX idx_asset_run_node ON asset(run_id, node);
 CREATE INDEX idx_ipam_run_ip ON ipam_record(run_id, ip);
 CREATE INDEX idx_ipam_run_dns ON ipam_record(run_id, dns_name);
+CREATE INDEX idx_ipam_run_zone ON ipam_record(run_id, meta_zone);
 CREATE INDEX idx_consolidated_run ON consolidated_asset(run_id);
 CREATE INDEX idx_consolidated_ipam_run ON consolidated_asset(ipam_record_id, run_id);
 CREATE INDEX idx_consolidated_run_match ON consolidated_asset(run_id, match_status);

@@ -63,11 +63,12 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | duplicate_dns | INTEGER | non | 0 | CHECK (0, 1) |
 | duplicate_ip | INTEGER | non | 0 | CHECK (0, 1) |
 | meta_zone | TEXT | oui | NULL | zone source même sans VM |
+| custom_fields | TEXT | oui | NULL | objet NetBox complet sérialisé en JSON ; NULL si absent, objet vide distinct |
 
 - PK : id ; UNIQUE(id, run_id) pour les références composites ; aucune unicité de ip ou dns_name.
 - FK : run_id → run(id) ON DELETE CASCADE.
-- Index : idx_ipam_run_ip (run_id, ip) ; idx_ipam_run_dns (run_id, dns_name), pour rapprochement et détection de doublons ; tous deux servent aussi la FK run_id.
-- Origine : IPAM_RECORD, observer_ipam — RG3, RG8, RG9, RG17, RG18, RG24.
+- Index : idx_ipam_run_ip (run_id, ip) ; idx_ipam_run_dns (run_id, dns_name), pour rapprochement et détection de doublons ; idx_ipam_run_zone (run_id, meta_zone), pour filtrer par zone dans un run ; tous servent aussi la FK run_id. Aucun index sur le JSON libre.
+- Origine : IPAM_RECORD, observer_ipam — RG3, RG7, RG8, RG9, RG17, RG18, RG24, RG35, RG36.
 
 ### consolidated_asset
 
@@ -116,6 +117,7 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 - Les colonnes physiques suivent le dictionnaire publié (`id`, `run_id`, `type`, `status`, `tags`, `role`, `ip`, `code`, `created_at`) ; elles réalisent respectivement les attributs conceptuels identifiant, run, asset_type, asset_status/ipam_status/run_status, asset_tags/ipam_tags, asset_role/consolidated_role, ipam_ip, anomaly_code et anomaly_date. Le SQL n'impose aucune longueur absente des règles.
 - CASCADE pour la suppression d'un run et de ses observations/résultats ; RESTRICT pour une observation encore référencée par une anomalie ou un rapprochement. Une FK composite facultative avec run_id non NULL est vérifiée dès que son identifiant de référence est présent.
 - Aucun CHECK reliant match_status et référence IPAM, ni déclencheur forçant les étapes RUNNING/SUCCESS/FAIL : les règles de pipeline RG9, RG14, RG19–RG20 relèvent du traitement applicatif ; les statuts sources et les unités restent à confirmer (Q1–Q6).
+- EV07 : `meta_zone TEXT NULL` existe déjà ; `custom_fields TEXT NULL` conserve l'objet JSON complet de chaque observation sans écraser un autre run (RG35), et l'index `(run_id, meta_zone)` sert le filtre borné au run (RG36). La sérialisation et la distinction entre absence et objet vide relèvent de la collecte ; aucune clé JSON supplémentaire n'est prescrite (Q8). Chaque champ non-clé dépend de l'observation identifiée par `id` : 1FN par stockage d'un document source indivisible, 2FN par PK simple, 3FN sans dérivation depuis `meta_zone` ; la zone source existante et l'objet JSON peuvent contenir la même information, conservée intentionnellement pour filtrer sans indexer le texte libre.
 
 ## Ordre de création
 
