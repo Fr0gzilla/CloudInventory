@@ -1,4 +1,5 @@
 import hmac
+import logging
 import secrets
 import time
 from urllib.parse import urlsplit
@@ -10,6 +11,10 @@ from flask_login import UserMixin, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash
 
 from . import login_manager
+
+security_log = logging.getLogger("security.auth")
+security_log.setLevel(logging.INFO)
+security_log.addHandler(logging.StreamHandler())
 
 
 class Admin(UserMixin):
@@ -37,8 +42,11 @@ def configure_auth(app, username, password):
     hasher = PasswordHasher()
     password_hash = hasher.hash(password)
     attempts = {}
+    state = {"epoch": secrets.randbits(128)}
     limit = 5
     window = 900
+    absolute_lifetime = 8 * 60 * 60
+    idle_lifetime = 30 * 60
     login_manager.login_view = "login_page.login"
 
     @app.context_processor
@@ -52,9 +60,19 @@ def configure_auth(app, username, password):
 
     @login_manager.user_loader
     def load_user(user_id):
-        return Admin() if user_id == "admin" else None
+        now = time.time()
+        started = session.get("login_at")
+        last_seen = session.get("last_seen")
+        if (user_id != "admin" or session.get("epoch") != state["epoch"] or
+                type(started) not in (int, float) or type(last_seen) not in (int, float) or
+                not 0 <= now - started < absolute_lifetime or
+                not 0 <= now - last_seen < idle_lifetime):
+            session.clear()
+            return None
+        session["last_seen"] = now
+        return Admin()
 
-    def authenticate(supplied_user, supplied_password):
+    def authenticate(supplied_user, supplied_password, channel="web"):
         nonlocal password_hash
         key = request.remote_addr or "unknown"
         now = time.monotonic()
@@ -63,6 +81,7 @@ def configure_auth(app, username, password):
                 del attempts[ip]
         started, count = attempts.get(key, (now, 0))
         if count >= limit:
+            security_log.warning("auth result=limited channel=%s ip=%s", channel, key)
             return "limited"
         valid_user = hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
                                          username.encode("utf-8", errors="surrogatepass"))
@@ -75,10 +94,12 @@ def configure_auth(app, username, password):
             valid_password = check_password_hash(password_hash, supplied_password)
         if not (valid_user and valid_password):
             attempts[key] = (started, count + 1)
+            security_log.warning("auth result=invalid channel=%s ip=%s", channel, key)
             return "invalid"
         if not password_hash.startswith("$argon2") or hasher.check_needs_rehash(password_hash):
             password_hash = hasher.hash(supplied_password)
         attempts.pop(key, None)
+        security_log.info("auth result=success channel=%s ip=%s", channel, key)
         return None
 
     @login_page.route("/login", methods=["GET", "POST"])
@@ -105,12 +126,17 @@ def configure_auth(app, username, password):
             return render_template("login.html", next=destination, csrf_token=expected, error=True), 401
         session.clear()
         login_user(Admin())
+        session.permanent = True
+        session["epoch"] = state["epoch"]
+        session["login_at"] = session["last_seen"] = time.time()
         session["csrf_token"] = secrets.token_urlsafe(32)
         return redirect(destination)
 
     @login_page.post("/logout")
     @login_required
     def logout():
+        state["epoch"] += 1
+        security_log.info("auth result=logout channel=web ip=%s", request.remote_addr or "unknown")
         logout_user()
         session.clear()
         return redirect(url_for("login_page.login"))

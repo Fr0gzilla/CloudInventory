@@ -95,7 +95,7 @@ def configure_api(app, authenticate):
         if (not isinstance(username, str) or not username or len(username) > 128 or
                 not isinstance(password, str) or not password or len(password) > 4096):
             return jsonify(error="Invalid credentials"), 400
-        result = authenticate(username, password)
+        result = authenticate(username, password, channel="api")
         if result == "limited":
             return jsonify(error="Too many attempts"), 429
         if result == "invalid":

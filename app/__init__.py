@@ -1,6 +1,7 @@
 import hmac
 import os
 import re
+from datetime import timedelta
 from importlib import import_module
 from pathlib import Path
 from secrets import token_urlsafe
@@ -275,6 +276,7 @@ def create_app(database_uri: str | None = None) -> Flask:
         SESSION_COOKIE_HTTPONLY=True,
         SESSION_COOKIE_SAMESITE="Lax",
         SESSION_COOKIE_SECURE=str(configured("SESSION_COOKIE_SECURE", "true")).lower() != "false",
+        PERMANENT_SESSION_LIFETIME=timedelta(hours=8),
     )
     if app.config["EXPORT_DESTINATION"] not in ("local", "samba") or any(
         app.config[key] < 0 for key in ("EXPORT_RETENTION_CONSOLIDATED", "EXPORT_RETENTION_RAW")
