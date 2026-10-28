@@ -271,6 +271,7 @@ def create_app(database_uri: str | None = None) -> Flask:
 
     app = Flask(__name__)
     password = secrets.pop("ADMIN_PASSWORD")
+    explicit_database_uri = database_uri is not None
     if database_uri is None:
         database_uri = configured("DATABASE_URL")
     if database_uri is None:
@@ -287,6 +288,10 @@ def create_app(database_uri: str | None = None) -> Flask:
         EXPORT_RETENTION_CONSOLIDATED=int(configured("EXPORT_RETENTION_CONSOLIDATED", "30")),
         EXPORT_RETENTION_RAW=int(configured("EXPORT_RETENTION_RAW", "7")),
         RUN_LOCK_PATH=configured("RUN_LOCK_PATH"),
+        SCHEDULER_ENABLED=str(configured(
+            "SCHEDULER_ENABLED", "false" if explicit_database_uri or
+            "PYTEST_CURRENT_TEST" in os.environ else "true",
+        )).lower() == "true",
         SQLALCHEMY_DATABASE_URI=database_uri,
         USE_MOCK_VIRT=str(configured("USE_MOCK_VIRT", "true")).lower() != "false",
         USE_MOCK_IPAM=str(configured("USE_MOCK_IPAM", "true")).lower() != "false",
@@ -399,5 +404,10 @@ def create_app(database_uri: str | None = None) -> Flask:
     app.register_blueprint(web, url_prefix="/")
     app.register_blueprint(api_blueprint, url_prefix="/api")
     app.register_blueprint(auth_blueprint, url_prefix="/auth")
+    from .scheduling import scheduling, start_scheduler
+
+    app.register_blueprint(scheduling)
     jwt.init_app(app)
+    if app.config["SCHEDULER_ENABLED"]:
+        start_scheduler(app)
     return app

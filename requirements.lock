@@ -8,6 +8,10 @@ alembic==1.16.5 \
     --hash=sha256:a88bb7f6e513bd4301ecf4c7f2206fe93f9913f9b48dac3b78babde2d6fe765e \
     --hash=sha256:e845dfe090c5ffa7b92593ae6687c5cb1a101e91fa53868497dbd79847f9dbe3
     # via -r requirements.txt
+apscheduler==3.11.3 \
+    --hash=sha256:bbeb2ec02d23d3c06a6c07ed7f0f3939ada6680eb121fae809a69bb42c537a30 \
+    --hash=sha256:cd2fcc9330039a81a5893472ad49facf23a6d5604cbe1d918c835c6de7834d5a
+    # via -r requirements.txt
 argon2-cffi==25.1.0 \
     --hash=sha256:694ae5cc8a42f4c4e2bf2ca0e64e51e23a040c6a517a85074683d3959e1346c1 \
     --hash=sha256:fdc8b074db390fccb6eb4a3604ae7231f219aa669a2652e0f20e16ba513d5741
@@ -698,6 +702,10 @@ typing-extensions==4.16.0 \
     #   alembic
     #   referencing
     #   sqlalchemy
+tzlocal==5.4.5 \
+    --hash=sha256:ba976898bad27945178c9ca25c222c19e322b30c10342b9f40b46714f70d2d5f \
+    --hash=sha256:ecab534f6d65d9deb4c4ea52c121ab6dd5958e9b878e71dcb102578269752454
+    # via apscheduler
 werkzeug==3.1.9 \
     --hash=sha256:55ca7c70a75689be937aa27f8ff4b018f06ff4838fc73045560bf0f5a1291060 \
     --hash=sha256:6392e50c78460ba618e5b21f08a71f59c99ce99cdc6cf6e3dd7e6ccca8754fab

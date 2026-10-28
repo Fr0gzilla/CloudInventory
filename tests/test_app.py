@@ -209,7 +209,7 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
                              "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
-                             "api.acknowledge_anomaly", "api.resolve_anomaly"}
+                             "api.acknowledge_anomaly", "api.resolve_anomaly", "scheduling.schedules_page", "scheduling.save_schedule"}
                or endpoint.startswith("flasgger.")
                for _, endpoint in routes)
 
@@ -230,11 +230,11 @@ def test_anonymous_page_has_no_navigation(valid_secrets):
     assert not any(tag == "nav" for tag, _, _ in elements)
 
 
-def test_authenticated_navigation_has_five_local_links_and_logout(valid_secrets):
+def test_authenticated_navigation_has_scheduling_link_and_logout(valid_secrets):
     client, _ = logged_in_client(valid_secrets)
     elements = parse_page(client.get("/"))
     assert {attrs.get("href") for tag, attrs, inside in elements if inside and tag == "a"} == {
-        "/", "/inventory", "/runs", "/runs/compare", "/anomalies"
+        "/", "/inventory", "/runs", "/runs/compare", "/anomalies", "/scheduling"
     } and any(tag == "form" and inside and attrs.get("action") == "/logout" and attrs.get("method") == "post"
               for tag, attrs, inside in elements)
 
