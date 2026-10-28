@@ -2,3 +2,7 @@ tests/test_api_auth.py:generic-password:31
 tests/test_api_auth.py:generic-password:131
 tests/test_api_auth.py:generic-password:143
 tests/test_api_auth.py:generic-password:152
+tests/test_api_auth.py:generic-password:130
+tests/test_api_auth.py:generic-password:142
+tests/test_api_auth.py:generic-password:151
+tests/test_api_auth.py:generic-password:30
