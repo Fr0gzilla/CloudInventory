@@ -12,6 +12,9 @@ classDiagram
         -Integer matched_ip_count
         -Integer no_match_count
         -String error_message
+        -Integer current_step
+        -Integer completed_steps
+        -RunTrigger run_trigger
         +start() void
         +collectAssets() void
         +collectIpamRecords() void
@@ -21,6 +24,7 @@ classDiagram
         +fail() void
         +compareWith(otherRun) void
         +purgeOldRuns(retainCount) void
+        +reportProgress() Integer
     }
     class Asset {
         -String vm_id
@@ -67,9 +71,31 @@ classDiagram
         -AnomalyCode anomaly_code
         -String anomaly_description
         -DateTime anomaly_date
+        -String tracking_key
+        -AnomalyState anomaly_state
+        -DateTime state_changed_at
+        -AnomalySeverity anomaly_severity
         +detectMatchedIp() Boolean
         +detectHostnameMismatch() Boolean
         +detectStatusMismatch() Boolean
+        +detectRename(otherRun) Boolean
+        +transitionState(newState) void
+        +classifySeverity() AnomalySeverity
+    }
+    class AnomalyException {
+        -AnomalyCode exception_code
+        -String exception_target
+        -String exception_justification
+        -DateTime exception_expires_at
+        -String exception_author
+        +appliesTo(anomaly) Boolean
+    }
+    class RunSchedule {
+        -ScheduleFrequency schedule_frequency
+        -Boolean schedule_enabled
+        -DateTime schedule_next_at
+        +configure() void
+        +triggerRun() void
     }
     class RunStatus {
         <<enumeration>>
@@ -97,6 +123,30 @@ classDiagram
         STATUS_MISMATCH
         DUPLICATE_DNS
         DUPLICATE_IP
+        RENAMED
+    }
+    class AnomalyState {
+        <<enumeration>>
+        ouverte
+        acquittee
+        resolue
+    }
+    class AnomalySeverity {
+        <<enumeration>>
+        info
+        mineure
+        majeure
+        critique
+    }
+    class RunTrigger {
+        <<enumeration>>
+        manuel
+        planifie
+    }
+    class ScheduleFrequency {
+        <<enumeration>>
+        horaire
+        quotidien
     }
     Run "1" *-- "*" Asset : observer_vm
     Run "1" *-- "*" IpamRecord : observer_ipam
@@ -106,15 +156,21 @@ classDiagram
     IpamRecord "0..1" -- "*" ConsolidatedAsset : rapprocher
     Asset "0..1" -- "*" Anomaly : concerner_vm
     IpamRecord "0..1" -- "*" Anomaly : concerner_ipam
+    RunSchedule "0..1" -- "*" Run : declencher
+    AnomalyException ..> Anomaly : appliquer_exception
 ```
 
 ## Classes
 
 - Run — entité RUN ; RG01, RG07, RG19–RG20, RG22–RG23, RG25–RG28 (§6.1, §8.2, §8.5–§8.8) ; start()/finish() : RG19 ; fail() : RG20 ; collectAssets()/collectIpamRecords() : RG25 ; reconcileObservations() : RG26 ; detectDuplicates() : RG27 ; compareWith() : RG22 ; purgeOldRuns() : RG23.
+- Progression et provenance de Run : current_step, completed_steps et run_trigger (RG46, RG48) ; reportProgress() : RG46 ; la relation vers RunSchedule porte la planification.
 - Asset — entité ASSET ; RG02, RG15–RG16, RG21 (§6.1, §7.3, §8.2) ; deriveRole() : RG15–RG16.
 - IpamRecord — entité IPAM_RECORD ; RG03, RG07–RG08, RG17–RG18, RG24, RG35–RG36 (§6.1, §7.4, §13.2, §16) ; `custom_fields` : JSON source complet facultatif sérialisé en TEXT, NULL si absent, distinct de l'objet vide ; `meta_zone` : zone existante nullable, filtre par run via `(run_id, meta_zone)` ; detectDuplicateDns()/detectDuplicateIp() : RG17–RG18 (sur les observations du run).
 - ConsolidatedAsset — entité CONSOLIDATED_ASSET ; RG04, RG09–RG10, RG14, RG22 (§6.1, §7.1–§7.2, §8.5) ; matchByPriority() : RG09–RG10 ; retainVirtualizationData() : RG14.
 - Anomaly — entité ANOMALY ; RG05–RG06, RG11–RG13 (§6.1–§6.2, §7.1) ; detectMatchedIp()/detectHostnameMismatch()/detectStatusMismatch() : RG11–RG13.
+- Suivi de Anomaly : tracking_key, anomaly_state, state_changed_at, anomaly_severity (RG39–RG43) ; detectRename() : RG39 ; transitionState() : RG41 ; classifySeverity() : RG43, classification non définie (Q10).
+- AnomalyException — entité ANOMALY_EXCEPTION ; code, cible, justification, expiration, auteur (RG44) ; appliesTo() : RG45, prédicat conditionnel sans association persistante.
+- RunSchedule — entité RUN_SCHEDULE ; fréquence, activation et prochain déclenchement (RG47–RG48) ; configure() : RG47 ; triggerRun() : RG47–RG48.
 
 ## Relations
 
@@ -128,6 +184,8 @@ classDiagram
 | IpamRecord | association : observation conservée sans résultat | ConsolidatedAsset | 0..1 | * | RG03, RG08–RG09, RG14 |
 | Asset | association : constat facultatif | Anomaly | 0..1 | * | RG05–RG06, RG14 |
 | IpamRecord | association : constat facultatif | Anomaly | 0..1 | * | RG05, RG08, RG17–RG18 |
+| RunSchedule | association : planification indépendante du run | Run | 0..1 | * | RG47–RG48 |
+| AnomalyException | dépendance ponctuelle : prédicat code + cible + expiration, sans cardinalité structurelle | Anomaly | — | — | RG44–RG45 |
 
 ## Limites Mermaid
 
@@ -136,3 +194,5 @@ classDiagram
 - Les opérations de rapprochement et de détection parcourent plusieurs observations d'un même run ; leur signature UML ne spécifie pas le service transactionnel ni le traitement des exceptions (RG09, RG17–RG18, RG28, §7.1, §7.4, §8.2).
 - Les types source, les unités des métriques, les tags, les statuts et la portée des doublons restent à confirmer (Q1–Q6, §6.1, §7.3–§7.4). Les énumérations indiquent uniquement les valeurs déjà prescrites.
 - Les clés et types internes de `custom_fields` restent à confirmer (Q8) ; l'objet complet est conservé par observation, sans inventer de clé ni d'association (RG35).
+- Les littéraux accentués acquittée, résolue et planifié sont transcrits sans accent dans les noms Mermaid uniquement ; leurs valeurs métier restent celles du MCD (RG41, RG48). Le suivi entre runs ne crée pas de lien entre constats ; Q9 reste ouvert.
+- AnomalyException est autonome dans le MCD : la dépendance pointillée représente seulement l'usage conditionnel RG45, sans FK ni multiplicité (Q11–Q12). Le calendrier et le fuseau restent à définir (Q15) ; les attributs décrivent la cible v2.2 et non l'ORM actuel.

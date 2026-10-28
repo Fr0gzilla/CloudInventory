@@ -1,5 +1,12 @@
 PRAGMA foreign_keys = ON;
 
+CREATE TABLE run_schedule (
+    id INTEGER PRIMARY KEY,
+    frequency TEXT NOT NULL CHECK (frequency IN ('horaire', 'quotidien')),
+    enabled INTEGER NOT NULL DEFAULT 0 CHECK (enabled IN (0, 1)),
+    next_at TEXT
+);
+
 CREATE TABLE run (
     id INTEGER PRIMARY KEY,
     status TEXT NOT NULL CHECK (status IN ('RUNNING', 'SUCCESS', 'FAIL')),
@@ -9,7 +16,11 @@ CREATE TABLE run (
     matched_fqdn_count INTEGER CHECK (matched_fqdn_count >= 0),
     matched_ip_count INTEGER CHECK (matched_ip_count >= 0),
     no_match_count INTEGER CHECK (no_match_count >= 0),
-    error_message TEXT
+    error_message TEXT,
+    current_step INTEGER CHECK (current_step BETWEEN 1 AND 7),
+    completed_steps INTEGER CHECK (completed_steps BETWEEN 0 AND 7),
+    run_trigger TEXT CHECK (run_trigger IN ('manuel', 'planifié')),
+    schedule_id INTEGER REFERENCES run_schedule(id) ON DELETE SET NULL
 );
 
 CREATE TABLE asset (
@@ -69,11 +80,24 @@ CREATE TABLE anomaly (
     run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
     asset_id INTEGER,
     ipam_record_id INTEGER,
-    code TEXT NOT NULL CHECK (code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', 'DUPLICATE_DNS', 'DUPLICATE_IP')),
+    code TEXT NOT NULL CHECK (code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', 'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')),
     description TEXT NOT NULL,
     created_at TEXT NOT NULL,
+    tracking_key TEXT,
+    state TEXT NOT NULL DEFAULT 'ouverte' CHECK (state IN ('ouverte', 'acquittée', 'résolue')),
+    state_changed_at TEXT,
+    severity TEXT NOT NULL CHECK (severity IN ('info', 'mineure', 'majeure', 'critique')),
     FOREIGN KEY (asset_id, run_id) REFERENCES asset(id, run_id) ON DELETE RESTRICT,
     FOREIGN KEY (ipam_record_id, run_id) REFERENCES ipam_record(id, run_id) ON DELETE RESTRICT
+);
+
+CREATE TABLE anomaly_exception (
+    id INTEGER PRIMARY KEY,
+    code TEXT NOT NULL CHECK (code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', 'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')),
+    target TEXT NOT NULL CHECK (length(trim(target)) > 0),
+    justification TEXT NOT NULL CHECK (length(trim(justification)) > 0),
+    expires_at TEXT NOT NULL,
+    author TEXT NOT NULL CHECK (length(trim(author)) > 0)
 );
 
 CREATE INDEX idx_asset_run ON asset(run_id);
@@ -91,3 +115,6 @@ CREATE INDEX idx_consolidated_run_match ON consolidated_asset(run_id, match_stat
 CREATE INDEX idx_anomaly_run ON anomaly(run_id);
 CREATE INDEX idx_anomaly_asset_run ON anomaly(asset_id, run_id);
 CREATE INDEX idx_anomaly_ipam_run ON anomaly(ipam_record_id, run_id);
+CREATE INDEX idx_run_schedule ON run(schedule_id);
+CREATE INDEX idx_anomaly_tracking ON anomaly(tracking_key, created_at);
+CREATE INDEX idx_anomaly_severity ON anomaly(severity);

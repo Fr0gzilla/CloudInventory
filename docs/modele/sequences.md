@@ -12,9 +12,11 @@ sequenceDiagram
     participant IpamRecord
     participant ConsolidatedAsset
     participant Anomaly
-    Administrateur->>Run: déclencher inventaire
+    participant AnomalyException
+    Administrateur-)Run: déclencher inventaire sans attendre la fin
     Note over Run: Une transaction pour les sept étapes
     Run->>Run: 1 start() : RUNNING, started_at
+    Note over Run: Progression consultable par étape, propre à ce run
     Run->>+Virtualisation: 2 collectAssets() : VM et CT
     Virtualisation-->>-Run: observations VM et CT
     Run->>+IPAM: 3 collectIpamRecords()
@@ -29,22 +31,32 @@ sequenceDiagram
     Asset-->>-Run: rôle
     Run->>+Anomaly: 5 constater les anomalies de correspondance
     Anomaly-->>-Run: anomalies
+    opt vm_id identique et vm_name changé depuis le run précédent
+        Run->>+Anomaly: 5 detectRename(otherRun) : constater RENAMED
+        Anomaly-->>-Run: anomalie RENAMED
+    end
+    opt exception applicable par code, cible et expiration
+        Run->>+AnomalyException: 5 appliesTo(anomaly)
+        AnomalyException-->>-Run: écarter le constat correspondant
+    end
     Run->>+IpamRecord: 6 detectDuplicateDns() et detectDuplicateIp()
     IpamRecord-->>-Run: doublons DNS et IP
     Run->>+Anomaly: 6 constater DUPLICATE_DNS et DUPLICATE_IP
     Anomaly-->>-Run: anomalies de doublons
     alt toutes les étapes réussissent
         Run->>Run: 7 finish() : SUCCESS, finished_at, quatre compteurs
-        Run-->>Administrateur: run réussi
+        Run->>Run: progression finale consultable
     else exception pendant le pipeline
         Run->>Run: rollback des données collectées puis fail() : FAIL, error_message
-        Run-->>Administrateur: échec du run
+        Run->>Run: garder l'étape atteinte sans observations annulées
     end
+    Administrateur->>Run: consulter progression et statut du run
+    Run-->>Administrateur: étape atteinte et statut
 ```
 
 ## Légende — pipeline
 
-- Flèche pleine : appel ou résultat ; `alt` : réussite ou exception. `Run`, `Asset`, `IpamRecord`, `ConsolidatedAsset` et `Anomaly` sont les classes du modèle ; l'administrateur et les deux sources sont les acteurs des règles.
+- Flèche pleine : appel ou résultat ; flèche asynchrone : lancement non bloquant ; `alt` : réussite ou exception ; `opt` : traitement conditionnel. `Run`, `Asset`, `IpamRecord`, `ConsolidatedAsset`, `Anomaly` et `AnomalyException` sont les classes du modèle ; l'administrateur et les deux sources sont les acteurs des règles.
 - Les étapes 1–7 sont ordonnées ; l'étape 4 représente la conservation/rapprochement intra-run, sans imposer de primitive SQL d'upsert absente du schéma. La branche d'exception peut survenir à chacune des étapes, et non uniquement après la détection des doublons.
 
 ## Traçabilité — pipeline
@@ -57,11 +69,14 @@ sequenceDiagram
 | Étape 5 : priorité, rôle, anomalies | RG09–RG16, RG26 ; §7.1–§7.3, §8.2, étape 5 |
 | Étape 6 : doublons | RG08, RG17–RG18, RG27 ; §7.4, §8.2, étape 6 |
 | Étape 7 et exception | RG19–RG20, RG28 ; §8.2, étape 7 et rollback |
+| Renommage et exception applicable | RG39–RG40, RG44–RG45 ; §18 EV12, EV15 |
+| Lancement non bloquant et consultation par étape | RG46, RG48 ; §20 EV30 |
 
 ## Non représenté — pipeline
 
 - Les multiplicités d'observations sont implicites ; Q1–Q6 ne fixent ni conversions source, ni arbitrage de plusieurs correspondances, ni granularité définitive des doublons. Le modèle n'introduit aucun statut ou anomalie supplémentaire.
 - Le mécanisme de persistance de FAIL après annulation de la transaction unique n'est pas prescrit ; la trace montre l'obligation métier sans inventer sa mise en œuvre.
+- Les sept étapes actualisent la progression (RG46) sans fixer les valeurs finales après rollback (Q13). Le planificateur externe peut déclencher un nouveau run selon `RunSchedule` (RG47–RG48), mais sa cadence et son fuseau restent hors de ce scénario manuel (Q15). Le suivi ouverte → acquittée → résolue est détaillé dans `etats.md`, pas dans le pipeline.
 
 ## Diagramme — authentification web et API
 
