@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "${APP_PORT:-5050}:5050"
+      - "127.0.0.1:${APP_PORT:-5050}:5050"
     environment:
       SECRET_KEY: ${SECRET_KEY:-}
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}

@@ -130,6 +130,18 @@ def test_session_cookie_is_signed_http_only_secure_and_samesite(auth_app):
             "." in session_cookie.value, values["ADMIN_PASSWORD"] not in session_cookie.value) == (True, True, "Lax", True, True)
 
 
+def test_session_cookie_secure_defaults_to_true_without_environment_variable(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.delenv("SESSION_COOKIE_SECURE", raising=False)
+    for key in ("SECRET_KEY", "JWT_SECRET_KEY", "ADMIN_PASSWORD"):
+        monkeypatch.setenv(key, f"test-{uuid4().hex}")
+    from app import create_app
+
+    app = create_app(database_uri="sqlite:///:memory:")
+
+    assert app.config["SESSION_COOKIE_SECURE"] is True
+
+
 def test_authenticated_web_post_requires_csrf(auth_app):
     app, values = auth_app
     from flask import Blueprint
