@@ -7,3 +7,4 @@ python-dotenv>=1.0,<2
 argon2-cffi>=23.1,<26
 alembic==1.16.5
 gunicorn>=23,<24
+APScheduler>=3.10,<4

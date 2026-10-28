@@ -19,6 +19,7 @@
             <li class="nav-item"><a class="nav-link" href="/">Tableau de bord</a></li>
             <li class="nav-item"><a class="nav-link" href="/inventory">Inventaire</a></li>
             <li class="nav-item"><a class="nav-link" href="/runs">Runs</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('scheduling.schedules_page') }}">Planification</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('web.run_compare_page') }}">Comparer</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('web.anomalies_page') }}">Anomalies{% if latest_anomaly_count %} <span class="badge text-bg-danger">{{ latest_anomaly_count }}</span>{% endif %}</a></li>
           </ul>

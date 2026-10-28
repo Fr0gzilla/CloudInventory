@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Planification · Cloud Inventory{% endblock %}
+{% block content %}
+<h1>Planification des runs</h1>
+<p>Échéances en UTC, à l'heure pleine (00:00 UTC pour la cadence quotidienne).</p>
+<form action="{{ url_for('scheduling.save_schedule') }}" method="post">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label for="frequency">Fréquence</label>
+  <select id="frequency" name="frequency" required><option value="horaire">Horaire</option><option value="quotidien">Quotidienne</option></select>
+  <input type="hidden" name="enabled" value="1">
+  <button type="submit" class="btn btn-primary">Créer et activer</button>
+</form>
+{% for schedule in schedules %}
+<form action="{{ url_for('scheduling.save_schedule') }}" method="post" class="my-3">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <input type="hidden" name="schedule_id" value="{{ schedule.id }}">
+  <label for="frequency-{{ schedule.id }}">Planification {{ schedule.id }}</label>
+  <select id="frequency-{{ schedule.id }}" name="frequency">
+    <option value="horaire" {% if schedule.frequency == 'horaire' %}selected{% endif %}>Horaire</option>
+    <option value="quotidien" {% if schedule.frequency == 'quotidien' %}selected{% endif %}>Quotidienne</option>
+  </select>
+  <select name="enabled" aria-label="Activation de la planification {{ schedule.id }}">
+    <option value="1" {% if schedule.enabled %}selected{% endif %}>Activée</option>
+    <option value="0" {% if not schedule.enabled %}selected{% endif %}>Désactivée</option>
+  </select>
+  <span>Prochaine échéance : {{ schedule.next_at or 'aucune' }}</span>
+  <button type="submit" class="btn btn-secondary">Enregistrer</button>
+</form>
+{% endfor %}
+{% endblock %}
