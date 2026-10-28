@@ -2,6 +2,7 @@ import hmac
 import logging
 import secrets
 import time
+from threading import Lock
 from urllib.parse import urlsplit
 
 from argon2 import PasswordHasher
@@ -42,6 +43,7 @@ def configure_auth(app, username, password):
     hasher = PasswordHasher()
     password_hash = hasher.hash(password)
     attempts = {}
+    attempts_lock = Lock()
     state = {"epoch": secrets.randbits(128)}
     limit = 5
     window = 900
@@ -75,32 +77,33 @@ def configure_auth(app, username, password):
     def authenticate(supplied_user, supplied_password, channel="web"):
         nonlocal password_hash
         key = request.remote_addr or "unknown"
-        now = time.monotonic()
-        for ip, state in list(attempts.items()):
-            if now - state[0] >= window:
-                del attempts[ip]
-        started, count = attempts.get(key, (now, 0))
-        if count >= limit:
-            security_log.warning("auth result=limited channel=%s ip=%s", channel, key)
-            return "limited"
-        valid_user = hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
-                                         username.encode("utf-8", errors="surrogatepass"))
-        if password_hash.startswith("$argon2"):
-            try:
-                valid_password = hasher.verify(password_hash, supplied_password)
-            except (InvalidHashError, VerificationError):
-                valid_password = False
-        else:
-            valid_password = check_password_hash(password_hash, supplied_password)
-        if not (valid_user and valid_password):
-            attempts[key] = (started, count + 1)
-            security_log.warning("auth result=invalid channel=%s ip=%s", channel, key)
-            return "invalid"
-        if not password_hash.startswith("$argon2") or hasher.check_needs_rehash(password_hash):
-            password_hash = hasher.hash(supplied_password)
-        attempts.pop(key, None)
-        security_log.info("auth result=success channel=%s ip=%s", channel, key)
-        return None
+        with attempts_lock:
+            now = time.monotonic()
+            for ip, entry in list(attempts.items()):
+                if now - entry[0] >= window:
+                    del attempts[ip]
+            started, count = attempts.get(key, (now, 0))
+            if count >= limit:
+                security_log.warning("auth result=limited channel=%s ip=%s", channel, key)
+                return "limited"
+            valid_user = hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
+                                             username.encode("utf-8", errors="surrogatepass"))
+            if password_hash.startswith("$argon2"):
+                try:
+                    valid_password = hasher.verify(password_hash, supplied_password)
+                except (InvalidHashError, VerificationError):
+                    valid_password = False
+            else:
+                valid_password = check_password_hash(password_hash, supplied_password)
+            if not (valid_user and valid_password):
+                attempts[key] = (started, count + 1)
+                security_log.warning("auth result=invalid channel=%s ip=%s", channel, key)
+                return "invalid"
+            if not password_hash.startswith("$argon2") or hasher.check_needs_rehash(password_hash):
+                password_hash = hasher.hash(supplied_password)
+            attempts.pop(key, None)
+            security_log.info("auth result=success channel=%s ip=%s", channel, key)
+            return None
 
     @login_page.route("/login", methods=["GET", "POST"])
     def login():
