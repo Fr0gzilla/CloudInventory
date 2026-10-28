@@ -1,4 +1,5 @@
 import json
+import os
 import socket
 from html.parser import HTMLParser
 
@@ -53,9 +54,11 @@ def offline(monkeypatch):
 
 def logged_client(app):
     client = app.test_client()
+    client.get("/login")
     with client.session_transaction() as session:
-        session["_user_id"] = "admin"
-        session["_fresh"] = True
+        token = session["csrf_token"]
+    response = client.post("/login", data={"username": "admin", "password": os.environ["ADMIN_PASSWORD"], "csrf_token": token})
+    assert response.status_code == 302
     return client
 
 

@@ -1,0 +1,9 @@
+[
+  {
+    "nom": "Connexion administrateur",
+    "pas": [
+      {"action": "aller", "adresse": "/login"},
+      {"action": "attendre", "texte": "Connexion"}
+    ]
+  }
+]
