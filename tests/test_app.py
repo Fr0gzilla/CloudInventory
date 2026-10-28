@@ -208,7 +208,8 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
                              "web.runs_page", "web.run_page", "web.run_compare_page", "web.anomalies_page", "web.asset_page",
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
-                            "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies"}
+                             "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
+                             "api.acknowledge_anomaly", "api.resolve_anomaly"}
                or endpoint.startswith("flasgger.")
                for _, endpoint in routes)
 

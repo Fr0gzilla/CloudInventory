@@ -1,10 +1,11 @@
 from collections import Counter
+import json
 
 import pytest
 
 from app import db
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
-from collector.inventory_runner import run_inventory
+from collector.inventory_runner import _severity_for, run_inventory
 from collector.mock_ipam import MockIpamSource
 from collector.mock_proxmox import MockProxmoxSource
 
@@ -59,6 +60,92 @@ def test_invalid_explicit_anomaly_severity_is_rejected(orm_app, monkeypatch):
     monkeypatch.setenv("ANOMALY_SEVERITIES", '{"NO_MATCH": "invalid"}')
     run = run_inventory(virtualization_source=Source([{"vm_id": "unmatched", "vm_name": "unmatched", "type": "qemu"}]), ipam_source=Source([]))
     assert run.status == "FAIL" and "No valid anomaly severity configured for NO_MATCH" in run.error_message
+
+
+@pytest.mark.parametrize("code", [
+    "NO_MATCH", "MATCHED_IP", "HOSTNAME_MISMATCH", "STATUS_MISMATCH",
+    "DUPLICATE_DNS", "DUPLICATE_IP", "RENAMED",
+])
+@pytest.mark.parametrize("severity", ["info", "mineure", "majeure", "critique"])
+def test_each_known_code_accepts_every_configurable_severity(orm_app, monkeypatch, code, severity):
+    monkeypatch.setenv("ANOMALY_SEVERITIES", json.dumps({code: severity}))
+    assert _severity_for(code) == severity
+
+
+@pytest.mark.parametrize("configuration", ['[]', '{"OTHER": "info"}', '{'])
+def test_invalid_severity_configuration_is_rejected(orm_app, monkeypatch, configuration):
+    monkeypatch.setenv("ANOMALY_SEVERITIES", configuration)
+    with pytest.raises((TypeError, ValueError, json.JSONDecodeError)):
+        _severity_for("NO_MATCH")
+
+
+def test_unknown_anomaly_code_is_not_classified(orm_app, monkeypatch):
+    monkeypatch.delenv("ANOMALY_SEVERITIES", raising=False)
+    with pytest.raises(ValueError, match="Unclassified anomaly code: OTHER"):
+        _severity_for("OTHER")
+
+
+def test_open_anomaly_disappearing_in_next_run_stays_open(orm_app):
+    asset = {"vm_id": "missing-42", "vm_name": "missing-42", "type": "qemu"}
+    first = run_inventory(Source([asset]), Source([]))
+    original = next(row for row in rows(Anomaly, first.id) if row.code == "NO_MATCH")
+    original_id = original.id
+    db.session.rollback()
+    second = run_inventory(Source([]), Source([]))
+    assert second.status == "SUCCESS"
+    db.session.expire_all()
+    assert db.session.get(Anomaly, original_id).state == "ouverte"
+
+
+def test_acknowledged_anomaly_disappearing_is_resolved_without_erasing_history(orm_app):
+    asset = {"vm_id": "missing-43", "vm_name": "missing-43", "type": "qemu"}
+    first = run_inventory(Source([asset]), Source([]))
+    original = next(row for row in rows(Anomaly, first.id) if row.code == "NO_MATCH")
+    original.state = "acquittée"
+    original.state_changed_at = original.created_at
+    db.session.commit()
+    second = run_inventory(Source([]), Source([]))
+    assert second.status == "SUCCESS"
+    db.session.expire_all()
+    assert (db.session.get(Anomaly, original.id).state,
+            len(rows(Anomaly, first.id))) == ("résolue", 1)
+
+
+def test_acknowledgement_is_inherited_without_replacing_previous_observation(orm_app):
+    asset = {"vm_id": "missing-44", "vm_name": "missing-44", "type": "qemu"}
+    first = run_inventory(Source([asset]), Source([]))
+    original = next(row for row in rows(Anomaly, first.id) if row.code == "NO_MATCH")
+    original.state = "acquittée"
+    original.state_changed_at = original.created_at
+    db.session.commit()
+    second = run_inventory(Source([asset]), Source([]))
+    successor = next(row for row in rows(Anomaly, second.id) if row.code == "NO_MATCH")
+    assert (successor.state, successor.state_changed_at, successor.tracking_key,
+            original.state, successor.id != original.id) == (
+                "acquittée", original.state_changed_at, original.tracking_key, "acquittée", True)
+
+
+def test_resolved_anomaly_reappearing_starts_open(orm_app):
+    asset = {"vm_id": "missing-45", "vm_name": "missing-45", "type": "qemu"}
+    first = run_inventory(Source([asset]), Source([]))
+    original = next(row for row in rows(Anomaly, first.id) if row.code == "NO_MATCH")
+    original.state = "acquittée"
+    db.session.commit()
+    run_inventory(Source([]), Source([]))
+    third = run_inventory(Source([asset]), Source([]))
+    successor = next(row for row in rows(Anomaly, third.id) if row.code == "NO_MATCH")
+    assert (original.state, successor.state, successor.id != original.id) == ("résolue", "ouverte", True)
+
+
+def test_ambiguous_target_without_stable_vm_id_is_not_merged(orm_app):
+    asset = {"vm_id": "", "vm_name": "unnamed", "type": "qemu"}
+    first = run_inventory(Source([asset]), Source([]))
+    original = next(row for row in rows(Anomaly, first.id) if row.code == "NO_MATCH")
+    original.state = "acquittée"
+    db.session.commit()
+    second = run_inventory(Source([asset]), Source([]))
+    successor = next(row for row in rows(Anomaly, second.id) if row.code == "NO_MATCH")
+    assert (original.tracking_key, successor.tracking_key, successor.state) == (None, None, "ouverte")
 
 
 def test_default_run_persists_seven_ordered_steps_and_four_counters(orm_app):
