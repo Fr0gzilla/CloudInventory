@@ -70,6 +70,7 @@ class IpamRecord(db.Model):
     duplicate_dns = db.Column(db.Integer, nullable=False, server_default=db.text("0"))
     duplicate_ip = db.Column(db.Integer, nullable=False, server_default=db.text("0"))
     meta_zone = db.Column(db.Text)
+    custom_fields = db.Column(db.Text)
 
     __table_args__ = (
         db.CheckConstraint("duplicate_dns IN (0, 1)"),
@@ -77,6 +78,7 @@ class IpamRecord(db.Model):
         db.UniqueConstraint("id", "run_id"),
         db.Index("idx_ipam_run_ip", "run_id", "ip"),
         db.Index("idx_ipam_run_dns", "run_id", "dns_name"),
+        db.Index("idx_ipam_run_zone", "run_id", "meta_zone"),
     )
 
 
