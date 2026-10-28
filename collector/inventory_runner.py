@@ -14,6 +14,7 @@ from collector.mock_ipam import MockIpamSource
 from collector.mock_proxmox import MockProxmoxSource
 from collector.normalization import normalize
 from collector.purge import purge_old_runs
+from collector.run_lock import run_lock
 from collector.source import AssetRecord, Source
 from collector.source import IpamRecord as IpamObservation
 
@@ -23,6 +24,15 @@ def _now() -> str:
 
 
 def run_inventory(
+    virtualization_source: Source[AssetRecord] | None = None,
+    ipam_source: Source[IpamObservation] | None = None,
+    after_step: Callable[[int], None] | None = None,
+) -> Run:
+    with run_lock():
+        return _run_inventory(virtualization_source, ipam_source, after_step)
+
+
+def _run_inventory(
     virtualization_source: Source[AssetRecord] | None = None,
     ipam_source: Source[IpamObservation] | None = None,
     after_step: Callable[[int], None] | None = None,

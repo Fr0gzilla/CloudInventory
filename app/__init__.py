@@ -4,6 +4,7 @@ import re
 from importlib import import_module
 from pathlib import Path
 from secrets import token_urlsafe
+from tempfile import TemporaryDirectory
 
 from dotenv import dotenv_values
 from flasgger import Swagger
@@ -258,6 +259,7 @@ def create_app(database_uri: str | None = None) -> Flask:
         EXPORT_RAW_ENABLED=str(configured("EXPORT_RAW_ENABLED", "false")).lower() == "true",
         EXPORT_RETENTION_CONSOLIDATED=int(configured("EXPORT_RETENTION_CONSOLIDATED", "30")),
         EXPORT_RETENTION_RAW=int(configured("EXPORT_RETENTION_RAW", "7")),
+        RUN_LOCK_PATH=configured("RUN_LOCK_PATH"),
         SQLALCHEMY_DATABASE_URI=database_uri,
         USE_MOCK_VIRT=str(configured("USE_MOCK_VIRT", "true")).lower() != "false",
         USE_MOCK_IPAM=str(configured("USE_MOCK_IPAM", "true")).lower() != "false",
@@ -269,11 +271,24 @@ def create_app(database_uri: str | None = None) -> Flask:
         app.config[key] < 0 for key in ("EXPORT_RETENTION_CONSOLIDATED", "EXPORT_RETENTION_RAW")
     ):
         raise ValueError("invalid export configuration")
+    if app.config["RUN_LOCK_PATH"] is not None and (
+        not isinstance(app.config["RUN_LOCK_PATH"], str) or not app.config["RUN_LOCK_PATH"].strip()
+    ):
+        raise ValueError("RUN_LOCK_PATH must be a non-empty file path")
 
     import_module("app.models")
     db.init_app(app)
     with app.app_context():
         engine = db.engine
+        if app.config["RUN_LOCK_PATH"] is None:
+            if engine.dialect.name != "sqlite":
+                raise ValueError("RUN_LOCK_PATH is required for non-SQLite databases")
+            if engine.url.database in (None, "", ":memory:"):
+                temporary_directory = TemporaryDirectory(prefix="cloudinventory-lock-")
+                app.extensions["run_lock_directory"] = temporary_directory
+                app.config["RUN_LOCK_PATH"] = str(Path(temporary_directory.name) / "run.lock")
+            else:
+                app.config["RUN_LOCK_PATH"] = str(Path(engine.url.database).with_suffix(".run.lock"))
         if engine.dialect.name == "sqlite":
             def enable_foreign_keys(connection, connection_record):
                 cursor = connection.cursor()

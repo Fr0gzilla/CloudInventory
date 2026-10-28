@@ -5,6 +5,7 @@ from flask_jwt_extended import create_access_token
 
 from app.models import Anomaly, Asset, ConsolidatedAsset, Run
 from collector.inventory_runner import run_inventory
+from collector.run_lock import RunAlreadyActive
 
 from . import db, jwt
 
@@ -189,8 +190,13 @@ def configure_api(app, authenticate):
                 error_message: {type: string}
           401:
             description: Missing or invalid Bearer token
+          409:
+            description: An inventory run is already in progress
         """
-        return jsonify(_run_json(run_inventory())), 201
+        try:
+            return jsonify(_run_json(run_inventory())), 201
+        except RunAlreadyActive as error:
+            return jsonify(error=str(error)), 409
 
     def run_detail(id):
         """Get a run with its consolidated assets and anomalies.
