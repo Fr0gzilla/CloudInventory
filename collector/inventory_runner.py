@@ -11,7 +11,7 @@ from typing import cast
 from app import db
 from app.anomaly_exceptions import anomaly_coverage
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
-from app.notifications import notify_anomalies
+from app.notifications import notify_anomalies, should_alert
 from collector.anomalies import duplicate_anomalies, match_anomalies, renamed_anomalies
 from collector.exports import export_run
 from collector.matching import consolidate_asset
@@ -109,7 +109,7 @@ def _run_inventory(
 
     try:
         with db.session.begin() if not asynchronous else nullcontext():
-            previous = db.session.query(Run.id).filter(Run.status == "SUCCESS").order_by(Run.id.desc()).first()
+            previous = db.session.query(Run).filter(Run.status == "SUCCESS").order_by(Run.id.desc()).first()
             previous_assets = (
                 db.session.query(Asset).filter(Asset.run_id == previous.id).all() if previous else []
             )
@@ -284,8 +284,21 @@ def _run_inventory(
         })
         db.session.rollback()
         rows = Anomaly.query.filter_by(run_id=run_id).all()
-        coverage = anomaly_coverage(rows)
-        notify_anomalies(run_id, sum(coverage[row.id] is None for row in rows), finished_at)
+        coverage = anomaly_coverage(rows, now=datetime.fromisoformat(finished_at))
+        eligible = [row for row in rows if row.state == "ouverte" and coverage[row.id] is None]
+        previous_rows = Anomaly.query.filter_by(run_id=previous.id).all() if previous else []
+        previous_coverage = anomaly_coverage(
+            previous_rows,
+            now=datetime.fromisoformat(previous.finished_at or previous.started_at),
+        ) if previous else {}
+        previous_eligible = [row for row in previous_rows
+                             if row.state == "ouverte" and previous_coverage[row.id] is None]
+        previous_keys = {row.tracking_key for row in previous_eligible if row.tracking_key}
+        new_count = sum(row.tracking_key not in previous_keys for row in eligible)
+        alert_count = len(eligible) if should_alert(
+            len(eligible), new_count, len(previous_eligible)
+        ) else 0
+        notify_anomalies(run_id, alert_count, finished_at)
         db.session.rollback()
     purge_old_runs()
     return result

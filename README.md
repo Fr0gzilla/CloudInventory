@@ -23,6 +23,8 @@ Pour Docker, construire l’image avec `docker compose build`, puis démarrer av
 
 Une base inaccessible provoque une erreur explicite au démarrage ou lors de la requête concernée. Les fichiers SQLite et les exports générés ne sont pas suivis par git.
 
+Les notifications SMTP et webhook sont simulées par défaut. `ANOMALY_ALERT_THRESHOLD` est un entier non négatif, fixé à `10` par défaut. Après un run réussi, une alerte part si au moins une anomalie ouverte, non couverte par une exception active, est nouvelle par rapport au dernier run réussi (même code et même cible stable), ou si le nombre de ces anomalies passe d'une valeur inférieure ou égale au seuil à une valeur strictement supérieure. Une anomalie sans cible stable est considérée nouvelle ; les anomalies acquittées, résolues et couvertes ne comptent pas. Un premier run considère toutes ses anomalies admissibles comme nouvelles. Un compte restant au-dessus du seuil sans nouveauté ne renvoie pas d'alerte. Une valeur de seuil invalide désactive les alertes et produit un avertissement côté serveur.
+
 ## Vérification
 
 - `make verify` exécute les tests pytest.

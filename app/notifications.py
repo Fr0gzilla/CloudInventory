@@ -61,6 +61,20 @@ def _mock_webhook(payload: dict[str, object]) -> None:
     """Simulated HTTP delivery; replace with a stub to inspect alerts."""
 
 
+def should_alert(anomaly_count: int, new_count: int, previous_count: int) -> bool:
+    """Only alert on novelty or a strict upward threshold crossing."""
+    if anomaly_count <= 0:
+        return False
+    try:
+        threshold = int(os.environ.get("ANOMALY_ALERT_THRESHOLD", "10"))
+        if threshold < 0:
+            raise ValueError("negative threshold")
+    except ValueError:
+        logger.warning("Invalid anomaly alert threshold")
+        return False
+    return new_count > 0 or previous_count <= threshold < anomaly_count
+
+
 def notify_anomalies(run_id: int, anomaly_count: int, finished_at: str) -> None:
     """Send each enabled channel independently, never raising delivery errors."""
     if anomaly_count <= 0:

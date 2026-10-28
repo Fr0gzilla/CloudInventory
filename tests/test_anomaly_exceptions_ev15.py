@@ -245,17 +245,21 @@ def test_expired_exception_restores_real_run_notification(orm_app, monkeypatch):
     sent = []
     monkeypatch.setattr("collector.inventory_runner.notify_anomalies",
                         lambda run_id, count, finished_at: sent.append((run_id, count)))
+    from collector import inventory_runner
+
+    clock = [datetime.now(UTC)]
+    monkeypatch.setattr(inventory_runner, "_now", lambda: clock[0].isoformat())
     exception = AnomalyException(code="NO_MATCH", target="vm-1", justification="maintenance",
-                                 expires_at=(datetime.now(UTC) + timedelta(days=1)).isoformat(), author="admin")
+                                  expires_at=(clock[0] + timedelta(days=1)).isoformat(), author="admin")
     db.session.add(exception)
     db.session.commit()
     covered = unmatched_run()
-    assert covered.status == "SUCCESS"
+    assert covered.status == "SUCCESS", covered.error_message
     assert sent[-1] == (covered.id, 0)
-    exception.expires_at = (datetime.now(UTC) - timedelta(seconds=1)).isoformat()
-    db.session.commit()
+    clock[0] += timedelta(days=2)
+    db.session.rollback()
     restored = unmatched_run()
-    assert restored.status == "SUCCESS"
+    assert restored.status == "SUCCESS", restored.error_message
     assert sent[-1] == (restored.id, 1)
 
 
