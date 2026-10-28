@@ -1,6 +1,7 @@
 """Persist one seven-step inventory run as a single atomic collection."""
 
 import json
+import os
 from collections import Counter
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -9,7 +10,7 @@ from typing import cast
 from app import db
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 from app.notifications import notify_anomalies
-from collector.anomalies import duplicate_anomalies, match_anomalies
+from collector.anomalies import duplicate_anomalies, match_anomalies, renamed_anomalies
 from collector.exports import export_run
 from collector.matching import consolidate_asset
 from collector.mock_ipam import MockIpamSource
@@ -23,6 +24,18 @@ from collector.source import IpamRecord as IpamObservation
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _severity_for(code: str) -> str:
+    configured = json.loads(os.environ.get("ANOMALY_SEVERITIES", "{}"))
+    if not isinstance(configured, dict):
+        raise TypeError("Invalid anomaly severities configuration")
+    severity = configured.get(code, "info")
+    if severity not in (
+        "info", "mineure", "majeure", "critique"
+    ):
+        raise ValueError(f"No valid anomaly severity configured for {code}")
+    return severity
 
 
 def run_inventory(
@@ -55,7 +68,11 @@ def _run_inventory(
 
     try:
         with db.session.begin():
-            run = Run(status="RUNNING", started_at=started_at)
+            previous = db.session.query(Run.id).filter(Run.status == "SUCCESS").order_by(Run.id.desc()).first()
+            previous_assets = (
+                db.session.query(Asset).filter(Asset.run_id == previous.id).all() if previous else []
+            )
+            run = Run(status="RUNNING", started_at=started_at, run_trigger="manuel")
             db.session.add(run)
             db.session.flush()
             completed(1)
@@ -104,6 +121,11 @@ def _run_inventory(
             unique_ipam = list(ipam_snapshots.values())
             counts: Counter[str] = Counter()
             anomaly_count = 0
+            renamed = renamed_anomalies(
+                asset_snapshots.values(),
+                [{"vm_id": row.vm_id, "vm_name": row.vm_name} for row in previous_assets],
+            )
+            renamed_by_vm = {entry["asset"]["vm_id"]: entry for entry in renamed if entry["asset"]}
             for observation in asset_snapshots.values():
                 asset = stored_assets[observation["vm_id"]]
                 result = consolidate_asset(observation, unique_ipam)
@@ -119,13 +141,15 @@ def _run_inventory(
                 ))
                 db.session.flush()
                 counts[result["match_status"]] += 1
-                for anomaly in match_anomalies(result):
+                for anomaly in match_anomalies(result) + (
+                    [renamed_by_vm[observation["vm_id"]]] if observation["vm_id"] in renamed_by_vm else []
+                ):
                     anomaly_count += 1
                     db.session.add(Anomaly(
                         run_id=run.id, asset_id=asset.id,
                         ipam_record_id=ipam.id if ipam else None,
                         code=anomaly["code"], description=anomaly["description"],
-                        created_at=_now(),
+                        created_at=_now(), severity=_severity_for(anomaly["code"]),
                     ))
                     db.session.flush()
             completed(5)
@@ -143,7 +167,7 @@ def _run_inventory(
                 db.session.add(Anomaly(
                     run_id=run.id, ipam_record_id=ipam.id,
                     code=anomaly["code"], description=anomaly["description"],
-                    created_at=_now(),
+                    created_at=_now(), severity=_severity_for(anomaly["code"]),
                 ))
                 db.session.flush()
             completed(6)

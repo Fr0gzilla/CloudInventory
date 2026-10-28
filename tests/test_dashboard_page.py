@@ -97,7 +97,7 @@ def test_server_cards_display_latest_counts_without_javascript(client):
     asset = Asset(run_id=run.id, vm_id="hostile", vm_name="<img src=x onerror=alert(1)>")
     db.session.add(asset)
     db.session.flush()
-    db.session.add_all([ConsolidatedAsset(run_id=run.id, asset_id=asset.id, match_status="MATCHED_IP"), Anomaly(run_id=run.id, code="MATCHED_IP", description="unsafe", created_at="2026-01-01")])
+    db.session.add_all([ConsolidatedAsset(run_id=run.id, asset_id=asset.id, match_status="MATCHED_IP"), Anomaly(run_id=run.id, code="MATCHED_IP", description="unsafe", created_at="2026-01-01", severity="info")])
     db.session.commit()
     response = client.get("/")
     page = markup(response)
@@ -119,7 +119,7 @@ def test_dashboard_json_isolates_latest_run_and_returns_api_history(client):
         db.session.add(asset)
         db.session.flush()
         db.session.add(ConsolidatedAsset(run_id=run.id, asset_id=asset.id, match_status=code))
-        db.session.add(Anomaly(run_id=run.id, code=code, description="sample", created_at="2026-01-01"))
+        db.session.add(Anomaly(run_id=run.id, code=code, description="sample", created_at="2026-01-01", severity="info"))
     db.session.commit()
     data = client.get("/dashboard/data").get_json()
     assert data["stats"]["run"]["id"] == latest.id

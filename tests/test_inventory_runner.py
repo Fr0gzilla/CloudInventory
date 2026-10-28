@@ -21,6 +21,46 @@ def rows(model, run_id):
     return db.session.query(model).filter_by(run_id=run_id).all()
 
 
+@pytest.mark.parametrize("scenario,expected", [
+    ("unchanged", 0),
+    ("renamed", 1),
+    ("renamed_with_creation", 1),
+])
+def test_renamed_anomaly_records_names_and_current_asset_only(orm_app, scenario, expected):
+    first = run_inventory()
+    previous = {item.vm_id: item.vm_name for item in rows(Asset, first.id)}
+    db.session.rollback()
+    second = run_inventory(virtualization_source=MockProxmoxSource(scenario), ipam_source=MockIpamSource())
+    current = {item.id: item for item in rows(Asset, second.id)}
+    renamed = [item for item in rows(Anomaly, second.id) if item.code == "RENAMED"]
+    assert len(renamed) == expected
+    for item in renamed:
+        asset = current[item.asset_id]
+        assert asset.vm_id in previous
+        assert previous[asset.vm_id] != asset.vm_name
+        assert previous[asset.vm_id] in item.description
+        assert asset.vm_name in item.description
+    assert all(current[item.asset_id].vm_id != "new-100" for item in renamed)
+
+
+def test_anomalies_default_to_info_without_severity_configuration(orm_app, monkeypatch):
+    monkeypatch.delenv("ANOMALY_SEVERITIES", raising=False)
+    run = run_inventory()
+    assert {item.severity for item in rows(Anomaly, run.id)} == {"info"}
+
+
+def test_explicit_anomaly_severity_is_applied(orm_app, monkeypatch):
+    monkeypatch.setenv("ANOMALY_SEVERITIES", '{"NO_MATCH": "majeure"}')
+    run = run_inventory()
+    assert {item.severity for item in rows(Anomaly, run.id) if item.code == "NO_MATCH"} == {"majeure"}
+
+
+def test_invalid_explicit_anomaly_severity_is_rejected(orm_app, monkeypatch):
+    monkeypatch.setenv("ANOMALY_SEVERITIES", '{"NO_MATCH": "invalid"}')
+    run = run_inventory(virtualization_source=Source([{"vm_id": "unmatched", "vm_name": "unmatched", "type": "qemu"}]), ipam_source=Source([]))
+    assert run.status == "FAIL" and "No valid anomaly severity configured for NO_MATCH" in run.error_message
+
+
 def test_default_run_persists_seven_ordered_steps_and_four_counters(orm_app):
     steps = []
     run = run_inventory(after_step=steps.append)

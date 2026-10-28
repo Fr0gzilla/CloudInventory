@@ -1,6 +1,20 @@
 from app import db
 
 
+class RunSchedule(db.Model):
+    __tablename__ = "run_schedule"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    frequency = db.Column(db.Text, nullable=False)
+    enabled = db.Column(db.Integer, nullable=False, server_default=db.text("0"))
+    next_at = db.Column(db.Text)
+
+    __table_args__ = (
+        db.CheckConstraint("frequency IN ('horaire', 'quotidien')"),
+        db.CheckConstraint("enabled IN (0, 1)"),
+    )
+
+
 class Run(db.Model):
     __tablename__ = "run"
 
@@ -13,6 +27,10 @@ class Run(db.Model):
     matched_ip_count = db.Column(db.Integer)
     no_match_count = db.Column(db.Integer)
     error_message = db.Column(db.Text)
+    current_step = db.Column(db.Integer)
+    completed_steps = db.Column(db.Integer)
+    run_trigger = db.Column(db.Text)
+    schedule_id = db.Column(db.Integer, db.ForeignKey("run_schedule.id", ondelete="SET NULL"))
 
     __table_args__ = (
         db.CheckConstraint("status IN ('RUNNING', 'SUCCESS', 'FAIL')"),
@@ -20,6 +38,10 @@ class Run(db.Model):
         db.CheckConstraint("matched_fqdn_count >= 0"),
         db.CheckConstraint("matched_ip_count >= 0"),
         db.CheckConstraint("no_match_count >= 0"),
+        db.CheckConstraint("current_step BETWEEN 1 AND 7"),
+        db.CheckConstraint("completed_steps BETWEEN 0 AND 7"),
+        db.CheckConstraint("run_trigger IN ('manuel', 'planifié')"),
+        db.Index("idx_run_schedule", "schedule_id"),
     )
 
 
@@ -122,12 +144,18 @@ class Anomaly(db.Model):
     code = db.Column(db.Text, nullable=False)
     description = db.Column(db.Text, nullable=False)
     created_at = db.Column(db.Text, nullable=False)
+    tracking_key = db.Column(db.Text)
+    state = db.Column(db.Text, nullable=False, server_default=db.text("'ouverte'"))
+    state_changed_at = db.Column(db.Text)
+    severity = db.Column(db.Text, nullable=False)
 
     __table_args__ = (
         db.CheckConstraint(
             "code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', "
-            "'DUPLICATE_DNS', 'DUPLICATE_IP')"
+            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')"
         ),
+        db.CheckConstraint("state IN ('ouverte', 'acquittée', 'résolue')"),
+        db.CheckConstraint("severity IN ('info', 'mineure', 'majeure', 'critique')"),
         db.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="CASCADE"),
         db.ForeignKeyConstraint(["asset_id", "run_id"], ["asset.id", "asset.run_id"], ondelete="RESTRICT"),
         db.ForeignKeyConstraint(
@@ -137,4 +165,27 @@ class Anomaly(db.Model):
         db.Index("idx_anomaly_run", "run_id"),
         db.Index("idx_anomaly_asset_run", "asset_id", "run_id"),
         db.Index("idx_anomaly_ipam_run", "ipam_record_id", "run_id"),
+        db.Index("idx_anomaly_tracking", "tracking_key", "created_at"),
+        db.Index("idx_anomaly_severity", "severity"),
+    )
+
+
+class AnomalyException(db.Model):
+    __tablename__ = "anomaly_exception"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    code = db.Column(db.Text, nullable=False)
+    target = db.Column(db.Text, nullable=False)
+    justification = db.Column(db.Text, nullable=False)
+    expires_at = db.Column(db.Text, nullable=False)
+    author = db.Column(db.Text, nullable=False)
+
+    __table_args__ = (
+        db.CheckConstraint(
+            "code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', "
+            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')"
+        ),
+        db.CheckConstraint("length(trim(target)) > 0"),
+        db.CheckConstraint("length(trim(justification)) > 0"),
+        db.CheckConstraint("length(trim(author)) > 0"),
     )

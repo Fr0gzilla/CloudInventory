@@ -127,9 +127,9 @@ def test_run_detail_contains_own_metadata_counters_and_anomalies(web_client):
     other = add_run()
     current = add_run(status="FAIL", finished_at="2026-01-01T01:00:00Z", error_message="collection failed",
                       matched_name_count=2, matched_fqdn_count=3, matched_ip_count=4, no_match_count=5)
-    db.session.add(Anomaly(run_id=other.id, code="NO_MATCH", description="other run only", created_at="2026-01-01"))
+    db.session.add(Anomaly(run_id=other.id, code="NO_MATCH", severity="info", description="other run only", created_at="2026-01-01"))
     db.session.commit()
-    db.session.add(Anomaly(run_id=current.id, code="MATCHED_IP", description="current only", created_at="2026-01-02"))
+    db.session.add(Anomaly(run_id=current.id, code="MATCHED_IP", severity="info", description="current only", created_at="2026-01-02"))
     db.session.commit()
     response = web_client.get(f"/runs/{current.id}")
     parsed = markup(response)
@@ -146,7 +146,7 @@ def test_unknown_run_returns_404(web_client):
 
 def test_hostile_anomaly_description_is_escaped(web_client):
     current = add_run()
-    db.session.add(Anomaly(run_id=current.id, code="NO_MATCH", description="<img src=x onerror=alert(1)>", created_at="2026-01-01"))
+    db.session.add(Anomaly(run_id=current.id, code="NO_MATCH", severity="info", description="<img src=x onerror=alert(1)>", created_at="2026-01-01"))
     db.session.commit()
     response = web_client.get(f"/runs/{current.id}")
     assert markup(response).sections["Anomalies du run"][1][1] == "<img src=x onerror=alert(1)>"

@@ -90,7 +90,7 @@ def asset(current, vm_id, name, ip):
 
 
 def anomaly(current, code, description):
-    db.session.add(Anomaly(run_id=current.id, code=code, description=description, created_at="2026-01-01"))
+    db.session.add(Anomaly(run_id=current.id, code=code, severity="info", description=description, created_at="2026-01-01"))
     db.session.commit()
 
 
