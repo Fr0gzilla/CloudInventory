@@ -1,6 +1,6 @@
 from collections import Counter
 
-from flask import jsonify, request
+from flask import g, jsonify, request
 from flask_jwt_extended import create_access_token
 
 from app.models import Anomaly, Asset, ConsolidatedAsset, Run
@@ -97,7 +97,10 @@ def configure_api(app, authenticate):
             return jsonify(error="Invalid credentials"), 400
         result = authenticate(username, password, channel="api")
         if result == "limited":
-            return jsonify(error="Too many attempts"), 429
+            response = jsonify(error="Too many attempts")
+            response.status_code = 429
+            response.headers["Retry-After"] = str(g.auth_retry_after)
+            return response
         if result == "invalid":
             return jsonify(error="Invalid credentials"), 401
         return jsonify(access_token=create_access_token(identity="admin"))

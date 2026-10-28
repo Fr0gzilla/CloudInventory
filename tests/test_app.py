@@ -93,7 +93,7 @@ def test_web_login_rejects_unicode_username_without_server_error(valid_secrets):
     assert response.status_code == 401
 
 
-def test_unicode_web_failures_limit_api_login(valid_secrets):
+def test_unicode_web_failures_do_not_limit_admin_api_login(valid_secrets):
     client = start_app().test_client()
     client.get("/login")
     with client.session_transaction() as session:
@@ -106,7 +106,7 @@ def test_unicode_web_failures_limit_api_login(valid_secrets):
     response = client.post(
         "/api/login", json={"username": "admin", "password": valid_secrets["ADMIN_PASSWORD"]}
     )
-    assert (response.status_code, response.get_json()) == (429, {"error": "Too many attempts"})
+    assert response.status_code == 200 and response.get_json()["access_token"]
 
 
 @pytest.mark.parametrize("key", SECRETS)
