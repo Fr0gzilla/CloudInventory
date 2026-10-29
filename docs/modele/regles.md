@@ -1,4 +1,4 @@
-# CloudInventory v2.2 — règles de gestion
+# CloudInventory v2.3 — règles de gestion
 
 ## Règles de gestion
 RG01 [structure] — Un run doit conserver son statut, ses dates, ses quatre compteurs de correspondance et son éventuel message d’erreur. (§6.1)
@@ -49,6 +49,16 @@ RG45 [comportement] — Une exception ne doit écarter un constat que si son cod
 RG46 [comportement] — Un run lancé doit pouvoir progresser sans immobiliser la requête de lancement, avec une progression consultable pour chacune des sept étapes de RG25–RG28. (§20 EV30 ; §8.2)
 RG47 [comportement] — L’administrateur doit pouvoir planifier depuis l’interface des runs à cadence quotidienne ou horaire. (§20 EV32)
 RG48 [structure] — Chaque run planifié doit conserver sa provenance planifiée et sa progression propre sans écraser les runs précédents. (§20 EV30, EV32 ; RG07)
+RG49 [structure] — Une observation de virtualisation issue de vSphere doit conserver son identité source et ses attributs dans le run qui l’a collectée. (§17 EV01 ; RG02, RG07)
+RG50 [structure] — Une observation IPAM issue d’EfficientIP doit conserver ses attributs dans le run qui l’a collectée, même sans VM correspondante. (§17 EV02 ; RG03, RG07)
+RG51 [contrainte] — Une identité de VM ne doit pas être assimilée à celle d’une autre source de virtualisation sur la seule égalité de son identifiant source. (§17 EV01 ; RG21)
+RG52 [comportement] — L’accès aux actions et aux données doit être soumis au rôle du compte authentifié parmi admin, opérateur et lecteur. (§22 EV48)
+RG53 [structure] — Chaque compte doit posséder une identité distincte et un rôle parmi admin, opérateur et lecteur. (§22 EV48)
+RG54 [contrainte] — Un compte authentifié par LDAP ou Active Directory ne doit avoir aucun mot de passe conservé dans l’application. (§22 EV49)
+RG55 [contrainte] — Un compte authentifié localement ne doit conserver qu’une représentation hachée de son mot de passe. (§10.1, §22 EV48–EV49)
+RG56 [comportement] — L’authentification annuaire doit permettre la connexion des comptes LDAP ou Active Directory sans mot de passe supplémentaire dans l’application. (§22 EV49)
+RG57 [structure] — Chaque lancement, acquittement, purge ou modification doit produire une trace d’audit précisant l’auteur, l’action, la date et la cible concernée. (§22 EV52)
+RG58 [contrainte] — La migration vers plusieurs comptes et sources ne doit pas effacer les observations, runs et constats historiques. (§23 EV59 ; RG07, RG37)
 
 ## Dictionnaire des données
 Les longueurs non prescrites sont indiquées « non précisée » ; les types conceptuels n’imposent aucun format d’interface.
@@ -130,6 +140,19 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 | schedule_enabled | booléen | — | activation selon choix technique ; Q15 | §20 EV32 |
 | schedule_next_at | datetime | — | prochain déclenchement calculé ; fuseau Q15 | §20 EV32 |
 | run_schedule_ref | entier | — | facultatif, référence schedule_id lorsque planifié | §20 EV32 |
+| virtual_source | texte (à confirmer) | non précisée | origine de l’observation VM par run ; identité disjointe de vm_id ; Q16 | §17 EV01 ; RG51 |
+| ipam_source | texte (à confirmer) | non précisée | origine de l’observation IPAM par run ; Q16 | §17 EV02 ; RG50 |
+| account_id | entier | — | identifiant candidat du compte ; Q17 | §22 EV48 |
+| account_username | texte | non précisée | identité distincte du compte ; portée d’unicité Q17 | §22 EV48–EV49 |
+| account_role | énumération{admin,opérateur,lecteur} | — | obligatoire pour un compte autorisé ; droits Q18 | §22 EV48 |
+| account_auth_source | énumération{local,LDAP,AD} | — | obligatoire ; annuaire configuré sans secret persisté dans le modèle ; Q17 | §22 EV49 |
+| local_password_hash | texte | non précisée | uniquement pour compte local, absent pour LDAP/AD | §10.1, §22 EV49 |
+| audit_id | entier | — | identifiant candidat de la trace | §22 EV52 |
+| audit_actor_ref | entier (à confirmer) | — | auteur du compte si connu ; conservation en cas de suppression Q19 | §22 EV52 |
+| audit_actor_identity | texte | non précisée | identité historique de l’auteur, même si compte supprimé ; Q19 | §22 EV52 |
+| audit_action | texte (à confirmer) | non précisée | lancement, acquittement, purge, modification ; autres actions Q19 | §22 EV52 |
+| audit_date | datetime | — | obligatoire, instant de l’action | §22 EV52 |
+| audit_target | texte (à confirmer) | non précisée | cible de l’action, format Q19 | §22 EV52 |
 
 ## Acteurs
 - Administrateur : déclenche et consulte les inventaires, comparaisons, exports et purges (§8.1–§8.10).
@@ -137,6 +160,8 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Source de virtualisation : fournit les VM et CT (§8.2).
 - Source IPAM : fournit les enregistrements réseau (§8.2).
 - Service de notification : reçoit les alertes configurées après succès (§8.9).
+- Opérateur et lecteur : accèdent aux fonctions autorisées par leur rôle ; droits détaillés à confirmer (§22 EV48).
+- Annuaire LDAP ou Active Directory : authentifie les comptes d’annuaire (§22 EV49).
 
 ## Cas d'utilisation candidats
 - Lancer un inventaire — Administrateur — RG19–RG20.
@@ -160,6 +185,11 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Lancer et suivre un run asynchrone — Administrateur — RG46.
 - Configurer une planification horaire ou quotidienne — Administrateur — RG47.
 - Déclencher un run planifié — Planificateur externe — RG47–RG48.
+- Collecter les observations vSphere — Source de virtualisation — RG49, RG51.
+- Collecter les observations EfficientIP — Source IPAM — RG50.
+- Gérer les comptes et leurs rôles — Administrateur — RG52–RG53.
+- Se connecter via l’annuaire — Opérateur, lecteur ou administrateur — RG54, RG56.
+- Consulter les actions auditées — Administrateur — RG57.
 
 ## Questions ouvertes
 - Q1 — RG2, RG21 — Quel est le type exact de vm_id ? Par défaut, conserver sans conversion son identité textuelle source ; vérifier avant de fixer l’unicité dans un même run.
@@ -177,3 +207,7 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Q13 — RG46 — Comment représenter la progression après rollback d’un run échoué ? Par défaut, conserver la dernière étape atteinte comme information de suivi, sans persister les observations annulées.
 - Q14 — RG48 — Comment qualifier les anciens runs sans provenance enregistrée ? Par défaut, provenance inconnue laissée vide, jamais imputée au planificateur.
 - Q15 — RG47 — Quel fuseau, horaire exact, gestion de l’activation et des déclenchements manqués ? Par défaut, cadence enregistrée, fuseau explicite avant activation ; ne jamais déclencher rétroactivement plusieurs runs sans décision.
+- Q16 — RG49–RG51 — Quel identifiant stable et quel vocabulaire des attributs fournissent vSphere et EfficientIP ? Par défaut, préserver les valeurs source par run et qualifier leur origine sans fusionner deux identifiants homonymes ; ne pas créer de faux attributs.
+- Q17 — RG53–RG56 — Comment lier une identité LDAP/AD à un compte local ou à plusieurs annuaires ? Par défaut, garder les identités séparées par origine et ne jamais enregistrer un mot de passe annuaire.
+- Q18 — RG52 — Quelles opérations précises sont autorisées à chaque rôle ? Par défaut, refuser toute opération non explicitement autorisée, sans attribuer automatiquement les droits admin aux comptes existants non identifiés.
+- Q19 — RG57 — Quelle portée d’audit, quel format des cibles et quelle politique de rétention ? Par défaut, conserver les traces des quatre familles d’actions citées et l’identité historique de l’auteur ; ne pas supprimer les traces lors d’une purge des runs.

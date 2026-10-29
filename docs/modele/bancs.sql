@@ -44,3 +44,37 @@ SELECT 1 WHERE (SELECT count(*) FROM anomaly WHERE code='RENAMED' AND severity='
 DELETE FROM run WHERE id=1;
 -- attendu : 1 ligne(s)
 SELECT 1 WHERE (SELECT count(*) FROM run WHERE id=1)=0 AND (SELECT count(*) FROM asset WHERE run_id=1)=0 AND (SELECT count(*) FROM ipam_record WHERE run_id=1)=0 AND (SELECT count(*) FROM consolidated_asset WHERE run_id=1)=0 AND (SELECT count(*) FROM anomaly WHERE run_id=1)=0 AND (SELECT count(*) FROM run WHERE id=2)=1 AND (SELECT count(*) FROM asset WHERE run_id=2)=1 AND (SELECT count(*) FROM ipam_record WHERE run_id=2)=1 AND (SELECT count(*) FROM consolidated_asset WHERE run_id=2)=1 AND (SELECT count(*) FROM pragma_foreign_key_check)=0;
+-- attendu : accepté
+INSERT INTO auth_origin(origin_code) VALUES ('local'),('LDAP'),('AD');
+-- attendu : accepté
+INSERT INTO role(role_code) VALUES ('admin'),('opérateur'),('lecteur');
+-- attendu : accepté
+INSERT INTO permission(permission_code) VALUES ('launch'),('read');
+-- attendu : accepté
+INSERT INTO account(id,origin_code,role_code,username,local_password_hash) VALUES (1,'local','admin','alex','hash-example'),(2,'LDAP','lecteur','alex',NULL),(3,'AD','opérateur','alex',NULL);
+-- attendu : accepté
+INSERT INTO role_permission(role_code,permission_code) VALUES ('admin','launch');
+-- attendu : accepté
+INSERT INTO audit(account_id,actor_identity,action,created_at,target) VALUES (1,'local:alex','purge','2026-01-03','run:1');
+-- attendu : accepté
+UPDATE asset SET virtual_source='vSphere' WHERE id=2;
+-- attendu : accepté
+UPDATE ipam_record SET ipam_source='EfficientIP' WHERE id=2;
+-- attendu : 1 ligne(s)
+SELECT 1 WHERE (SELECT count(*) FROM account WHERE username='alex')=3 AND (SELECT count(*) FROM account WHERE local_password_hash IS NULL)=2 AND (SELECT count(*) FROM role_permission)=1 AND (SELECT count(*) FROM audit WHERE target='run:1')=1 AND (SELECT virtual_source FROM asset WHERE id=2)='vSphere' AND (SELECT ipam_source FROM ipam_record WHERE id=2)='EfficientIP';
+-- attendu : refus
+INSERT INTO account(origin_code,role_code,username,local_password_hash) VALUES ('LDAP','lecteur','other','forbidden');
+-- attendu : refus
+INSERT INTO account(origin_code,role_code,username) VALUES ('local','admin','other');
+-- attendu : refus
+INSERT INTO account(origin_code,role_code,username) VALUES ('LDAP','lecteur','alex');
+-- attendu : refus
+INSERT INTO role_permission(role_code,permission_code) VALUES ('lecteur','missing');
+-- attendu : refus
+INSERT INTO role_permission(role_code,permission_code) VALUES ('admin','launch');
+-- attendu : refus
+INSERT INTO audit(actor_identity,action,created_at,target) VALUES (' ','purge','2026-01-03','run:1');
+-- attendu : accepté
+DELETE FROM account WHERE id=1;
+-- attendu : 1 ligne(s)
+SELECT 1 WHERE (SELECT count(*) FROM audit WHERE account_id IS NULL AND actor_identity='local:alex' AND target='run:1')=1 AND (SELECT count(*) FROM pragma_foreign_key_check)=0 AND (SELECT count(*) FROM pragma_integrity_check WHERE integrity_check='ok')=1;

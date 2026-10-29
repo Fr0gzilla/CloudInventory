@@ -27,6 +27,7 @@ CREATE TABLE asset (
     id INTEGER PRIMARY KEY,
     run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
     vm_id TEXT NOT NULL,
+    virtual_source TEXT,
     vm_name TEXT,
     fqdn TEXT,
     ip_reported TEXT,
@@ -48,6 +49,7 @@ CREATE TABLE ipam_record (
     id INTEGER PRIMARY KEY,
     run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
     ip TEXT,
+    ipam_source TEXT,
     dns_name TEXT,
     status TEXT,
     tenant TEXT,
@@ -101,6 +103,33 @@ CREATE TABLE anomaly_exception (
 );
 
 CREATE INDEX idx_asset_run ON asset(run_id);
+CREATE TABLE auth_origin (origin_code TEXT PRIMARY KEY CHECK (origin_code IN ('local', 'LDAP', 'AD')));
+CREATE TABLE role (role_code TEXT PRIMARY KEY CHECK (role_code IN ('admin', 'opérateur', 'lecteur')));
+CREATE TABLE permission (permission_code TEXT PRIMARY KEY CHECK (length(trim(permission_code)) > 0));
+CREATE TABLE account (
+    id INTEGER PRIMARY KEY,
+    origin_code TEXT NOT NULL REFERENCES auth_origin(origin_code) ON DELETE RESTRICT,
+    role_code TEXT NOT NULL REFERENCES role(role_code) ON DELETE RESTRICT,
+    username TEXT NOT NULL CHECK (length(trim(username)) > 0),
+    local_password_hash TEXT,
+    UNIQUE (origin_code, username),
+    CHECK ((origin_code = 'local' AND local_password_hash IS NOT NULL AND length(trim(local_password_hash)) > 0)
+        OR (origin_code <> 'local' AND local_password_hash IS NULL))
+);
+CREATE TABLE role_permission (
+    id INTEGER PRIMARY KEY,
+    role_code TEXT NOT NULL REFERENCES role(role_code) ON DELETE CASCADE,
+    permission_code TEXT NOT NULL REFERENCES permission(permission_code) ON DELETE CASCADE,
+    UNIQUE (role_code, permission_code)
+);
+CREATE TABLE audit (
+    id INTEGER PRIMARY KEY,
+    account_id INTEGER REFERENCES account(id) ON DELETE SET NULL,
+    actor_identity TEXT NOT NULL CHECK (length(trim(actor_identity)) > 0),
+    action TEXT NOT NULL CHECK (length(trim(action)) > 0),
+    created_at TEXT NOT NULL,
+    target TEXT NOT NULL CHECK (length(trim(target)) > 0)
+);
 CREATE INDEX idx_asset_run_vm ON asset(run_id, vm_id);
 CREATE INDEX idx_asset_run_name ON asset(run_id, vm_name);
 CREATE INDEX idx_asset_run_fqdn ON asset(run_id, fqdn);
@@ -118,3 +147,7 @@ CREATE INDEX idx_anomaly_ipam_run ON anomaly(ipam_record_id, run_id);
 CREATE INDEX idx_run_schedule ON run(schedule_id);
 CREATE INDEX idx_anomaly_tracking ON anomaly(tracking_key, created_at);
 CREATE INDEX idx_anomaly_severity ON anomaly(severity);
+CREATE INDEX idx_account_role ON account(role_code);
+CREATE INDEX idx_role_permission_permission ON role_permission(permission_code);
+CREATE INDEX idx_audit_account ON audit(account_id);
+CREATE INDEX idx_audit_date ON audit(created_at);

@@ -1,4 +1,4 @@
-# Dictionnaire des données — CloudInventory v2.2
+# Dictionnaire des données — CloudInventory v2.3
 
 Les cinq ensembles sont `run`, `asset`, `ipam_record`, `consolidated_asset` et `anomaly`. Types SQLite proposés : INTEGER pour identifiants, compteurs et booléens (0/1), TEXT pour dates ISO 8601, chaînes et énumérations, REAL pour métriques numériques dont unités et précision restent à confirmer. NULL signifie valeur source absente ou non applicable, jamais suppression de la ligne. Les valeurs variables sont conservées par run ; les doublons IPAM restent stockables. Les clés de liaison doivent viser le même run.
 
@@ -89,3 +89,25 @@ Décisions à confirmer avant schéma SQL : format réel de vm_id et unicité in
 - Les sept étapes numérotées du §8.2 sont : 1 création RUNNING ; 2 collecte VM/CT ; 3 collecte IPAM ; 4 rapprochement des observations par identités source ; 5 consolidation, rôle et anomalies ; 6 doublons DNS/IP ; 7 finalisation SUCCESS, dates et compteurs. L’affichage de progression est indépendant de la transaction des observations ; si rollback, aucun constat d’un run échoué ne doit subsister (RG20, RG28, RG46).
 - Choix SQLite proposés, non obligations du cahier : `anomaly_exception` et `run_schedule` sont deux nouvelles entités ; codes, états, sévérités et fréquences se stockent en TEXT avec CHECK ; dates en TEXT ISO 8601 ; FK `run.schedule_id` nullable ; progression en entiers bornés. Les anciennes lignes restent lisibles, sans imputation rétrospective de provenance ni gravité fictive.
 - La persistance exacte du suivi inter-runs (clé, transitions, historique de résolution), la répartition des sept sévérités, la granularité des cibles et les paramètres temporels restent Q9–Q15 ; une sévérité inconnue est signalée et non remplacée. Ne pas appliquer une exception expirée ni fusionner des anomalies ambiguës.
+
+## Compléments conceptuels v2.3 (schéma cible)
+
+| ensemble | donnée | type conceptuel | contraintes / provenance |
+| --- | --- | --- | --- |
+| asset | virtual_source | texte à confirmer | origine par run ; disjoint de vm_id pour éviter les collisions inter-sources (§17 EV01, Q16) |
+| ipam_record | ipam_source | texte à confirmer | origine par run ; IP et DNS toujours non uniques (§17 EV02, Q16) |
+| account | account_id | entier | identifiant candidat (§22 EV48) |
+| account | account_username | texte | identité du compte ; portée d’unicité Q17 (§22 EV48–EV49) |
+| account | account_role | énumération{admin,opérateur,lecteur} | rôle obligatoire ; permissions détaillées Q18 (§22 EV48) |
+| account | account_auth_source | énumération{local,LDAP,AD} | origine de connexion ; liaison inter-origines Q17 (§22 EV49) |
+| account | local_password_hash | texte | seulement compte local ; absent pour LDAP/AD (§10.1, §22 EV49) |
+| audit | audit_id | entier | identifiant candidat (§22 EV52) |
+| audit | audit_actor_ref | entier à confirmer | référence au compte si connu ; rétention Q19 (§22 EV52) |
+| audit | audit_actor_identity | texte | identité historique de l’auteur ; conservation si compte supprimé, Q19 (§22 EV52) |
+| audit | audit_action | texte à confirmer | lancement, acquittement, purge, modification ; extension Q19 (§22 EV52) |
+| audit | audit_date | datetime | instant de l’action, obligatoire (§22 EV52) |
+| audit | audit_target | texte à confirmer | cible de l’action, format Q19 (§22 EV52) |
+
+Migration compatible : ajouter les origines facultatives aux observations historiques sans leur attribuer arbitrairement une source ; conserver les comptes et les runs préexistants, sans fabriquer d’identité annuaire ni de rôle historique. L’identité d’un compte ancien et l’attribution de ses droits restent à confirmer (Q17–Q18). Le stockage précis et les contraintes SQL sont des choix de la chaîne MLD, pas des obligations nouvelles du besoin.
+
+Correspondance physique : `asset.virtual_source TEXT NULL`, `ipam_record.ipam_source TEXT NULL` ; `auth_origin(origin_code TEXT PRIMARY KEY)` limité à local/LDAP/AD, `role(role_code TEXT PRIMARY KEY)` limité à admin/opérateur/lecteur, `permission(permission_code TEXT PRIMARY KEY)` non vide. `account(id INTEGER PRIMARY KEY, origin_code TEXT NOT NULL, role_code TEXT NOT NULL, username TEXT NOT NULL, local_password_hash TEXT NULL)` : FK vers les référentiels, UNIQUE(origin_code, username), hash non vide obligatoire pour local et NULL pour LDAP/AD. `role_permission(id INTEGER PRIMARY KEY, role_code TEXT NOT NULL, permission_code TEXT NOT NULL)` : deux FK et UNIQUE(role_code, permission_code), sans attribution initiale. `audit(id INTEGER PRIMARY KEY, account_id INTEGER NULL, actor_identity TEXT NOT NULL, action TEXT NOT NULL, created_at TEXT NOT NULL, target TEXT NOT NULL)` : FK compte ON DELETE SET NULL ; identité et cible historiques non vides. Une purge des runs ne supprime jamais l'audit. L'unicité par origine est un choix technique révisable (Q17).

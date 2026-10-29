@@ -16,7 +16,7 @@ stateDiagram-v2
 
 - `[*]` marque l'entrée et la fin du cycle ; les flèches portent événement, garde éventuelle et effet. `RUNNING`, `SUCCESS`, `FAIL` sont les seules valeurs autorisées par `run.status` et `Run.run_status` (`RunStatus`).
 - La fin du cycle n'est pas une suppression du run : son historique demeure. Après rollback, l'échec doit rester enregistré ; le diagramme ne prescrit pas la mécanique transactionnelle de cette persistance.
-- Un déclenchement manuel ou planifié crée son propre `Run` ; `run_trigger` et le lien facultatif vers `RunSchedule` indiquent la provenance, sans changer les trois statuts. La boucle de progression représente les sept étapes, sans imposer la valeur du compteur après échec (Q13).
+- Un déclenchement manuel ou planifié crée son propre `Run` ; `run_trigger` et le lien facultatif vers `RunSchedule` indiquent la provenance, sans changer les trois statuts. Les observations `Asset.virtual_source` et `IpamRecord.ipam_source` qualifient leur origine par run ; deux `vm_id` égaux d'origines différentes ne sont pas fusionnés. La boucle de progression représente les sept étapes, sans imposer la valeur du compteur après échec (Q13).
 
 ## Traçabilité
 
@@ -28,11 +28,14 @@ stateDiagram-v2
 | Exception RUNNING → FAIL | RG20, RG28 ; §8.2, rollback |
 | SUCCESS / FAIL → fin du cycle | RG07, RG19–RG20 ; §8.2, §8.5 |
 
+Les origines des observations et la conservation des runs historiques relèvent de RG49–RG51 et RG58 ; elles ne créent aucune transition d'état supplémentaire.
+
 ## Non représenté
 
 - Le SQL vérifie uniquement l'ensemble des statuts, non les transitions, les gardes ou la présence conditionnelle des dates, compteurs et erreur ; ces invariants relèvent du traitement applicatif.
 - Les statuts source des VM et de l'IPAM (Q2) ne sont pas des états du run.
 - Le déclenchement par `RunSchedule` (RG47–RG48) et la cadence sont hors du cycle d'état du run ; Q13–Q15 restent ouvertes.
+- La purge de runs n'efface pas les traces `Audit` de lancement, acquittement, purge et modification : auteur historique, action, date et cible restent consultables (RG57–RG58, Q19). L'audit n'est pas un état du run.
 
 # États — Anomaly
 

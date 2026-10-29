@@ -11,6 +11,11 @@ erDiagram
     ASSET |o..o{ ANOMALY : concerner_vm
     IPAM_RECORD |o..o{ ANOMALY : concerner_ipam
     RUN_SCHEDULE |o..o{ RUN : declencher
+    ROLE ||--o{ ACCOUNT : attribuer_role
+    AUTH_ORIGIN ||--o{ ACCOUNT : authentifier
+    ROLE ||--o{ ROLE_PERMISSION : autoriser_role
+    PERMISSION ||--o{ ROLE_PERMISSION : definir_permission
+    ACCOUNT |o..o{ AUDIT : identifier_auteur
     RUN {
         int run_id PK
         string run_status
@@ -28,6 +33,7 @@ erDiagram
     ASSET {
         int asset_id PK
         string vm_id
+        string virtual_source
         string vm_name
         string fqdn
         string ip_reported
@@ -46,6 +52,7 @@ erDiagram
     IPAM_RECORD {
         int ipam_record_id PK
         string ipam_ip
+        string ipam_source
         string dns_name
         string ipam_status
         string tenant
@@ -88,6 +95,30 @@ erDiagram
         boolean schedule_enabled
         datetime schedule_next_at
     }
+    AUTH_ORIGIN {
+        string origin_code PK
+    }
+    ROLE {
+        string role_code PK
+    }
+    ACCOUNT {
+        int account_id PK
+        string account_username
+        string local_password_hash
+    }
+    PERMISSION {
+        string permission_code PK
+    }
+    ROLE_PERMISSION {
+        int role_permission_id PK
+    }
+    AUDIT {
+        int audit_id PK
+        string audit_actor_identity
+        string audit_action
+        datetime audit_date
+        string audit_target
+    }
 ```
 
 Les identifiants de liaison du dictionnaire sont représentés par les associations, non répétés comme attributs conceptuels. Les liens vers RUN sont identifiants pour l'appartenance à un instantané ; les rapprochements facultatifs sont non identifiants. Aucun caractère IP ou DNS n'est unique dans IPAM_RECORD (RG8). Chaque lien vers ASSET ou IPAM_RECORD doit viser le RUN du résultat ou de l'anomalie (RG4, RG5, RG7).
@@ -97,12 +128,18 @@ Les identifiants de liaison du dictionnaire sont représentés par les associati
 | Entité (RG) | Identifiant | Attributs conceptuels : type (longueur) ; référence au dictionnaire |
 | --- | --- | --- |
 | RUN (RG1, RG7, RG19, RG46, RG48) | run_id : entier | run_status : énumération RUNNING/SUCCESS/FAIL ; started_at, finished_at : datetime ; matched_name_count, matched_fqdn_count, matched_ip_count, no_match_count : entier ; error_message : texte (non précisée) ; current_step : entier facultatif (1 à 7) ; completed_steps : entier (0 à 7, facultatif pour anciens runs) ; run_trigger : énumération manuel/planifié (facultatif pour anciens runs). |
-| ASSET (RG2, RG7, RG21) | asset_id : entier | vm_id : texte à confirmer (non précisée) ; vm_name, fqdn, ip_reported, node : texte (non précisée) ; asset_type : énumération qemu/lxc ; asset_status, asset_tags : texte à confirmer (non précisée) ; asset_role, os, annotation : texte (non précisée) ; cpu, ram, disk, uptime : décimal, précision et unités à confirmer. |
-| IPAM_RECORD (RG3, RG8, RG24, RG35–RG36) | ipam_record_id : entier | ipam_ip, dns_name : texte (non précisée, doublons admis) ; ipam_status, ipam_tags : texte à confirmer (non précisée) ; tenant, site, meta_zone : texte (non précisée) ; custom_fields : objet JSON source facultatif (non précisée), NULL si absent ; duplicate_dns, duplicate_ip : booléen. |
+| ASSET (RG2, RG7, RG21, RG49, RG51) | asset_id : entier | vm_id, virtual_source : texte à confirmer (non précisée) ; vm_name, fqdn, ip_reported, node : texte (non précisée) ; asset_type : énumération qemu/lxc ; asset_status, asset_tags : texte à confirmer (non précisée) ; asset_role, os, annotation : texte (non précisée) ; cpu, ram, disk, uptime : décimal, précision et unités à confirmer. |
+| IPAM_RECORD (RG3, RG8, RG24, RG35–RG36, RG50) | ipam_record_id : entier | ipam_ip, dns_name : texte (non précisée, doublons admis) ; ipam_source : texte à confirmer (non précisée) ; ipam_status, ipam_tags : texte à confirmer (non précisée) ; tenant, site, meta_zone : texte (non précisée) ; custom_fields : objet JSON source facultatif (non précisée), NULL si absent ; duplicate_dns, duplicate_ip : booléen. |
 | CONSOLIDATED_ASSET (RG4, RG7, RG14, RG22) | consolidated_asset_id : entier | ip_final, dns_final, consolidated_role : texte (non précisée) ; status_final : texte à confirmer (non précisée) ; match_status : énumération MATCHED_NAME/MATCHED_FQDN/MATCHED_IP/NO_MATCH. |
 | ANOMALY (RG5, RG6, RG39–RG43) | anomaly_id : entier | anomaly_code : énumération NO_MATCH/MATCHED_IP/HOSTNAME_MISMATCH/STATUS_MISMATCH/DUPLICATE_DNS/DUPLICATE_IP/RENAMED ; anomaly_description : texte (non précisée) ; anomaly_date, state_changed_at : datetime ; tracking_key : texte à confirmer (non précisée) ; anomaly_state : énumération ouverte/acquittée/résolue ; anomaly_severity : énumération info/mineure/majeure/critique (classification inconnue signalée, Q10). |
 | ANOMALY_EXCEPTION (RG44, RG45) | exception_id : entier | exception_code : même domaine que anomaly_code ; exception_target, exception_justification, exception_author : texte (non précisée) ; exception_expires_at : datetime. |
 | RUN_SCHEDULE (RG47, RG48) | schedule_id : entier | schedule_frequency : énumération horaire/quotidien ; schedule_enabled : booléen ; schedule_next_at : datetime facultatif. |
+| AUTH_ORIGIN (RG53–RG56) | origin_code : énumération local/LDAP/AD | Aucun autre attribut prescrit ; origine de connexion, sans assimilation automatique entre annuaires (Q17). |
+| ROLE (RG52–RG53) | role_code : énumération admin/opérateur/lecteur | Aucun autre attribut prescrit ; référentiel des rôles, sans droits implicites (Q18). |
+| ACCOUNT (RG53–RG56) | account_id : entier | account_username : texte (non précisée), identité qualifiée par AUTH_ORIGIN ; local_password_hash : texte (non précisée), seulement si origine locale, absent si LDAP/AD. |
+| PERMISSION (RG52, Q18) | permission_code : texte (non précisée) | Référentiel extensible d'opérations ; aucune permission effective présumée (Q18). |
+| ROLE_PERMISSION (RG52, Q18) | role_permission_id : entier | Attribution explicite d'une permission à un rôle ; unicité conceptuelle du couple rôle/permission ; aucune attribution initiale présumée. |
+| AUDIT (RG57–RG58) | audit_id : entier | audit_actor_identity : texte (non précisée), identité historique ; audit_action : texte à confirmer (non précisée), au minimum lancement/acquittement/purge/modification ; audit_date : datetime ; audit_target : texte à confirmer (non précisée), cible historique durable. |
 
 Chaque identifiant interne est distinct entre runs ; vm_id sert d'identité source par run, sans imposer ici une unicité intra-run non confirmée (RG21, Q1). Tous les autres champs ont pour longueur « non précisée » quand aucune longueur n'est indiquée ci-dessus ; les dates, compteurs, booléens et énumérations n'ont pas de longueur prescrite.
 
@@ -121,6 +158,11 @@ Les cardinalités indiquent la participation de chaque occurrence de l'entité n
 | concerner_vm | ASSET | (0,n) RG5, RG6 | ANOMALY | (0,1) RG5 | aucun | RG5, RG6, RG14 |
 | concerner_ipam | IPAM_RECORD | (0,n) RG5, RG8, RG17, RG18 | ANOMALY | (0,1) RG5 | aucun | RG5, RG8, RG17, RG18 |
 | declencher | RUN_SCHEDULE | (0,n) RG47, RG48 | RUN | (0,1) RG48, Q14 | aucun | RG47, RG48 |
+| attribuer_role | ROLE | (0,n) RG53, Q17 | ACCOUNT | (1,1) RG53 | aucun | RG52, RG53 |
+| authentifier | AUTH_ORIGIN | (0,n) RG53–RG56, Q17 | ACCOUNT | (1,1) RG54–RG56 | aucun | RG53–RG56 |
+| autoriser_role | ROLE | (0,n) RG52, Q18 | ROLE_PERMISSION | (1,1) RG52 | aucun | RG52, Q18 |
+| definir_permission | PERMISSION | (0,n) RG52, Q18 | ROLE_PERMISSION | (1,1) RG52 | aucun | RG52, Q18 |
+| identifier_auteur | ACCOUNT | (0,n) RG57, RG58, Q19 | AUDIT | (0,1) RG57, RG58, Q19 | aucun | RG57, RG58 |
 
 Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché au seul run ; ces deux références sont indépendamment facultatives (RG5). Une VM sans IPAM reste consolidable avec NO_MATCH et uniquement ses données de virtualisation ; un enregistrement IPAM non rapproché reste présent (RG3, RG14). Plusieurs anomalies peuvent concerner le même enregistrement sans fusionner les doublons (RG5, RG8).
 
@@ -147,6 +189,16 @@ Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché
 | concerner_vm ; ASSET (0,n), ANOMALY (0,1) | association et cardinalités | RG5, RG6, RG14 |
 | concerner_ipam ; IPAM_RECORD (0,n), ANOMALY (0,1) | association et cardinalités | RG5, RG8, RG17, RG18 |
 | declencher ; RUN_SCHEDULE (0,n), RUN (0,1) | association et cardinalités | RG47, RG48 |
+| ASSET ; virtual_source + vm_id par run, sans fusion inter-sources | attribut et identité qualifiée | RG02, RG07, RG21, RG49, RG51, RG58 |
+| IPAM_RECORD ; ipam_source, doublons et autonomie | attribut et identité qualifiée | RG03, RG07, RG08, RG50, RG58 |
+| ROLE ; ACCOUNT ; AUTH_ORIGIN | entités, rôles et origines distinctes | RG52, RG53, RG54, RG55, RG56 |
+| PERMISSION ; ROLE_PERMISSION | entités, permissions extensibles sans attribution supposée | RG52, RG53, Q18 |
+| AUDIT ; auteur, action, date, cible historiques | entité et attributs durables | RG57, RG58 |
+| attribuer_role ; ROLE (0,n), ACCOUNT (1,1) | association et cardinalités | RG52, RG53, Q17 |
+| authentifier ; AUTH_ORIGIN (0,n), ACCOUNT (1,1) | association et cardinalités | RG53, RG54, RG55, RG56, Q17 |
+| autoriser_role ; ROLE (0,n), ROLE_PERMISSION (1,1) | association et cardinalités | RG52, Q18 |
+| definir_permission ; PERMISSION (0,n), ROLE_PERMISSION (1,1) | association et cardinalités | RG52, Q18 |
+| identifier_auteur ; ACCOUNT (0,n), AUDIT (0,1) | association et cardinalités facultatives ; identité historique conservée | RG57, RG58, Q19 |
 | appliquer_exception ; ANOMALY_EXCEPTION et ANOMALY | rapprochement conditionnel par code, cible et expiration, sans cardinalité imposée | RG44, RG45 |
 
 ## Écarts et questions
@@ -163,3 +215,7 @@ Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché
 - Q10 : correspondance code/sévérité absente ; ne pas attribuer une gravité fictive aux anciens constats (RG43).
 - Q11–Q12 : cible stable et auteur d'exception restent à préciser ; l'application d'une exception est un prédicat code + cible + date, non une association persistante à cardinalité déductible (RG44–RG45). ANOMALY_EXCEPTION est une entité autonome sans association structurelle prescrite ; cette exception à la règle de rattachement des entités est à arbitrer.
 - Q13–Q15 : suivi des étapes après rollback, provenance des anciens runs et fuseau/activation de la planification restent ouverts (RG46–RG48). La planification peut n'avoir encore déclenché aucun run ; un run manuel ou ancien n'en référence aucune.
+- Q16 : identifiants et vocabulaire vSphere/EfficientIP inconnus ; conserver les origines de chaque observation et ne jamais fusionner deux vm_id identiques d'origines différentes ; les observations anciennes gardent une origine inconnue plutôt qu'une provenance inventée (RG49–RG51, RG58).
+- Q17 : portée de l'unicité de account_username et rattachement entre comptes locaux/LDAP/AD non définis ; account_id reste distinct et l'origine qualifie l'identité, sans fusion automatique ; les anciens comptes ne reçoivent pas d'origine fictive (RG53–RG56, RG58).
+- Q18 : aucune matrice rôle/permission validée ; ROLE_PERMISSION prévoit des attributions explicites mais reste vide sans décision métier ; aucun droit hérité ou accordé automatiquement aux anciens comptes (RG52–RG53, RG58).
+- Q19 : format des cibles et durée de rétention non fixés ; AUDIT garde auteur et cible textuels durables même si le compte, le run ou la cible est supprimé ; le lien facultatif vers ACCOUNT ne commande aucune purge en cascade (RG57–RG58).

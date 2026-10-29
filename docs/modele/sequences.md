@@ -18,10 +18,10 @@ sequenceDiagram
     Run->>Run: 1 start() : RUNNING, started_at
     Note over Run: Progression consultable par étape, propre à ce run
     Run->>+Virtualisation: 2 collectAssets() : VM et CT
-    Virtualisation-->>-Run: observations VM et CT
+    Virtualisation-->>-Run: observations VM et CT, origine vSphere qualifiée
     Run->>+IPAM: 3 collectIpamRecords()
-    IPAM-->>-Run: observations IPAM
-    Run->>+Asset: 4 rapprocher par vm_id dans ce run
+    IPAM-->>-Run: observations IPAM, origine EfficientIP qualifiée
+    Run->>+Asset: 4 rapprocher par origine virtuelle et vm_id dans ce run
     Asset-->>-Run: observations Asset conservées
     Run->>+IpamRecord: 4 rapprocher par IP et nom DNS dans ce run
     IpamRecord-->>-Run: observations IPAM conservées
@@ -58,6 +58,7 @@ sequenceDiagram
 
 - Flèche pleine : appel ou résultat ; flèche asynchrone : lancement non bloquant ; `alt` : réussite ou exception ; `opt` : traitement conditionnel. `Run`, `Asset`, `IpamRecord`, `ConsolidatedAsset`, `Anomaly` et `AnomalyException` sont les classes du modèle ; l'administrateur et les deux sources sont les acteurs des règles.
 - Les étapes 1–7 sont ordonnées ; l'étape 4 représente la conservation/rapprochement intra-run, sans imposer de primitive SQL d'upsert absente du schéma. La branche d'exception peut survenir à chacune des étapes, et non uniquement après la détection des doublons.
+- `Asset.virtual_source` et `IpamRecord.ipam_source` conservent la provenance des valeurs reçues dans chaque run, même pour un enregistrement IPAM sans VM ; aucun `vm_id` d'une autre source n'est assimilé sur sa seule valeur. Les constats et observations des anciens runs ne sont pas écrasés.
 
 ## Traçabilité — pipeline
 
@@ -71,12 +72,14 @@ sequenceDiagram
 | Étape 7 et exception | RG19–RG20, RG28 ; §8.2, étape 7 et rollback |
 | Renommage et exception applicable | RG39–RG40, RG44–RG45 ; §18 EV12, EV15 |
 | Lancement non bloquant et consultation par étape | RG46, RG48 ; §20 EV30 |
+| Collecte qualifiée vSphere et EfficientIP, identité distincte par origine | RG49–RG51, RG58 ; §17 EV01–EV02, §23 EV59 |
 
 ## Non représenté — pipeline
 
 - Les multiplicités d'observations sont implicites ; Q1–Q6 ne fixent ni conversions source, ni arbitrage de plusieurs correspondances, ni granularité définitive des doublons. Le modèle n'introduit aucun statut ou anomalie supplémentaire.
 - Le mécanisme de persistance de FAIL après annulation de la transaction unique n'est pas prescrit ; la trace montre l'obligation métier sans inventer sa mise en œuvre.
 - Les sept étapes actualisent la progression (RG46) sans fixer les valeurs finales après rollback (Q13). Le planificateur externe peut déclencher un nouveau run selon `RunSchedule` (RG47–RG48), mais sa cadence et son fuseau restent hors de ce scénario manuel (Q15). Le suivi ouverte → acquittée → résolue est détaillé dans `etats.md`, pas dans le pipeline.
+- L'autorisation d'un lancement et sa trace d'audit sont illustrées dans le scénario d'accès ci-dessous ; elles ne modifient ni les sept étapes ni le cycle du run.
 
 ## Diagramme — authentification web et API
 
@@ -129,3 +132,63 @@ sequenceDiagram
 
 - La gestion des erreurs de formulaire et la durée de vie des sessions et jetons ne sont pas définies ici ; Q7 laisse ouvert le mécanisme de stockage de la session et du compte, sans ajouter d'entité au modèle.
 - Les autres protections transverses du §10 ne constituent pas des étapes supplémentaires de connexion dans ces scénarios.
+
+## Diagramme — accès authentifié et audit v2.3
+
+```mermaid
+sequenceDiagram
+    actor Utilisateur as Administrateur, opérateur ou lecteur
+    participant Account
+    participant AuthOrigin
+    actor Annuaire as Annuaire LDAP ou Active Directory
+    participant Role
+    participant RolePermission
+    participant Permission
+    participant Run
+    participant Audit
+    Utilisateur->>+Account: authenticate(identifiants, origine)
+    Account->>AuthOrigin: identifier local, LDAP ou AD
+    alt origine locale
+        Account->>Account: vérifier local_password_hash sans conserver le mot de passe en clair
+    else origine LDAP ou AD
+        Account->>+Annuaire: vérifier les identifiants auprès de l'annuaire
+        Annuaire-->>-Account: résultat de l'authentification
+        Note over Account,AuthOrigin: Aucun mot de passe annuaire conservé
+    end
+    Account-->>-Utilisateur: authentification acceptée ou refusée
+    opt compte authentifié demandant le lancement d'un run
+        Utilisateur->>+Account: authorize(permission de lancement)
+        Account->>+Role: allows(permission)
+        Role->>RolePermission: chercher une attribution explicite au rôle
+        RolePermission->>Permission: vérifier le code de permission attribué
+        Permission-->>RolePermission: attribution existante ou absente
+        RolePermission-->>Role: permission attribuée ou non
+        Role-->>-Account: autoriser uniquement si attribuée
+        alt permission explicitement attribuée
+            Account-->>Utilisateur: action autorisée
+            Utilisateur-)Run: déclencher un nouveau run
+            Account->>+Audit: recordAction(auteur, lancement, date, cible du run)
+            Audit-->>-Account: trace durable
+        else permission absente
+            Account-->>Utilisateur: action refusée
+        end
+    end
+```
+
+## Légende — accès et audit
+
+- `alt` distingue les origines locale et annuaire, puis autorisation ou refus ; `opt` limite la demande d'action aux comptes authentifiés. La flèche asynchrone lance le run sans attendre son achèvement. `Account`, `AuthOrigin`, `Role`, `RolePermission`, `Permission`, `Run` et `Audit` sont les classes du modèle ; utilisateur et annuaire sont les acteurs des règles.
+- `Account.local_password_hash` n'existe que pour l'origine locale ; l'annuaire authentifie sans empreinte ni mot de passe applicatif. Une permission n'est accordée que par l'association explicite `RolePermission`, sans matrice présumée. `Audit.audit_actor_identity`, `audit_action`, `audit_date` et `audit_target` restent durables après purge de runs.
+
+## Traçabilité — accès et audit
+
+| Échanges | Règles et cahier des charges |
+| --- | --- |
+| Compte distinct et origine locale ou annuaire | RG53–RG56 ; §22 EV48–EV49 |
+| Autorisation par rôle et permission attribuée | RG52 ; §22 EV48 |
+| Trace du lancement, auteur, action, date et cible durables | RG57–RG58 ; §22 EV52, §23 EV59 |
+
+## Non représenté — accès et audit
+
+- La matrice effective des permissions, l'association entre identités d'origines différentes et la rétention des audits restent ouvertes (Q17–Q19). Acquittement, purge et modification suivent la même obligation de trace après autorisation ; aucun droit n'est inventé pour ces opérations. La purge des runs ne purge pas les audits.
+- La représentation d'une authentification acceptée ou refusée est condensée en réponse ; seuls les comptes effectivement authentifiés peuvent demander l'autorisation. La forme des échanges réseau avec l'annuaire n'est pas prescrite.
