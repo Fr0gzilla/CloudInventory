@@ -24,6 +24,7 @@ from flask_login import UserMixin, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash
 
 from . import db, login_manager
+from .ldap_auth import DirectoryUnavailable, authenticate_directory
 from .models import Account, AuthOrigin, Role
 
 
@@ -109,13 +110,17 @@ def configure_auth(app, username, password):
             session.clear()
             return None
         account = db.session.get(Account, int(user_id)) if user_id.isdecimal() else None
-        if account is None or account.origin_code != "local" or account.local_password_hash.startswith("disabled:"):
+        if account is None or (account.origin_code == "local" and account.local_password_hash.startswith("disabled:")):
             session.clear()
             return None
         session["last_seen"] = now
         return LocalUser(account)
 
     def authenticate(supplied_user, supplied_password, channel="web"):
+        if (not isinstance(supplied_user, str) or not isinstance(supplied_password, str) or
+                not supplied_user or not supplied_password or len(supplied_user) > 128 or
+                len(supplied_password) > 4096):
+            return "invalid"
         ip = request.remote_addr or "unknown"
         try:
             supplied_user.encode("utf-8")
@@ -144,7 +149,32 @@ def configure_auth(app, username, password):
                 g.auth_retry_after = max(1, math.ceil(remaining))
                 security_log.warning("auth result=limited channel=%s ip=%s", channel, ip)
                 return "limited"
-            password_hash = account.local_password_hash if valid_user else None
+            directory = None
+            directory_unavailable = False
+            try:
+                directory = authenticate_directory(app, supplied_user, supplied_password)
+            except DirectoryUnavailable:
+                directory_unavailable = True
+                security_log.warning("auth directory=unavailable channel=%s", channel)
+            if directory is not None:
+                origin, role = directory
+                directory_account = Account.query.filter_by(origin_code=origin, username=supplied_user).first()
+                if directory_account is None:
+                    if db.session.get(AuthOrigin, origin) is None:
+                        db.session.add(AuthOrigin(origin_code=origin))
+                        db.session.flush()
+                    directory_account = Account(origin_code=origin, username=supplied_user,
+                                                role_code=role, local_password_hash=None)
+                    db.session.add(directory_account)
+                else:
+                    directory_account.role_code = role
+                db.session.commit()
+                attempts.pop(bucket, None)
+                g.auth_account = directory_account
+                security_log.info("auth result=success channel=%s ip=%s", channel, ip)
+                return None
+            password_hash = account.local_password_hash if valid_user and (
+                directory_unavailable or not app.config["LDAP_SERVER"]) else None
             if password_hash and password_hash.startswith("$argon2"):
                 try:
                     valid_password = hasher.verify(password_hash, supplied_password)

@@ -58,8 +58,8 @@ def create_exception(data):
         current_user.get_id() if current_user.is_authenticated else None
     )
     account = db.session.get(Account, int(identity)) if isinstance(identity, str) and identity.isdecimal() else None
-    if (account is None or account.origin_code != "local" or
-            account.local_password_hash.startswith("disabled:") or
+    if (account is None or account.origin_code not in ("local", "LDAP", "AD") or
+            (account.origin_code == "local" and account.local_password_hash.startswith("disabled:")) or
             account.role_code not in ("admin", "opérateur")):
         raise ValueError("Invalid exception")
     row = AnomalyException(code=code, target=target, justification=justification.strip(),

@@ -370,6 +370,10 @@ def create_app(database_uri: str | None = None) -> Flask:
     ):
         raise ValueError("RUN_LOCK_PATH must be a non-empty file path")
 
+    from .ldap_auth import configure_ldap
+
+    configure_ldap(app, configured)
+
     import_module("app.models")
     db.init_app(app)
     with app.app_context():
@@ -476,7 +480,7 @@ def create_app(database_uri: str | None = None) -> Flask:
 
             identity = get_jwt_identity()
             account = db.session.get(Account, int(identity)) if isinstance(identity, str) and identity.isdecimal() else None
-            if account is None or account.origin_code != "local" or account.local_password_hash.startswith("disabled:"):
+            if account is None or (account.origin_code == "local" and account.local_password_hash.startswith("disabled:")):
                 return jsonify(error="Unauthorized"), 401
             role = account.role_code
         elif not current_user.is_authenticated:
