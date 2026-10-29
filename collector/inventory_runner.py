@@ -12,6 +12,7 @@ from app import db
 from app.anomaly_exceptions import anomaly_coverage
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 from app.notifications import notify_anomalies, should_alert
+from app.observability import collection_errors, log_run, run_anomalies, run_duration
 from collector.anomalies import duplicate_anomalies, match_anomalies, renamed_anomalies
 from collector.exports import export_run
 from collector.matching import consolidate_asset
@@ -120,12 +121,21 @@ def _run_inventory(
             else:
                 run = db.session.get(Run, run_id)
                 started_at = run.started_at
+            log_run("inventory_started", run.id)
             completed(1)
 
-            assets = virtualization_source.collect()
+            try:
+                assets = virtualization_source.collect()
+            except Exception:
+                collection_errors.inc()
+                raise
             completed(2)
 
-            ipam_records = ipam_source.collect()
+            try:
+                ipam_records = ipam_source.collect()
+            except Exception:
+                collection_errors.inc()
+                raise
             completed(3)
 
             stored_assets: dict[str, Asset] = {}
@@ -258,6 +268,8 @@ def _run_inventory(
             db.session.commit()
         result = run
         succeeded = True
+        metrics_run_id = run_id
+        metrics_finished_at = finished_at
     except Exception as error:  # noqa: BLE001 - all pipeline failures must leave a FAIL run
         db.session.rollback()
         with db.session.begin():
@@ -272,9 +284,17 @@ def _run_inventory(
                 failed.error_message = str(error)
                 failed.current_step = completed_step or 1
                 failed.completed_steps = completed_step
+            db.session.flush()
+            metrics_run_id = failed.id
+            metrics_finished_at = failed.finished_at
         result = failed
         succeeded = False
+    duration = max(0.0, (datetime.fromisoformat(metrics_finished_at) -
+                         datetime.fromisoformat(started_at)).total_seconds())
+    run_duration.observe(duration)
+    log_run("inventory_succeeded" if succeeded else "inventory_failed", metrics_run_id)
     if succeeded:
+        run_anomalies.inc(anomaly_count)
         export_run(run_id, {
             "finished_at": finished_at,
             "matched_name_count": counts["MATCHED_NAME"],

@@ -17,9 +17,9 @@ from flask import (
     current_app,
     flash,
     jsonify,
+    redirect,
     render_template,
     request,
-    redirect,
     session,
     url_for,
 )
@@ -468,6 +468,9 @@ def create_app(database_uri: str | None = None) -> Flask:
     app.register_blueprint(web, url_prefix="/")
     app.register_blueprint(api_blueprint, url_prefix="/api")
     app.register_blueprint(auth_blueprint, url_prefix="/auth")
+    from .observability import metrics
+
+    app.register_blueprint(metrics)
     from .scheduling import scheduling, start_scheduler
 
     app.register_blueprint(scheduling)
