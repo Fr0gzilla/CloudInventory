@@ -13,6 +13,7 @@ from app.anomaly_exceptions import (
     list_exceptions,
 )
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
+from collector.exports import export_inventory_excel
 
 from . import db
 
@@ -173,6 +174,25 @@ def configure_inventory_api(app):
         query = _inventory_query(run.id if run else -1, request.args)
         if query is None:
             return jsonify(error="Invalid inventory query"), 400
+        if request.path.endswith(".xlsx"):
+            severity_order = {"info": 0, "mineure": 1, "majeure": 2, "critique": 3}
+            anomalies = Anomaly.query.filter_by(run_id=run.id if run else -1).all()
+            by_asset = {}
+            by_ipam = {}
+            for anomaly in anomalies:
+                for mapping, key in ((by_asset, anomaly.asset_id), (by_ipam, anomaly.ipam_record_id)):
+                    if key is not None and severity_order.get(anomaly.severity, -1) > severity_order.get(mapping.get(key), -1):
+                        mapping[key] = anomaly.severity
+
+            def excel_rows():
+                for asset, consolidated, ipam in query.yield_per(500):
+                    severity = max((by_asset.get(asset.id), by_ipam.get(ipam.id) if ipam else None),
+                                   key=lambda value: severity_order.get(value, -1))
+                    yield _row(asset, consolidated, ipam), severity
+
+            return Response(export_inventory_excel(FIELDS, excel_rows()),
+                            mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                            headers={"Content-Disposition": 'attachment; filename="inventory.xlsx"'})
         output = io.StringIO(newline="")
         writer = csv.writer(output)
         writer.writerow(FIELDS)
@@ -335,6 +355,8 @@ def configure_inventory_api(app):
 
     app.add_url_rule("/api/inventory", endpoint="api.inventory", view_func=inventory)
     app.add_url_rule("/api/inventory/export", endpoint="api.inventory_export", view_func=export)
+    app.add_url_rule("/api/inventory/export.xlsx", endpoint="api.inventory_export", view_func=export)
+    app.add_url_rule("/inventory/export.xlsx", endpoint="api.inventory_export", view_func=export)
     app.add_url_rule("/api/assets/<int:id>", endpoint="api.asset_detail", view_func=asset_detail)
     app.add_url_rule("/api/anomalies", endpoint="api.anomalies", view_func=anomalies)
     app.add_url_rule("/api/anomaly-exceptions", endpoint="api.anomaly_exceptions",

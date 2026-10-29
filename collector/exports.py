@@ -1,6 +1,7 @@
 """Whitelisted, replaceable exports for a committed inventory run."""
 
 import gzip
+import io
 import json
 import os
 import re
@@ -11,6 +12,9 @@ from typing import Protocol
 
 from dotenv import dotenv_values
 from flask import current_app
+from openpyxl import Workbook
+from openpyxl.styles import PatternFill
+from openpyxl.utils import get_column_letter
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -63,6 +67,40 @@ _VM = ("vm_id", "vm_name", "type", "node", "status", "tags", "ip_reported",
 _IPAM = ("ip", "dns_name", "status", "tenant", "site", "tags", "duplicate_dns",
          "duplicate_ip", "meta_zone")
 _MANAGED = re.compile(r"(?:consolidated|raw-vm|raw-ipam)-[0-9]+\.json(?:l)?\.gz\Z")
+
+_ANOMALY_COLORS = {
+    "critique": "F4CCCC", "majeure": "FCE5CD", "mineure": "FFF2CC", "info": "D9EAD3",
+}
+
+
+def export_inventory_excel(fields, rows) -> bytes:
+    """Build an XLSX from (projected inventory mapping, anomaly severity) pairs."""
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.title = "Inventaire"
+    sheet.append(fields)
+    widths = [len(field) for field in fields]
+    fills = {level: PatternFill(fill_type="solid", fgColor=color)
+             for level, color in _ANOMALY_COLORS.items()}
+    for data, severity in rows:
+        values = []
+        for index, field in enumerate(fields):
+            value = data[field]
+            if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+                value = "'" + value
+            values.append(value)
+            widths[index] = max(widths[index], min(len(str(value)) if value is not None else 0, 60))
+        sheet.append(values)
+        if severity in fills:
+            for cell in sheet[sheet.max_row]:
+                cell.fill = fills[severity]
+    sheet.freeze_panes = "A2"
+    sheet.auto_filter.ref = sheet.dimensions
+    for index, width in enumerate(widths, 1):
+        sheet.column_dimensions[get_column_letter(index)].width = min(width + 2, 62)
+    output = io.BytesIO()
+    workbook.save(output)
+    return output.getvalue()
 
 
 def _safe(value: object) -> object:

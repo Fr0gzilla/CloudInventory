@@ -3,7 +3,7 @@
 from contextvars import ContextVar
 from datetime import UTC, datetime
 
-from flask import Blueprint, abort, has_request_context, render_template, request
+from flask import Blueprint, abort, g, has_request_context, render_template, request
 from flask_jwt_extended import get_jwt_identity
 from flask_login import current_user, login_required
 from sqlalchemy import event, inspect, select
@@ -20,9 +20,9 @@ def record_action(connection, action, target):
     account_id = None
     identity = None
     if has_request_context():
-        if request.path.startswith("/api/"):
+        if request.path.startswith("/api/") and getattr(g, "_jwt_extended_jwt", None) is not None:
             identity = get_jwt_identity()
-        elif current_user.is_authenticated:
+        elif not request.path.startswith("/api/") and current_user.is_authenticated:
             identity = current_user.get_id()
     if isinstance(identity, str) and identity.isdecimal():
         account = connection.execute(

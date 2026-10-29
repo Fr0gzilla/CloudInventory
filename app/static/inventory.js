@@ -3,6 +3,7 @@
   const rows = document.getElementById('inventory-rows');
   const message = document.getElementById('inventory-message');
   const exportLink = document.getElementById('inventory-export');
+  const excelExportLink = document.getElementById('inventory-export-excel');
   const previous = document.getElementById('inventory-prev');
   const next = document.getElementById('inventory-next');
   const pageLabel = document.getElementById('inventory-page');
@@ -24,6 +25,7 @@
     const id = ++requestId;
     const params = filters();
     exportLink.href = `/inventory/export?${params}`;
+    excelExportLink.href = `/inventory/export.xlsx?${params}`;
     params.set('page', String(page));
     params.set('per_page', '25');
     message.textContent = 'Chargement de l’inventaire…';
