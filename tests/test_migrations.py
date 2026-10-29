@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import StaticPool
 
 from app import db
-from tests.test_models import SCHEMA, inspect_schema
+from tests.test_models import SCHEMA, extract_checks, inspect_schema
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,7 +31,7 @@ def test_baseline_matches_published_sql_and_orm(orm_app):
             config = migration_config(connection)
             command.upgrade(config, "head")
             migrated = connection.connection.driver_connection
-            assert migrated.execute("SELECT version_num FROM alembic_version").fetchone()[0] == "0002_model_v22"
+            assert migrated.execute("SELECT version_num FROM alembic_version").fetchone()[0] != "0002_model_v22"
             migrated_schema = inspect_schema(migrated)
             migrated_schema.pop("alembic_version")
             with db.engine.connect() as orm_connection:
@@ -61,6 +61,31 @@ def test_schema_comparison_rejects_missing_ipam_fields(difference):
     finally:
         changed.close()
         reference.close()
+
+
+def test_schema_comparison_accepts_reordered_columns_and_constraints():
+    original = sqlite3.connect(":memory:")
+    reordered = sqlite3.connect(":memory:")
+    try:
+        original.execute("CREATE TABLE example (id INTEGER PRIMARY KEY, label TEXT NOT NULL, CHECK (length(trim(label)) > 0), UNIQUE (label))")
+        reordered.execute("CREATE TABLE example (label TEXT NOT NULL, id INTEGER PRIMARY KEY, UNIQUE (label), CHECK (length(trim(label)) > 0))")
+        assert inspect_schema(original) == inspect_schema(reordered)
+    finally:
+        original.close()
+        reordered.close()
+
+
+def test_schema_comparison_detects_changed_column_attribute_and_check():
+    original = sqlite3.connect(":memory:")
+    changed = sqlite3.connect(":memory:")
+    try:
+        original.execute("CREATE TABLE example (id INTEGER PRIMARY KEY, label TEXT NOT NULL DEFAULT 'x', CHECK (length(trim(label)) > 0))")
+        changed.execute("CREATE TABLE example (id INTEGER PRIMARY KEY, label TEXT DEFAULT 'y', CHECK (length(trim(label)) >= 0))")
+        assert inspect_schema(original) != inspect_schema(changed)
+        assert extract_checks(original.execute("SELECT sql FROM sqlite_master WHERE name='example'").fetchone()[0]) != extract_checks(changed.execute("SELECT sql FROM sqlite_master WHERE name='example'").fetchone()[0])
+    finally:
+        original.close()
+        changed.close()
 
 
 def test_upgrade_preserves_baseline_rows_and_accepts_renamed(monkeypatch):

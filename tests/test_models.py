@@ -10,7 +10,37 @@ from app import db
 
 
 SCHEMA = Path(__file__).resolve().parents[1] / "docs/modele/schema.sql"
-TABLES = {"run_schedule", "run", "asset", "ipam_record", "consolidated_asset", "anomaly", "anomaly_exception"}
+TABLES = {"run_schedule", "run", "asset", "ipam_record", "consolidated_asset", "anomaly", "anomaly_exception", "auth_origin", "role", "permission", "account", "role_permission", "audit"}
+
+
+def extract_checks(sql):
+    checks = []
+    for match in re.finditer(r"\bCHECK\s*\(", sql, re.IGNORECASE):
+        start = match.end() - 1
+        depth = 0
+        quote = None
+        position = start
+        while position < len(sql):
+            character = sql[position]
+            if quote:
+                if character == quote:
+                    if position + 1 < len(sql) and sql[position + 1] == quote:
+                        position += 2
+                        continue
+                    quote = None
+            elif character in ("'", '"'):
+                quote = character
+            elif character == "(":
+                depth += 1
+            elif character == ")":
+                depth -= 1
+                if depth == 0:
+                    checks.append(re.sub(r"\s+", "", sql[start:position + 1]).lower())
+                    break
+            position += 1
+        else:
+            raise ValueError("Unclosed CHECK constraint")
+    return sorted(checks)
 
 
 def inspect_schema(connection):
@@ -21,7 +51,7 @@ def inspect_schema(connection):
     }
     result = {}
     for table in tables:
-        columns = [tuple(row[1:6]) for row in connection.execute(f"PRAGMA table_info('{table}')")]
+        columns = {row[1]: tuple(row[2:6]) for row in connection.execute(f"PRAGMA table_info('{table}')")}
         foreign = {
             (row[0], row[2], row[6].upper()): []
             for row in connection.execute(f"PRAGMA foreign_key_list('{table}')")
@@ -38,14 +68,7 @@ def inspect_schema(connection):
         sql = connection.execute(
             "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
         ).fetchone()[0]
-        checks = sorted(
-            re.sub(r"\s+", "", match).lower()
-            for match in re.findall(
-                r"CHECK\s*\(\s*(?:\w+\s*(?:IN\s*\([^)]*\)|>=\s*\d+|BETWEEN\s+\d+\s+AND\s+\d+)|length\s*\(\s*trim\s*\(\s*\w+\s*\)\s*\)\s*>\s*0)\s*\)",
-                sql,
-                re.IGNORECASE,
-            )
-        )
+        checks = extract_checks(sql)
         result[table] = (columns, foreign, indexes, checks)
     return result
 
@@ -67,7 +90,7 @@ def run(identifier=1):
     insert("run", id=identifier, status="RUNNING", started_at="2026-01-01")
 
 
-def test_seven_tables_match_reference_schema(orm_app):
+def test_thirteen_tables_match_reference_schema(orm_app):
     reference = sqlite3.connect(":memory:")
     try:
         reference.executescript(SCHEMA.read_text(encoding="utf-8"))
@@ -166,7 +189,7 @@ def test_unblocked_run_delete_cascades_children(orm_app):
     db.session.execute(text("DELETE FROM run WHERE id=1"))
     db.session.commit()
     assert all(db.session.execute(text(f"SELECT count(*) FROM {table}")).scalar() == 0
-               for table in TABLES)
+               for table in ("run", "asset", "ipam_record", "consolidated_asset", "anomaly"))
 
 
 def test_database_supplies_ipam_flag_defaults(orm_app):

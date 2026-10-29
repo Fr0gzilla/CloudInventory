@@ -51,6 +51,7 @@ class Asset(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=True)
     run_id = db.Column(db.Integer, db.ForeignKey("run.id", ondelete="CASCADE"), nullable=False)
     vm_id = db.Column(db.Text, nullable=False)
+    virtual_source = db.Column(db.Text)
     vm_name = db.Column(db.Text)
     fqdn = db.Column(db.Text)
     ip_reported = db.Column(db.Text)
@@ -84,6 +85,7 @@ class IpamRecord(db.Model):
     id = db.Column(db.Integer, primary_key=True, nullable=True)
     run_id = db.Column(db.Integer, db.ForeignKey("run.id", ondelete="CASCADE"), nullable=False)
     ip = db.Column(db.Text)
+    ipam_source = db.Column(db.Text)
     dns_name = db.Column(db.Text)
     status = db.Column(db.Text)
     tenant = db.Column(db.Text)
@@ -188,4 +190,80 @@ class AnomalyException(db.Model):
         db.CheckConstraint("length(trim(target)) > 0"),
         db.CheckConstraint("length(trim(justification)) > 0"),
         db.CheckConstraint("length(trim(author)) > 0"),
+    )
+
+
+class AuthOrigin(db.Model):
+    __tablename__ = "auth_origin"
+
+    origin_code = db.Column(db.Text, primary_key=True, nullable=True)
+
+    __table_args__ = (db.CheckConstraint("origin_code IN ('local', 'LDAP', 'AD')"),)
+
+
+class Role(db.Model):
+    __tablename__ = "role"
+
+    role_code = db.Column(db.Text, primary_key=True, nullable=True)
+
+    __table_args__ = (db.CheckConstraint("role_code IN ('admin', 'opérateur', 'lecteur')"),)
+
+
+class Permission(db.Model):
+    __tablename__ = "permission"
+
+    permission_code = db.Column(db.Text, primary_key=True, nullable=True)
+
+    __table_args__ = (db.CheckConstraint("length(trim(permission_code)) > 0"),)
+
+
+class Account(db.Model):
+    __tablename__ = "account"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    origin_code = db.Column(db.Text, db.ForeignKey("auth_origin.origin_code", ondelete="RESTRICT"), nullable=False)
+    role_code = db.Column(db.Text, db.ForeignKey("role.role_code", ondelete="RESTRICT"), nullable=False)
+    username = db.Column(db.Text, nullable=False)
+    local_password_hash = db.Column(db.Text)
+
+    __table_args__ = (
+        db.UniqueConstraint("origin_code", "username"),
+        db.CheckConstraint("length(trim(username)) > 0"),
+        db.CheckConstraint(
+            "(origin_code = 'local' AND local_password_hash IS NOT NULL AND length(trim(local_password_hash)) > 0) "
+            "OR (origin_code <> 'local' AND local_password_hash IS NULL)"
+        ),
+        db.Index("idx_account_role", "role_code"),
+    )
+
+
+class RolePermission(db.Model):
+    __tablename__ = "role_permission"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    role_code = db.Column(db.Text, db.ForeignKey("role.role_code", ondelete="CASCADE"), nullable=False)
+    permission_code = db.Column(db.Text, db.ForeignKey("permission.permission_code", ondelete="CASCADE"), nullable=False)
+
+    __table_args__ = (
+        db.UniqueConstraint("role_code", "permission_code"),
+        db.Index("idx_role_permission_permission", "permission_code"),
+    )
+
+
+class Audit(db.Model):
+    __tablename__ = "audit"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    account_id = db.Column(db.Integer, db.ForeignKey("account.id", ondelete="SET NULL"))
+    actor_identity = db.Column(db.Text, nullable=False)
+    action = db.Column(db.Text, nullable=False)
+    created_at = db.Column(db.Text, nullable=False)
+    target = db.Column(db.Text, nullable=False)
+
+    __table_args__ = (
+        db.CheckConstraint("length(trim(actor_identity)) > 0"),
+        db.CheckConstraint("length(trim(action)) > 0"),
+        db.CheckConstraint("length(trim(target)) > 0"),
+        db.Index("idx_audit_account", "account_id"),
+        db.Index("idx_audit_date", "created_at"),
     )
