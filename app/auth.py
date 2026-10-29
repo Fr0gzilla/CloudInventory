@@ -23,7 +23,8 @@ from flask import (
 from flask_login import UserMixin, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash
 
-from . import login_manager
+from . import db, login_manager
+from .models import Account, AuthOrigin, Role
 
 
 class AuthLogHandler(logging.StreamHandler):
@@ -40,9 +41,13 @@ if not any(getattr(handler, "_cloudinventory_auth", False) for handler in securi
     security_log.addHandler(handler)
 
 
-class Admin(UserMixin):
+class LocalUser(UserMixin):
+    def __init__(self, account):
+        self.id = account.id
+        self.role_code = account.role_code
+
     def get_id(self):
-        return "admin"
+        return str(self.id)
 
 
 def internal_next(value):
@@ -63,7 +68,17 @@ def configure_auth(app, username, password):
         raise ValueError("ADMIN_PASSWORD must be at least 12 characters")
     login_page = Blueprint("login_page", __name__)
     hasher = PasswordHasher()
-    password_hash = hasher.hash(password)
+    with app.app_context():
+        if db.session.get(AuthOrigin, "local") is None:
+            db.session.add(AuthOrigin(origin_code="local"))
+        for role in ("admin", "opérateur", "lecteur"):
+            if db.session.get(Role, role) is None:
+                db.session.add(Role(role_code=role))
+        db.session.flush()
+        if Account.query.filter_by(origin_code="local", username=username).first() is None:
+            db.session.add(Account(origin_code="local", role_code="admin", username=username,
+                                   local_password_hash=hasher.hash(password)))
+        db.session.commit()
     attempts = {}
     attempts_lock = Lock()
     state = {"epoch": secrets.randbits(128)}
@@ -87,27 +102,35 @@ def configure_auth(app, username, password):
         now = time.time()
         started = session.get("login_at")
         last_seen = session.get("last_seen")
-        if (user_id != "admin" or session.get("epoch") != state["epoch"] or
+        if (session.get("epoch") != state["epoch"] or
                 type(started) not in (int, float) or type(last_seen) not in (int, float) or
                 not 0 <= now - started < absolute_lifetime or
                 not 0 <= now - last_seen < idle_lifetime):
             session.clear()
             return None
+        account = db.session.get(Account, int(user_id)) if user_id.isdecimal() else None
+        if account is None or account.origin_code != "local" or account.local_password_hash.startswith("disabled:"):
+            session.clear()
+            return None
         session["last_seen"] = now
-        return Admin()
+        return LocalUser(account)
 
     def authenticate(supplied_user, supplied_password, channel="web"):
-        nonlocal password_hash
         ip = request.remote_addr or "unknown"
-        valid_user = hmac.compare_digest(supplied_user.encode("utf-8", errors="surrogatepass"),
-                                         username.encode("utf-8", errors="surrogatepass"))
+        try:
+            supplied_user.encode("utf-8")
+        except UnicodeEncodeError:
+            account = None
+        else:
+            account = Account.query.filter_by(origin_code="local", username=supplied_user).first()
+        valid_user = account is not None and not account.local_password_hash.startswith("disabled:")
         normalized_user = unicodedata.normalize("NFKC", supplied_user).strip().casefold()[:128]
-        bucket = (ip, "admin") if valid_user else (ip, "other", normalized_user)
+        bucket = (ip, "account", account.id) if valid_user else (ip, "other", normalized_user)
         others = (ip, "others")
         with attempts_lock:
             now = time.monotonic()
             for entry_key, entry in list(attempts.items()):
-                if entry_key[1] != "admin" and now - entry[0] >= window:
+                if entry_key[1] != "account" and now - entry[0] >= window:
                     del attempts[entry_key]
             if valid_user:
                 started, count, next_at = attempts.get(bucket, (now, 0, now))
@@ -121,13 +144,16 @@ def configure_auth(app, username, password):
                 g.auth_retry_after = max(1, math.ceil(remaining))
                 security_log.warning("auth result=limited channel=%s ip=%s", channel, ip)
                 return "limited"
-            if password_hash.startswith("$argon2"):
+            password_hash = account.local_password_hash if valid_user else None
+            if password_hash and password_hash.startswith("$argon2"):
                 try:
                     valid_password = hasher.verify(password_hash, supplied_password)
                 except (InvalidHashError, VerificationError):
                     valid_password = False
-            else:
+            elif password_hash:
                 valid_password = check_password_hash(password_hash, supplied_password)
+            else:
+                valid_password = False
             if not (valid_user and valid_password):
                 if valid_user:
                     failures = count + 1
@@ -139,8 +165,10 @@ def configure_auth(app, username, password):
                 security_log.warning("auth result=invalid channel=%s ip=%s", channel, ip)
                 return "invalid"
             if not password_hash.startswith("$argon2") or hasher.check_needs_rehash(password_hash):
-                password_hash = hasher.hash(supplied_password)
+                account.local_password_hash = hasher.hash(supplied_password)
+                db.session.commit()
             attempts.pop(bucket, None)
+            g.auth_account = account
             security_log.info("auth result=success channel=%s ip=%s", channel, ip)
             return None
 
@@ -169,7 +197,7 @@ def configure_auth(app, username, password):
         if result == "invalid":
             return render_template("login.html", next=destination, csrf_token=expected, error=True), 401
         session.clear()
-        login_user(Admin())
+        login_user(LocalUser(g.auth_account))
         session.permanent = True
         session["epoch"] = state["epoch"]
         session["login_at"] = session["last_seen"] = time.time()
@@ -179,8 +207,8 @@ def configure_auth(app, username, password):
     @login_page.post("/logout")
     @login_required
     def logout():
-        state["epoch"] += 1
         security_log.info("auth result=logout channel=web ip=%s", request.remote_addr or "unknown")
+        state["epoch"] = secrets.randbits(128)
         logout_user()
         session.clear()
         return redirect(url_for("login_page.login"))

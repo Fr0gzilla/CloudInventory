@@ -142,7 +142,7 @@ def test_session_cookie_secure_defaults_to_true_without_environment_variable(mon
     assert app.config["SESSION_COOKIE_SECURE"] is True
 
 
-def test_authenticated_web_post_requires_csrf(auth_app):
+def test_unlisted_web_post_is_denied_without_csrf(auth_app):
     app, values = auth_app
     from flask import Blueprint
 
@@ -152,10 +152,10 @@ def test_authenticated_web_post_requires_csrf(auth_app):
     client = app.test_client()
     token = token_for(client)
     submit(client, values["ADMIN_PASSWORD"], token)
-    assert client.post("/test-form").status_code == 400
+    assert client.post("/test-form").status_code == 403
 
 
-def test_authenticated_web_post_accepts_valid_csrf(auth_app):
+def test_unlisted_web_post_is_denied_even_with_valid_csrf(auth_app):
     app, values = auth_app
     from flask import Blueprint
 
@@ -166,4 +166,4 @@ def test_authenticated_web_post_accepts_valid_csrf(auth_app):
     token = token_for(client)
     submit(client, values["ADMIN_PASSWORD"], token)
     token = token_for(client)
-    assert client.post("/test-form", data={"csrf_token": token}).data == b"accepted"
+    assert client.post("/test-form", data={"csrf_token": token}).status_code == 403

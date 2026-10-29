@@ -16,6 +16,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    g,
     jsonify,
     redirect,
     render_template,
@@ -23,7 +24,7 @@ from flask import (
     session,
     url_for,
 )
-from flask_jwt_extended import JWTManager, verify_jwt_in_request
+from flask_jwt_extended import JWTManager, get_jwt_identity, verify_jwt_in_request
 from flask_login import LoginManager, current_user, login_required
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
@@ -405,6 +406,50 @@ def create_app(database_uri: str | None = None) -> Flask:
     from .api import configure_api
 
     configure_api(app, authenticate)
+    from .accounts import accounts
+
+    app.register_blueprint(accounts)
+
+    read_endpoints = {
+        "web.index", "web.dashboard_data", "web.run_status", "web.inventory_page",
+        "web.inventory_data", "web.inventory_export", "web.runs_page", "web.run_page",
+        "web.run_compare_page", "web.anomalies_page", "web.asset_page", "web.health",
+        "api.stats", "api.runs", "api.compare_runs", "api.run_detail",
+        "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
+        "api.anomaly_exceptions",
+    }
+    operator_endpoints = {
+        "web.dashboard_run", "web.anomaly_action", "web.add_anomaly_exception",
+        "web.remove_anomaly_exception", "api.create_run", "api.delete_anomaly_exception",
+        "api.acknowledge_anomaly", "api.resolve_anomaly", "api.create_anomaly_exception",
+        "api.anomaly_exceptions",
+    }
+    admin_endpoints = {
+        "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",
+        "accounts.list_accounts", "accounts.create_account", "accounts.update_account",
+    }
+    read_methods = {"GET", "HEAD"}
+    operator_methods = {endpoint: {"POST"} for endpoint in operator_endpoints}
+    operator_methods["api.delete_anomaly_exception"] = {"DELETE"}
+    operator_methods["api.anomaly_exceptions"] = {"GET", "HEAD", "POST"}
+    admin_methods = {endpoint: {"POST"} for endpoint in admin_endpoints}
+    for endpoint in ("scheduling.schedules_page", "metrics.metrics_page", "accounts.list_accounts"):
+        admin_methods[endpoint] = read_methods
+
+    def permitted(endpoint, method, role):
+        if role not in ("admin", "opérateur", "lecteur"):
+            return False
+        if endpoint and endpoint.startswith("flasgger."):
+            return method in read_methods
+        if endpoint in read_endpoints and method in read_methods:
+            return True
+        if endpoint == "api.anomaly_exceptions" and method in read_methods:
+            return True
+        if endpoint in operator_methods and method in operator_methods[endpoint]:
+            return role in ("admin", "opérateur")
+        if endpoint == "login_page.logout" and method == "POST":
+            return True
+        return role == "admin" and method in admin_methods.get(endpoint, ())
 
     @app.context_processor
     def latest_anomaly_context():
@@ -422,12 +467,26 @@ def create_app(database_uri: str | None = None) -> Flask:
 
     @app.before_request
     def protect_web():
-        if request.path == "/api" or request.path.startswith("/api/"):
-            if request.endpoint != "api.login":
-                verify_jwt_in_request()
+        g.pop("_login_user", None)
+        if request.endpoint in ("login_page.login", "static", "api.login"):
             return None
-        if request.endpoint not in ("login_page.login", "static") and not current_user.is_authenticated:
+        if request.path == "/api" or request.path.startswith("/api/"):
+            verify_jwt_in_request()
+            from .models import Account
+
+            identity = get_jwt_identity()
+            account = db.session.get(Account, int(identity)) if isinstance(identity, str) and identity.isdecimal() else None
+            if account is None or account.origin_code != "local" or account.local_password_hash.startswith("disabled:"):
+                return jsonify(error="Unauthorized"), 401
+            role = account.role_code
+        elif not current_user.is_authenticated:
             return login_manager.unauthorized()
+        else:
+            role = current_user.role_code
+        if not permitted(request.endpoint, request.method, role):
+            abort(403)
+        if request.path == "/api" or request.path.startswith("/api/"):
+            return None
         if request.method == "POST" and request.endpoint != "login_page.login":
             token = request.form.get("csrf_token", "")
             expected = session.get("csrf_token", "")
@@ -471,6 +530,13 @@ def create_app(database_uri: str | None = None) -> Flask:
     from .observability import metrics
 
     app.register_blueprint(metrics)
+    from flask import Response
+    from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+    def admin_metrics():
+        return Response(generate_latest(), content_type=CONTENT_TYPE_LATEST)
+
+    app.view_functions["metrics.metrics_page"] = admin_metrics
     from .scheduling import scheduling, start_scheduler
 
     app.register_blueprint(scheduling)

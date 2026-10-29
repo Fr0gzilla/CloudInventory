@@ -84,12 +84,12 @@ def test_api_probe_rejects_invalid_token(api_app):
     assert response.status_code == 401 and response.get_json() == {"error": "Unauthorized"}
 
 
-def test_api_probe_accepts_valid_token_for_post_without_csrf(api_app):
+def test_api_probe_rejects_unlisted_post_even_with_valid_bearer(api_app):
     app, credentials = api_app
     client = app.test_client()
     token = login(client, credentials).get_json()["access_token"]
     response = client.post("/api/probe", headers={"Authorization": f"Bearer {token}"})
-    assert response.status_code == 200 and response.get_json() == {"result": "protected"}
+    assert response.status_code == 403
 
 
 def test_api_probe_rejects_expired_token(api_app):

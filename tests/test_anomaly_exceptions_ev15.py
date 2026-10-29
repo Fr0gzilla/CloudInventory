@@ -266,6 +266,7 @@ def test_expired_exception_restores_real_run_notification(orm_app, monkeypatch):
 def test_navigation_badge_disappears_for_active_exception_and_returns_after_expiration(orm_app):
     client = orm_app.test_client()
     web_login(client)
+    db.session.rollback()
     run = unmatched_run()
     assert run.status == "SUCCESS"
     assert navigation_badge(client) == "1"

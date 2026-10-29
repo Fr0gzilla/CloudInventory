@@ -77,6 +77,7 @@ def test_admin_metrics_expose_three_unlabelled_families_and_run_changes(orm_app)
     names = ('cloudinventory_run_duration_seconds_count', 'cloudinventory_run_anomalies_total',
              'cloudinventory_collection_errors_total')
     baseline = {name: value(initial, name) for name in names}
+    db.session.rollback()
     run = run_inventory(virtualization_source=Source([{'vm_id': 'sensitive-vm', 'vm_name': 'sensitive-vm', 'type': 'qemu'}]),
                         ipam_source=Source())
     count = Anomaly.query.filter_by(run_id=run.id).count()
@@ -86,6 +87,7 @@ def test_admin_metrics_expose_three_unlabelled_families_and_run_changes(orm_app)
     assert value(after_success, names[0]) == baseline[names[0]] + 1
     assert value(after_success, names[1]) == baseline[names[1]] + count
     assert 'sensitive-vm' not in after_success
+    db.session.rollback()
     failed = run_inventory(virtualization_source=Source(error=RuntimeError('source unavailable')),
                            ipam_source=Source())
     after_failure = client.get('/metrics').get_data(as_text=True)

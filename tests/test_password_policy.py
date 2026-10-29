@@ -94,17 +94,18 @@ def test_legacy_werkzeug_hash_migrates_only_after_success(monkeypatch, credentia
     app = create_app(database_uri="sqlite:///:memory:")
     created.clear()
     monkeypatch.setattr(auth, "check_password_hash", check_legacy)
-    function = app.view_functions["login_page.login"]
-    authenticate = next((cell.cell_contents for cell in function.__closure__ or ()
-                         if callable(cell.cell_contents) and cell.cell_contents.__name__ == "authenticate"), None)
-    assert authenticate is not None
-    hash_cell = next(cell for name, cell in zip(authenticate.__code__.co_freevars, authenticate.__closure__)
-                     if name == "password_hash")
-    hash_cell.cell_contents = legacy
+    from app import db
+    from app.models import Account
+
+    with app.app_context():
+        account = Account.query.filter_by(username="admin").one()
+        account.local_password_hash = legacy
+        db.session.commit()
     response = app.test_client().post("/api/login", json={"username": "admin", "password": password})
     assert response.status_code == expected
-    if expected == 200:
-        assert len(created) == 1 and PasswordHasher().verify(hash_cell.cell_contents, "legacy-short")
-        assert hash_cell.cell_contents != legacy
-    else:
-        assert created == [] and hash_cell.cell_contents == legacy
+    with app.app_context():
+        stored = Account.query.filter_by(username="admin").one().local_password_hash
+        if expected == 200:
+            assert len(created) == 1 and stored.startswith("$argon2") and PasswordHasher().verify(stored, "legacy-short")
+        else:
+            assert created == [] and stored == legacy

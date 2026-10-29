@@ -3,11 +3,12 @@
 import json
 from datetime import UTC, datetime
 
+from flask import request
 from flask_jwt_extended import get_jwt_identity
 from flask_login import current_user
 
 from app import db
-from app.models import Anomaly, AnomalyException
+from app.models import Account, Anomaly, AnomalyException
 
 CODES = frozenset({
     "NO_MATCH", "MATCHED_IP", "HOSTNAME_MISMATCH", "STATUS_MISMATCH",
@@ -53,11 +54,16 @@ def create_exception(data):
     key = json.dumps([code, target])
     if not Anomaly.query.filter_by(tracking_key=key).first():
         raise ValueError("Invalid exception")
-    author = current_user.get_id() if current_user.is_authenticated else get_jwt_identity()
-    if author != "admin":
+    identity = get_jwt_identity() if request.path.startswith("/api/") else (
+        current_user.get_id() if current_user.is_authenticated else None
+    )
+    account = db.session.get(Account, int(identity)) if isinstance(identity, str) and identity.isdecimal() else None
+    if (account is None or account.origin_code != "local" or
+            account.local_password_hash.startswith("disabled:") or
+            account.role_code not in ("admin", "opérateur")):
         raise ValueError("Invalid exception")
     row = AnomalyException(code=code, target=target, justification=justification.strip(),
-                           expires_at=expires.isoformat(), author=author)
+                           expires_at=expires.isoformat(), author=account.username)
     db.session.add(row)
     db.session.commit()
     return exception_row(row)

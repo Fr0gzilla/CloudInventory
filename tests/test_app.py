@@ -194,14 +194,14 @@ def test_registers_blueprints_at_expected_prefixes(valid_secrets):
             }
 
 
-def test_unknown_route_returns_404(valid_secrets):
+def test_unknown_route_is_denied_to_authenticated_user(valid_secrets):
     app = start_app()
     client = app.test_client()
     client.get("/login")
     with client.session_transaction() as session:
         token = session["csrf_token"]
     client.post("/login", data={"username": "admin", "password": valid_secrets["ADMIN_PASSWORD"], "csrf_token": token})
-    assert client.get("/unregistered-path").status_code == 404
+    assert client.get("/unregistered-path").status_code == 403
 
 
 def test_only_expected_business_routes_are_registered(valid_secrets):
@@ -213,7 +213,8 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
                              "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
                               "api.acknowledge_anomaly", "api.resolve_anomaly", "api.anomaly_exceptions", "api.delete_anomaly_exception",
-                               "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page"}
+                                "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",
+                                "accounts.list_accounts", "accounts.create_account", "accounts.update_account"}
                or endpoint.startswith("flasgger.")
                for _, endpoint in routes)
 

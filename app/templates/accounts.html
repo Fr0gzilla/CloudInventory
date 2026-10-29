@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Comptes · Cloud Inventory{% endblock %}
+{% block content %}
+<h1>Comptes locaux</h1>
+<form method="post" action="{{ url_for('accounts.create_account') }}">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+  <label>Identifiant <input name="username" required maxlength="128"></label>
+  <label>Mot de passe <input name="password" type="password" required minlength="12" maxlength="4096"></label>
+  <label>Rôle <select name="role">{% for role in roles %}<option value="{{ role }}">{{ role }}</option>{% endfor %}</select></label>
+  <button type="submit">Créer</button>
+</form>
+{% for account in accounts %}
+<section>
+  <h2>{{ account.username }}</h2>
+  <p>{{ account.role_code }} — {{ 'Désactivé' if account.local_password_hash.startswith('disabled:') else 'Actif' }}</p>
+  {% if not account.local_password_hash.startswith('disabled:') %}
+  <form method="post" action="{{ url_for('accounts.update_account', id=account.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="action" value="role">
+    <select name="role" aria-label="Rôle de {{ account.username }}">{% for role in roles %}<option value="{{ role }}" {% if role == account.role_code %}selected{% endif %}>{{ role }}</option>{% endfor %}</select>
+    <button type="submit">Changer le rôle</button>
+  </form>
+  <form method="post" action="{{ url_for('accounts.update_account', id=account.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="action" value="password">
+    <input name="password" type="password" required minlength="12" maxlength="4096" aria-label="Nouveau mot de passe de {{ account.username }}">
+    <button type="submit">Réinitialiser le mot de passe</button>
+  </form>
+  <form method="post" action="{{ url_for('accounts.update_account', id=account.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}"><input type="hidden" name="action" value="disable">
+    <button type="submit">Désactiver</button>
+  </form>
+  {% endif %}
+</section>
+{% endfor %}
+{% endblock %}
