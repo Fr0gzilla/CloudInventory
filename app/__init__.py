@@ -375,6 +375,7 @@ def create_app(database_uri: str | None = None) -> Flask:
     configure_ldap(app, configured)
 
     import_module("app.models")
+    import_module("app.audit")
     db.init_app(app)
     with app.app_context():
         engine = db.engine
@@ -413,6 +414,9 @@ def create_app(database_uri: str | None = None) -> Flask:
     from .accounts import accounts
 
     app.register_blueprint(accounts)
+    from .audit import audit
+
+    app.register_blueprint(audit)
 
     read_endpoints = {
         "web.index", "web.dashboard_data", "web.run_status", "web.inventory_page",
@@ -431,13 +435,14 @@ def create_app(database_uri: str | None = None) -> Flask:
     admin_endpoints = {
         "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",
         "accounts.list_accounts", "accounts.create_account", "accounts.update_account",
+        "audit.audit_page",
     }
     read_methods = {"GET", "HEAD"}
     operator_methods = {endpoint: {"POST"} for endpoint in operator_endpoints}
     operator_methods["api.delete_anomaly_exception"] = {"DELETE"}
     operator_methods["api.anomaly_exceptions"] = {"GET", "HEAD", "POST"}
     admin_methods = {endpoint: {"POST"} for endpoint in admin_endpoints}
-    for endpoint in ("scheduling.schedules_page", "metrics.metrics_page", "accounts.list_accounts"):
+    for endpoint in ("scheduling.schedules_page", "metrics.metrics_page", "accounts.list_accounts", "audit.audit_page"):
         admin_methods[endpoint] = read_methods
 
     def permitted(endpoint, method, role):
