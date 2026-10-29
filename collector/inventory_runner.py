@@ -14,11 +14,14 @@ from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 from app.notifications import notify_anomalies, should_alert
 from app.observability import collection_errors, log_run, run_anomalies, run_duration
 from collector.anomalies import duplicate_anomalies, match_anomalies, renamed_anomalies
+from collector.efficientip import EfficientIpSource
 from collector.exports import export_run
 from collector.matching import consolidate_asset
+from collector.mock_efficientip import MockEfficientIpSource
 from collector.mock_ipam import MockIpamSource
 from collector.mock_proxmox import MockProxmoxSource
 from collector.mock_vsphere import MockVsphereSource
+from collector.netbox import NetBoxSource
 from collector.normalization import normalize
 from collector.proxmox import ProxmoxSource
 from collector.purge import purge_old_runs
@@ -105,7 +108,18 @@ def _run_inventory(
             ("vsphere", "real"): VsphereSource,
         }[(source_name, source_mode)]()
     source_default = getattr(virtualization_source, "virtual_source", "proxmox")
-    ipam_source = ipam_source if ipam_source is not None else MockIpamSource()
+    if ipam_source is None:
+        ipam_name = os.environ.get("IPAM_SOURCE", "netbox").lower()
+        ipam_mode = os.environ.get("IPAM_MODE", "mock").lower()
+        if ipam_name not in ("netbox", "efficientip") or ipam_mode not in ("mock", "real"):
+            raise ValueError("Invalid IPAM source configuration")
+        ipam_source = {
+            ("netbox", "mock"): MockIpamSource,
+            ("netbox", "real"): NetBoxSource,
+            ("efficientip", "mock"): MockEfficientIpSource,
+            ("efficientip", "real"): EfficientIpSource,
+        }[(ipam_name, ipam_mode)]()
+    ipam_default = getattr(ipam_source, "ipam_source", None)
     started_at = _now()
     completed_step = 0
     asynchronous = run_id is not None
@@ -172,16 +186,20 @@ def _run_inventory(
                 if row.id is None and not asynchronous:
                     db.session.flush()
 
-            stored_ipam: dict[tuple[str | None, str | None], IpamRecord] = {}
-            ipam_snapshots: dict[tuple[str | None, str | None], IpamObservation] = {}
+            stored_ipam: dict[tuple[str | None, str | None, str | None], IpamRecord] = {}
+            ipam_snapshots: dict[tuple[str | None, str | None, str | None], IpamObservation] = {}
             for ipam_observation in ipam_records:
-                ipam_key: tuple[str | None, str | None] = (ipam_observation.get("ip"), ipam_observation.get("dns_name"))
+                origin = cast(str | None, ipam_observation.get("ipam_source", ipam_default))
+                if origin is not None and origin not in ("netbox", "efficientip"):
+                    raise ValueError("Invalid IPAM observation source")
+                ipam_key = (origin, ipam_observation.get("ip"), ipam_observation.get("dns_name"))
                 ipam_snapshots[ipam_key] = ipam_observation.copy()
                 if ipam_key not in stored_ipam:
                     stored_ipam[ipam_key] = IpamRecord(run_id=run.id)
                     if not asynchronous:
                         db.session.add(stored_ipam[ipam_key])
                 ipam_row = stored_ipam[ipam_key]
+                ipam_row.ipam_source = origin
                 for field in ("ip", "dns_name", "status", "tenant", "site", "tags", "meta_zone"):
                     setattr(ipam_row, field, ipam_observation.get(field))
                 custom = ipam_observation.get("custom_fields")
@@ -210,7 +228,8 @@ def _run_inventory(
                 asset = stored_assets[key]
                 result = consolidate_asset(observation, unique_ipam)
                 matched = result["ipam_record"]
-                ipam = stored_ipam[(matched.get("ip"), matched.get("dns_name"))] if matched else None
+                ipam = stored_ipam[(cast(str | None, matched.get("ipam_source", ipam_default)),
+                                    matched.get("ip"), matched.get("dns_name"))] if matched else None
                 asset.role = result["role"]
                 consolidated = {
                     "run_id": run.id, "ip_final": result["ip_final"], "dns_final": result["dns_final"],
@@ -241,12 +260,13 @@ def _run_inventory(
                                  if record.get("dns_name"))
             ip_counts = Counter(record.get("ip") for record in unique_ipam if record.get("ip"))
             for ipam_key, ipam_row in stored_ipam.items():
-                ipam_row.duplicate_dns = int(bool(ipam_key[1]) and dns_counts[normalize(ipam_key[1])] > 1)
-                ipam_row.duplicate_ip = int(bool(ipam_key[0]) and ip_counts[cast(str, ipam_key[0])] > 1)
+                ipam_row.duplicate_dns = int(bool(ipam_key[2]) and dns_counts[normalize(ipam_key[2])] > 1)
+                ipam_row.duplicate_ip = int(bool(ipam_key[1]) and ip_counts[cast(str, ipam_key[1])] > 1)
             for anomaly in duplicate_anomalies(unique_ipam):
                 anomaly_count += 1
                 ipam_observation = cast(IpamObservation, anomaly["ipam_record"])
-                ipam = stored_ipam[(ipam_observation.get("ip"), ipam_observation.get("dns_name"))]
+                ipam = stored_ipam[(cast(str | None, ipam_observation.get("ipam_source", ipam_default)),
+                                    ipam_observation.get("ip"), ipam_observation.get("dns_name"))]
                 if asynchronous:
                     pending_anomalies.append((None, ipam, anomaly["code"], anomaly["description"]))
                 else:
