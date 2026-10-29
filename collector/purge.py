@@ -25,10 +25,13 @@ def purge_old_runs(keep: int | None = None) -> int:
         raise ValueError("run retention must be a positive integer")
 
     with db.session.begin():
+        from app.audit import record_action
+
         old_ids: Sequence[int] = db.session.scalars(
             select(Run.id).order_by(Run.started_at.desc(), Run.id.desc()).offset(keep)
         ).all()
         if old_ids:
+            record_action(db.session.connection(), "runs purgés", f"runs:{','.join(map(str, old_ids))}")
             # RESTRICT references need removing before database cascades remove the run's assets.
             db.session.execute(delete(Anomaly).where(Anomaly.run_id.in_(old_ids)))
             db.session.execute(delete(ConsolidatedAsset).where(ConsolidatedAsset.run_id.in_(old_ids)))

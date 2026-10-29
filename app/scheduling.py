@@ -16,6 +16,7 @@ from flask import (
 from flask_login import login_required
 
 from app import db
+from app.audit import scheduled_run
 from app.models import Run, RunSchedule
 from collector.async_runner import start_inventory
 from collector.run_lock import RunAlreadyActive
@@ -38,7 +39,11 @@ def fire_schedule(app, schedule_id):
         if schedule is None or not schedule.enabled:
             return
         try:
-            identifier = start_inventory()
+            token = scheduled_run.set(schedule_id)
+            try:
+                identifier = start_inventory()
+            finally:
+                scheduled_run.reset(token)
         except RunAlreadyActive:
             app.logger.info("Scheduled run %s skipped: inventory already active", schedule_id)
             return

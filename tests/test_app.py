@@ -214,7 +214,8 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
                              "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
                               "api.acknowledge_anomaly", "api.resolve_anomaly", "api.anomaly_exceptions", "api.delete_anomaly_exception",
                                 "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",
-                                "accounts.list_accounts", "accounts.create_account", "accounts.update_account"}
+                                 "accounts.list_accounts", "accounts.create_account", "accounts.update_account",
+                                 "audit.audit_page"}
                or endpoint.startswith("flasgger.")
                for _, endpoint in routes)
 
@@ -239,7 +240,7 @@ def test_authenticated_navigation_has_scheduling_link_and_logout(valid_secrets):
     client, _ = logged_in_client(valid_secrets)
     elements = parse_page(client.get("/"))
     assert {attrs.get("href") for tag, attrs, inside in elements if inside and tag == "a"} == {
-        "/", "/inventory", "/runs", "/runs/compare", "/anomalies", "/scheduling"
+        "/", "/inventory", "/runs", "/runs/compare", "/anomalies", "/scheduling", "/audit"
     } and any(tag == "form" and inside and attrs.get("action") == "/logout" and attrs.get("method") == "post"
               for tag, attrs, inside in elements)
 
