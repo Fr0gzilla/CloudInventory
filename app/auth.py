@@ -25,11 +25,15 @@ from werkzeug.security import check_password_hash
 
 from . import login_manager
 
+
+class AuthLogHandler(logging.StreamHandler):
+    _cloudinventory_auth = True
+
+
 security_log = logging.getLogger("security.auth")
 security_log.setLevel(logging.INFO)
 if not any(getattr(handler, "_cloudinventory_auth", False) for handler in security_log.handlers):
-    handler = logging.StreamHandler()
-    handler._cloudinventory_auth = True
+    handler = AuthLogHandler()
     formatter = logging.Formatter("%(asctime)s %(levelname)s %(name)s %(message)s", "%Y-%m-%dT%H:%M:%SZ")
     formatter.converter = time.gmtime
     handler.setFormatter(formatter)

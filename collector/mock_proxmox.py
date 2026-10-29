@@ -56,7 +56,7 @@ class MockProxmoxSource:
             assets[0]["fqdn"] = "web-a500-renamed.prod.local"
         if self.scenario == "renamed_with_creation":
             created = assets[0].copy()
-            created.update(vm_id="new-100", vm_name="new-vm", fqdn="new-vm.prod.local",
-                           ip_reported="10.0.9.200")
+            created.update({"vm_id": "new-100", "vm_name": "new-vm", "fqdn": "new-vm.prod.local",
+                            "ip_reported": "10.0.9.200"})
             assets.append(created)
         return assets

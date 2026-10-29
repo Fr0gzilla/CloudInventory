@@ -65,7 +65,7 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
                    ipam_record_id=ipam.id if ipam else None, code=code,
                    description=description, created_at=_now(), severity=_severity_for(code),
                    tracking_key=key, state=state,
-                   state_changed_at=previous.state_changed_at if state == "acquittée" else None)
+                   state_changed_at=previous.state_changed_at if state == "acquittée" and previous else None)
 
 
 def run_inventory(
@@ -95,7 +95,7 @@ def _run_inventory(
     completed_step = 0
     asynchronous = run_id is not None
     pending_consolidated = []
-    pending_anomalies = []
+    pending_anomalies: list[tuple[Asset | None, IpamRecord | None, str, str]] = []
 
     def completed(step: int) -> None:
         nonlocal completed_step
@@ -119,7 +119,7 @@ def _run_inventory(
                 db.session.add(run)
                 db.session.flush()
             else:
-                run = db.session.get(Run, run_id)
+                run = cast(Run, db.session.get(Run, run_id))
                 started_at = run.started_at
             log_run("inventory_started", run.id)
             completed(1)
@@ -181,7 +181,7 @@ def _run_inventory(
             anomaly_count = 0
             renamed = renamed_anomalies(
                 asset_snapshots.values(),
-                [{"vm_id": row.vm_id, "vm_name": row.vm_name} for row in previous_assets],
+                [cast(AssetRecord, {"vm_id": row.vm_id, "vm_name": row.vm_name}) for row in previous_assets],
             )
             renamed_by_vm = {entry["asset"]["vm_id"]: entry for entry in renamed if entry["asset"]}
             for observation in asset_snapshots.values():
@@ -234,16 +234,16 @@ def _run_inventory(
 
             if asynchronous:
                 completed(7)
-                for row in (*stored_assets.values(), *stored_ipam.values()):
-                    db.session.add(row)
+                for stored_row in (*stored_assets.values(), *stored_ipam.values()):
+                    db.session.add(stored_row)
                     db.session.flush()
                 for asset, ipam, details in pending_consolidated:
                     db.session.add(ConsolidatedAsset(
                         asset_id=asset.id, ipam_record_id=ipam.id if ipam else None, **details,
                     ))
                     db.session.flush()
-                for asset, ipam, code, description in pending_anomalies:
-                    db.session.add(_tracked_anomaly(run.id, code, description, asset, ipam))
+                for pending_asset, ipam, code, description in pending_anomalies:
+                    db.session.add(_tracked_anomaly(run.id, code, description, pending_asset, ipam))
                     db.session.flush()
 
             if previous:
@@ -262,7 +262,7 @@ def _run_inventory(
             run.no_match_count = counts["NO_MATCH"]
             if not asynchronous:
                 completed(7)
-            run_id = run.id
+            run_id = cast(int, run.id)
             finished_at = run.finished_at
         if asynchronous:
             db.session.commit()
@@ -278,7 +278,7 @@ def _run_inventory(
                              error_message=str(error))
                 db.session.add(failed)
             else:
-                failed = db.session.get(Run, run_id)
+                failed = cast(Run, db.session.get(Run, run_id))
                 failed.status = "FAIL"
                 failed.finished_at = _now()
                 failed.error_message = str(error)
@@ -295,7 +295,7 @@ def _run_inventory(
     log_run("inventory_succeeded" if succeeded else "inventory_failed", metrics_run_id)
     if succeeded:
         run_anomalies.inc(anomaly_count)
-        export_run(run_id, {
+        export_run(cast(int, run_id), {
             "finished_at": finished_at,
             "matched_name_count": counts["MATCHED_NAME"],
             "matched_fqdn_count": counts["MATCHED_FQDN"],
@@ -318,7 +318,7 @@ def _run_inventory(
         alert_count = len(eligible) if should_alert(
             len(eligible), new_count, len(previous_eligible)
         ) else 0
-        notify_anomalies(run_id, alert_count, finished_at)
+        notify_anomalies(cast(int, run_id), alert_count, finished_at)
         db.session.rollback()
     purge_old_runs()
     return result

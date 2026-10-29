@@ -8,7 +8,12 @@ install:
 	$(VENV)/bin/python -m pip install -r requirements-dev.txt
 
 verify:
-	$(VENV)/bin/python -m pytest tests/ -v
+	$(VENV)/bin/ruff check app collector
+	$(VENV)/bin/mypy app collector
+	$(VENV)/bin/coverage run -m pytest tests/ -q
+	$(VENV)/bin/coverage report --fail-under=0
+	$(VENV)/bin/bandit -r app collector -q
+	$(VENV)/bin/pip-audit -r requirements.txt
 
 smoke:
 	@test -x $(VENV)/bin/python || $(MAKE) install

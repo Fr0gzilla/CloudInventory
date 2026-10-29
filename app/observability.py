@@ -31,12 +31,15 @@ class RunJSONFormatter(logging.Formatter):
         })
 
 
+class RunLogHandler(logging.StreamHandler):
+    _cloudinventory_run = True
+
+
 run_log = logging.getLogger("cloudinventory.run")
 run_log.setLevel(logging.INFO)
 run_log.propagate = False
 if not any(getattr(handler, "_cloudinventory_run", False) for handler in run_log.handlers):
-    handler = logging.StreamHandler()
-    handler._cloudinventory_run = True
+    handler = RunLogHandler()
     handler.setFormatter(RunJSONFormatter())
     run_log.addHandler(handler)
 
