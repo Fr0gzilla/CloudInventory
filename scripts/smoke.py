@@ -51,7 +51,8 @@ def main() -> None:
                         raise RuntimeError("server did not become healthy") from None
                     time.sleep(0.1)
 
-            def request(path: str, *, payload: dict | None = None, token: str | None = None) -> dict:
+            def request(path: str, *, payload: dict | None = None, token: str | None = None,
+                        expected_status: int = 200) -> dict:
                 headers = {"Content-Type": "application/json"}
                 if token:
                     headers["Authorization"] = "Bearer " + token
@@ -60,7 +61,7 @@ def main() -> None:
                 try:
                     with urllib.request.urlopen(req, timeout=10) as response:
                         body = json.load(response)
-                        if response.status not in (200, 201):
+                        if response.status != expected_status:
                             raise RuntimeError(f"{path}: HTTP {response.status}")
                         return body
                 except urllib.error.HTTPError as error:
@@ -68,9 +69,19 @@ def main() -> None:
 
             login = request("/api/login", payload={"username": "admin", "password": env["ADMIN_PASSWORD"]})
             token = login["access_token"]
-            run = request("/api/runs", payload={}, token=token)
-            if run.get("status") != "SUCCESS":
-                raise RuntimeError("simulated run did not succeed")
+            run = request("/api/runs", payload={}, token=token, expected_status=202)
+            run_id = run["id"]
+            deadline = time.monotonic() + 15
+            while True:
+                result = request(f"/api/runs/{run_id}", token=token)
+                status = result.get("status")
+                if status == "SUCCESS":
+                    break
+                if status != "RUNNING":
+                    raise RuntimeError(f"simulated run {run_id} failed: {status}")
+                if time.monotonic() >= deadline:
+                    raise RuntimeError(f"simulated run {run_id} timed out waiting for SUCCESS")
+                time.sleep(0.1)
             request("/api/runs", token=token)
             print("smoke: health, authenticated simulated run SUCCESS over HTTP")
         finally:
