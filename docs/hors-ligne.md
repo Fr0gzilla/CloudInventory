@@ -1,0 +1,7 @@
+# Installation hors ligne
+
+Sur une machine connectée disposant de Docker et de Python 3.11 avec pip, lancer `make hors-ligne`. Le paquet `hors-ligne/` contient l'image Docker exportée, le verrou, les roues Python, un fichier Compose autonome et cette notice. Préparer sur une plateforme Docker identique à celle de la cible (architecture et système) ; les roues sont téléchargées pour la plateforme et la version Python de la machine de préparation (Python 3.11). Choisir une machine de préparation compatible avec l'environnement Python qui utilisera les roues.
+
+Transférer intégralement le dossier sur la cible, puis, depuis ce dossier, vérifier `sha256sum -c SHA256SUMS` avant toute installation. Charger l'image par `docker load -i image.tar`. Fournir séparément, hors du paquet, les variables `SECRET_KEY`, `JWT_SECRET_KEY` et `ADMIN_PASSWORD` avec des valeurs non vides et non triviales ; ne jamais les enregistrer dans le paquet. Lancer `docker compose -f docker-compose.yml up -d --wait --pull never` ; le Compose livré référence l'image locale et ne construit rien. Le service est accessible sur le port hôte 5050 par défaut.
+
+Le wheelhouse est une alternative pour un environnement Python compatible, et non une dépendance du déploiement Docker. Pour installer les dépendances sans réseau : `python3.11 -m pip install --no-index --find-links wheelhouse --require-hashes -r requirements.lock`. Le paquet ne contient **pas** les sources de l'application nécessaires à une installation native : l'image Docker est la méthode d'installation autonome fournie.

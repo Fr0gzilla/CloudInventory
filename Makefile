@@ -1,4 +1,4 @@
-.PHONY: install verify smoke up down logs
+.PHONY: install verify smoke up down logs hors-ligne
 
 VENV ?= .venv
 PYTHON ?= python3
@@ -27,3 +27,6 @@ down:
 
 logs:
 	docker compose logs -f --tail=100
+
+hors-ligne:
+	$(PYTHON) scripts/offline.py

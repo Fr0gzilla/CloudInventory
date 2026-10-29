@@ -10,3 +10,4 @@ data/
 htmlcov/
 __pycache__/
 *.pyc
+hors-ligne/
