@@ -32,14 +32,16 @@ def _base_url(value: str) -> str:
     return value.rstrip("/") + "/"
 
 
-def _read_json(url: str, base: str, authorization: str, transport: Transport, timeout: float):
+def _read_json(url: str, base: str, authorization: str, transport: Transport, timeout: float,
+               *, method: str = "GET", auth_header: str = "Authorization"):
     target = urlsplit(url)
     origin = urlsplit(base)
     if (target.scheme != "https" or target.netloc != origin.netloc
             or not target.path.startswith(origin.path) or target.fragment
             or target.username or target.password):
         raise ValueError("Source URL outside configured HTTPS API")
-    request = Request(url, headers={"Authorization": authorization, "Accept": "application/json"})
+    request = Request(url, headers={auth_header: authorization, "Accept": "application/json"},
+                      method=method)
     try:
         payload = transport(request, timeout)
         return json.loads(payload)

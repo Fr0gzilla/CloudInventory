@@ -18,11 +18,14 @@ from collector.exports import export_run
 from collector.matching import consolidate_asset
 from collector.mock_ipam import MockIpamSource
 from collector.mock_proxmox import MockProxmoxSource
+from collector.mock_vsphere import MockVsphereSource
 from collector.normalization import normalize
+from collector.proxmox import ProxmoxSource
 from collector.purge import purge_old_runs
 from collector.run_lock import run_lock
 from collector.source import AssetRecord, Source
 from collector.source import IpamRecord as IpamObservation
+from collector.vsphere import VsphereSource
 
 
 def _now() -> str:
@@ -50,7 +53,8 @@ def _severity_for(code: str) -> str:
 def _tracked_anomaly(run_id: int, code: str, description: str,
                      asset: Asset | None = None, ipam: IpamRecord | None = None) -> Anomaly:
     if asset is not None:
-        target = asset.vm_id
+        target = (json.dumps(["vsphere", asset.vm_id]) if asset.virtual_source == "vsphere"
+                  and asset.vm_id else asset.vm_id)
     elif code == "DUPLICATE_DNS" and ipam is not None:
         target = normalize(ipam.dns_name)
     elif code == "DUPLICATE_IP" and ipam is not None:
@@ -89,7 +93,18 @@ def _run_inventory(
     separately persisted FAIL run with no observations; an error persisting FAIL
     propagates to the caller.
     """
-    virtualization_source = virtualization_source if virtualization_source is not None else MockProxmoxSource()
+    if virtualization_source is None:
+        source_name = os.environ.get("VIRTUALIZATION_SOURCE", "proxmox").lower()
+        source_mode = os.environ.get("VIRTUALIZATION_MODE", "mock").lower()
+        if source_name not in ("proxmox", "vsphere") or source_mode not in ("mock", "real"):
+            raise ValueError("Invalid virtualization source configuration")
+        virtualization_source = {
+            ("proxmox", "mock"): MockProxmoxSource,
+            ("proxmox", "real"): ProxmoxSource,
+            ("vsphere", "mock"): MockVsphereSource,
+            ("vsphere", "real"): VsphereSource,
+        }[(source_name, source_mode)]()
+    source_default = getattr(virtualization_source, "virtual_source", "proxmox")
     ipam_source = ipam_source if ipam_source is not None else MockIpamSource()
     started_at = _now()
     completed_step = 0
@@ -138,13 +153,16 @@ def _run_inventory(
                 raise
             completed(3)
 
-            stored_assets: dict[str, Asset] = {}
-            asset_snapshots: dict[str, AssetRecord] = {}
+            stored_assets: dict[tuple[str, str], Asset] = {}
+            asset_snapshots: dict[tuple[str, str], AssetRecord] = {}
             for observation in assets:
-                key = observation["vm_id"]
-                asset_snapshots[key] = observation.copy()
+                source = observation.get("virtual_source", source_default)
+                if source not in ("proxmox", "vsphere") or not isinstance(observation.get("vm_id"), str):
+                    raise ValueError("Invalid virtualization observation")
+                key = (source, observation["vm_id"])
+                asset_snapshots[key] = cast(AssetRecord, {**observation, "virtual_source": source})
                 if key not in stored_assets:
-                    stored_assets[key] = Asset(run_id=run.id, vm_id=key)
+                    stored_assets[key] = Asset(run_id=run.id, vm_id=key[1], virtual_source=source)
                     if not asynchronous:
                         db.session.add(stored_assets[key])
                 row = stored_assets[key]
@@ -181,11 +199,15 @@ def _run_inventory(
             anomaly_count = 0
             renamed = renamed_anomalies(
                 asset_snapshots.values(),
-                [cast(AssetRecord, {"vm_id": row.vm_id, "vm_name": row.vm_name}) for row in previous_assets],
+                [cast(AssetRecord, {"vm_id": row.vm_id, "vm_name": row.vm_name,
+                                    "virtual_source": row.virtual_source or "proxmox"})
+                 for row in previous_assets],
             )
-            renamed_by_vm = {entry["asset"]["vm_id"]: entry for entry in renamed if entry["asset"]}
+            renamed_by_vm = {(entry["asset"].get("virtual_source", "proxmox"), entry["asset"]["vm_id"]): entry
+                             for entry in renamed if entry["asset"]}
             for observation in asset_snapshots.values():
-                asset = stored_assets[observation["vm_id"]]
+                key = (cast(str, observation.get("virtual_source", source_default)), observation["vm_id"])
+                asset = stored_assets[key]
                 result = consolidate_asset(observation, unique_ipam)
                 matched = result["ipam_record"]
                 ipam = stored_ipam[(matched.get("ip"), matched.get("dns_name"))] if matched else None
@@ -205,7 +227,7 @@ def _run_inventory(
                     db.session.flush()
                 counts[result["match_status"]] += 1
                 for anomaly in match_anomalies(result) + (
-                    [renamed_by_vm[observation["vm_id"]]] if observation["vm_id"] in renamed_by_vm else []
+                    [renamed_by_vm[key]] if key in renamed_by_vm else []
                 ):
                     anomaly_count += 1
                     if asynchronous:
