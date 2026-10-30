@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block title %}Topologie — Cloud Inventory{% endblock %}
+{% block content %}
+<h1>Topologie</h1>
+<p>Carte du dernier run : nœuds → VM → adresses IP. Déplacer les éléments ou zoomer pour explorer.</p>
+<section aria-label="Carte de topologie">
+  <h2 class="h5">Graphe de l’inventaire</h2>
+  <p id="topology-status" role="status" aria-live="polite">Chargement de la topologie…</p>
+  <div id="topology-graph" role="img" aria-label="Topologie des nœuds, machines virtuelles et adresses IP" aria-describedby="topology-status"></div>
+  <ul id="topology-list" class="visually-hidden" aria-label="Relations de la topologie"></ul>
+</section>
+<section aria-label="Légende de la topologie" class="mt-3">
+  <h2 class="h5">Légende</h2>
+  <p>Formes : nœud (rectangle), VM (ellipse), IP (losange). Couleurs des anomalies :</p>
+  <ul class="topology-legend">
+    <li><span class="topology-swatch topology-neutral"></span> Aucune</li>
+    <li><span class="topology-swatch topology-info"></span> Information</li>
+    <li><span class="topology-swatch topology-minor"></span> Mineure</li>
+    <li><span class="topology-swatch topology-major"></span> Majeure</li>
+    <li><span class="topology-swatch topology-critical"></span> Critique</li>
+  </ul>
+</section>
+<link rel="stylesheet" href="{{ url_for('static', filename='topology.css') }}">
+<script defer src="{{ url_for('static', filename='vendor/cytoscape/cytoscape.min.js') }}"></script>
+<script defer src="{{ url_for('static', filename='topology.js') }}"></script>
+{% endblock %}

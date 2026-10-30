@@ -180,7 +180,8 @@ def test_registers_blueprints_at_expected_prefixes(valid_secrets):
                  ("web.dashboard_data", "/dashboard/data"),
                   ("web.dashboard_run", "/dashboard/run"),
                  ("web.run_status", "/runs/<int:id>/status"),
-                ("web.inventory_page", "/inventory"),
+                 ("web.inventory_page", "/inventory"),
+                 ("web.topology_page", "/topology"),
                 ("web.inventory_data", "/inventory/data"),
                 ("web.inventory_export", "/inventory/export"),
                 ("web.runs_page", "/runs"),
@@ -207,11 +208,11 @@ def test_unknown_route_is_denied_to_authenticated_user(valid_secrets):
 def test_only_expected_business_routes_are_registered(valid_secrets):
     routes = {(rule.rule, rule.endpoint) for rule in start_app().url_map.iter_rules()}
     assert ("/health", "web.health") in routes
-    assert all(endpoint in {"web.health", "web.index", "web.dashboard_data", "web.dashboard_run", "web.run_status", "web.inventory_page", "web.inventory_data", "web.inventory_export",
+    assert all(endpoint in {"web.health", "web.index", "web.dashboard_data", "web.dashboard_run", "web.run_status", "web.inventory_page", "web.topology_page", "web.inventory_data", "web.inventory_export",
                              "web.runs_page", "web.run_page", "web.run_compare_page", "web.anomalies_page", "web.anomaly_action", "web.add_anomaly_exception", "web.remove_anomaly_exception", "web.asset_page",
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                              "api.runs", "api.create_run", "api.run_detail", "api.compare_runs", "api.node_capacity",
-                             "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
+                              "api.inventory", "api.topology", "api.inventory_export", "api.asset_detail", "api.anomalies",
                                "api.acknowledge_anomaly", "api.resolve_anomaly", "api.anomaly_proposal", "api.anomaly_exceptions", "api.delete_anomaly_exception",
                                 "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",
                                  "accounts.list_accounts", "accounts.create_account", "accounts.update_account",
@@ -240,7 +241,7 @@ def test_authenticated_navigation_has_scheduling_link_and_logout(valid_secrets):
     client, _ = logged_in_client(valid_secrets)
     elements = parse_page(client.get("/"))
     assert {attrs.get("href") for tag, attrs, inside in elements if inside and tag == "a"} == {
-        "/", "/inventory", "/runs", "/runs/compare", "/anomalies", "/scheduling", "/audit"
+        "/", "/inventory", "/topology", "/runs", "/runs/compare", "/anomalies", "/scheduling", "/audit"
     } and any(tag == "form" and inside and attrs.get("action") == "/logout" and attrs.get("method") == "post"
               for tag, attrs, inside in elements)
 

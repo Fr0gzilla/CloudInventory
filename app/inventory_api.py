@@ -107,6 +107,66 @@ def _csv_safe(value):
 
 
 def configure_inventory_api(app):
+    def topology():
+        """Return the latest run's node, VM and IP topology as JSON."""
+        if request.args:
+            return jsonify(error="Invalid topology query"), 400
+        run = Run.query.order_by(Run.id.desc()).first()
+        if run is None:
+            return jsonify(run_id=None, nodes=[], edges=[])
+
+        severity_order = {None: -1, "info": 0, "mineure": 1, "majeure": 2, "critique": 3}
+        colors = {None: "#64748b", "info": "#2563eb", "mineure": "#eab308",
+                  "majeure": "#f97316", "critique": "#dc2626"}
+        assets = Asset.query.filter_by(run_id=run.id).order_by(Asset.id).all()
+        consolidated = ConsolidatedAsset.query.filter_by(run_id=run.id).all()
+        by_asset = {row.asset_id: row for row in consolidated}
+        by_ipam = {}
+        for row in consolidated:
+            if row.ipam_record_id is not None:
+                by_ipam.setdefault(row.ipam_record_id, []).append(row.asset_id)
+
+        anomalies = Anomaly.query.filter_by(run_id=run.id, state="ouverte").all()
+        vm_severity = {}
+        for anomaly in anomalies:
+            if anomaly.severity not in severity_order or anomaly.severity is None:
+                continue
+            related = set()
+            if anomaly.asset_id is not None:
+                related.add(anomaly.asset_id)
+            if anomaly.ipam_record_id is not None:
+                related.update(by_ipam.get(anomaly.ipam_record_id, ()))
+            for asset_id in related:
+                if severity_order[anomaly.severity] > severity_order[vm_severity.get(asset_id)]:
+                    vm_severity[asset_id] = anomaly.severity
+
+        nodes = {}
+        edges = []
+
+        def add_node(identifier, kind, label, severity=None):
+            previous = nodes.get(identifier)
+            if previous is None or severity_order[severity] > severity_order[previous["anomaly_severity"]]:
+                nodes[identifier] = {"id": identifier, "type": kind, "label": label,
+                                     "anomaly_severity": severity, "color": colors[severity]}
+
+        for asset in assets:
+            node_name = asset.node.strip() if asset.node else ""
+            node_id = f"node:known:{node_name}" if node_name else "node:unknown"
+            vm_id = f"vm:{asset.id}"
+            severity = vm_severity.get(asset.id)
+            add_node(node_id, "node", node_name or "inconnu", severity)
+            add_node(vm_id, "vm", asset.vm_name or asset.vm_id, severity)
+            edges.append({"source": node_id, "target": vm_id})
+            row = by_asset.get(asset.id)
+            ip = (row.ip_final if row else None) or asset.ip_reported
+            if ip and ip.strip():
+                ip = ip.strip()
+                ip_id = f"ip:{ip}"
+                add_node(ip_id, "ip", ip, severity)
+                edges.append({"source": vm_id, "target": ip_id})
+
+        return jsonify(run_id=run.id, nodes=list(nodes.values()), edges=edges)
+
     def inventory():
         """List the latest run's consolidated inventory.
         ---
@@ -355,6 +415,7 @@ def configure_inventory_api(app):
         return jsonify(id=anomaly.id, state=anomaly.state, state_changed_at=anomaly.state_changed_at,
                        resolution_seconds=duration)
 
+    app.add_url_rule("/api/topology", endpoint="api.topology", view_func=topology)
     app.add_url_rule("/api/inventory", endpoint="api.inventory", view_func=inventory)
     app.add_url_rule("/api/inventory/export", endpoint="api.inventory_export", view_func=export)
     app.add_url_rule("/api/inventory/export.xlsx", endpoint="api.inventory_export", view_func=export)

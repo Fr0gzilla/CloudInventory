@@ -18,6 +18,7 @@
           <ul class="navbar-nav me-auto">
             <li class="nav-item"><a class="nav-link" href="/">Tableau de bord</a></li>
             <li class="nav-item"><a class="nav-link" href="/inventory">Inventaire</a></li>
+            <li class="nav-item"><a class="nav-link" href="{{ url_for('web.topology_page') }}">Topologie</a></li>
             <li class="nav-item"><a class="nav-link" href="/runs">Runs</a></li>
             <li class="nav-item"><a class="nav-link" href="{{ url_for('scheduling.schedules_page') }}">Planification</a></li>
             {% if current_user.role_code == 'admin' %}<li class="nav-item"><a class="nav-link" href="{{ url_for('audit.audit_page') }}">Audit</a></li>{% endif %}
