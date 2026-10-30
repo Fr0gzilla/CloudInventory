@@ -106,3 +106,59 @@ def test_upgrade_preserves_baseline_rows_and_accepts_renamed(monkeypatch):
                 connection.execute(text("INSERT INTO anomaly (run_id, code, description, created_at, severity) VALUES (1, 'INVALID', 'bad', '2026-01-02', 'info')"))
     finally:
         engine.dispose()
+
+
+def test_upgrade_v23_filled_database_preserves_rows_and_enforces_v30_constraints():
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    try:
+        with engine.begin() as connection:
+            config = migration_config(connection)
+            command.upgrade(config, "0003_model_v23")
+            raw = connection.connection.driver_connection
+            raw.execute("PRAGMA foreign_keys=ON")
+            rows = {
+                "run_schedule": ("id, frequency", (11, "horaire")),
+                "run": ("id, status, started_at, schedule_id", (12, "SUCCESS", "2026-01-01", 11)),
+                "asset": ("id, run_id, vm_id, virtual_source", (13, 12, "vm-13", "proxmox")),
+                "ipam_record": ("id, run_id, ipam_source", (14, 12, "ipam")),
+                "consolidated_asset": ("id, run_id, asset_id, ipam_record_id, match_status", (15, 12, 13, 14, "MATCHED_IP")),
+                "anomaly": ("id, run_id, asset_id, code, description, created_at, severity", (16, 12, 13, "NO_MATCH", "historical", "2026-01-01", "info")),
+                "anomaly_exception": ("id, code, target, justification, expires_at, author", (17, "NO_MATCH", "vm-13", "reason", "2027-01-01", "tester")),
+                "auth_origin": ("origin_code", ("local",)),
+                "role": ("role_code", ("admin",)),
+                "permission": ("permission_code", ("read",)),
+                "account": ("id, origin_code, role_code, username, local_password_hash", (18, "local", "admin", "tester", "hash")),
+                "role_permission": ("id, role_code, permission_code", (19, "admin", "read")),
+                "audit": ("id, account_id, actor_identity, action, created_at, target", (20, 18, "tester", "read", "2026-01-01", "vm-13")),
+            }
+            for table, (columns, values) in rows.items():
+                placeholders = ", ".join("?" for _ in values)
+                raw.execute(f"INSERT INTO {table} ({columns}) VALUES ({placeholders})", values)
+            before = {table: raw.execute(f"SELECT {columns} FROM {table}").fetchall() for table, (columns, _) in rows.items()}
+            command.upgrade(config, "0004_model_v30")
+            assert {table: raw.execute(f"SELECT {columns} FROM {table}").fetchall() for table, (columns, _) in rows.items()} == before
+            for table, (columns, values) in rows.items():
+                assert raw.execute(f"SELECT {columns} FROM {table}").fetchone() == values
+            reference = sqlite3.connect(":memory:")
+            try:
+                reference.executescript(SCHEMA.read_text(encoding="utf-8"))
+                schema = inspect_schema(raw)
+                schema.pop("alembic_version")
+                assert schema == inspect_schema(reference)
+            finally:
+                reference.close()
+            raw.commit()
+            raw.execute("PRAGMA foreign_keys=ON")
+            assert raw.execute("PRAGMA foreign_keys").fetchone() == (1,)
+            assert raw.execute("PRAGMA foreign_key_check").fetchall() == []
+            assert raw.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
+            for statement, values in (
+                ("INSERT INTO asset (run_id, vm_id, disk_usage_percent) VALUES (?, ?, ?)", (12, "bad", 101)),
+                ("INSERT INTO anomaly (run_id, code, description, created_at) VALUES (?, ?, ?, ?)", (12, "INVALID", "bad", "now")),
+                ("INSERT INTO snapshot_observation (run_id, asset_id) VALUES (?, ?)", (12, 999)),
+                ("INSERT INTO node_capacity_observation (run_id, node_capacity_name) VALUES (?, ?)", (999, "node")),
+            ):
+                with pytest.raises(sqlite3.IntegrityError):
+                    raw.execute(statement, values)
+    finally:
+        engine.dispose()

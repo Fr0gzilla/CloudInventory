@@ -66,9 +66,16 @@ class Asset(db.Model):
     ram = db.Column(db.REAL)
     disk = db.Column(db.REAL)
     uptime = db.Column(db.REAL)
+    disk_usage_percent = db.Column(db.REAL)
+    ram_usage_percent = db.Column(db.REAL)
+    vm_stopped_since = db.Column(db.Text)
+    backup_collection_status = db.Column(db.Text)
 
     __table_args__ = (
         db.CheckConstraint("type IN ('qemu', 'lxc')"),
+        db.CheckConstraint("disk_usage_percent BETWEEN 0 AND 100"),
+        db.CheckConstraint("ram_usage_percent BETWEEN 0 AND 100"),
+        db.CheckConstraint("backup_collection_status IN ('inconnue', 'réussie', 'échouée')"),
         db.UniqueConstraint("id", "run_id"),
         db.Index("idx_asset_run", "run_id"),
         db.Index("idx_asset_run_vm", "run_id", "vm_id"),
@@ -95,6 +102,8 @@ class IpamRecord(db.Model):
     duplicate_ip = db.Column(db.Integer, nullable=False, server_default=db.text("0"))
     meta_zone = db.Column(db.Text)
     custom_fields = db.Column(db.Text)
+    network_prefix = db.Column(db.Text)
+    ptr_name = db.Column(db.Text)
 
     __table_args__ = (
         db.CheckConstraint("duplicate_dns IN (0, 1)"),
@@ -118,8 +127,12 @@ class ConsolidatedAsset(db.Model):
     status_final = db.Column(db.Text)
     match_status = db.Column(db.Text, nullable=False)
     role = db.Column(db.Text)
+    match_confidence = db.Column(db.Integer)
+    match_doubt = db.Column(db.Integer)
 
     __table_args__ = (
+        db.CheckConstraint("match_confidence BETWEEN 0 AND 100"),
+        db.CheckConstraint("match_doubt IN (0, 1)"),
         db.CheckConstraint(
             "match_status IN ('MATCHED_NAME', 'MATCHED_FQDN', 'MATCHED_IP', 'NO_MATCH')"
         ),
@@ -149,12 +162,15 @@ class Anomaly(db.Model):
     tracking_key = db.Column(db.Text)
     state = db.Column(db.Text, nullable=False, server_default=db.text("'ouverte'"))
     state_changed_at = db.Column(db.Text)
-    severity = db.Column(db.Text, nullable=False)
+    severity = db.Column(db.Text)
 
     __table_args__ = (
         db.CheckConstraint(
             "code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', "
-            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')"
+            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', "
+            "'DNS_MISSING_PTR', 'PTR_MISMATCH', 'MISSING_REQUIRED_TAG', 'MISSING_TENANT', "
+            "'MISSING_SITE', 'DISK_OVER_90', 'RAM_SATURATED', 'VM_UNDERUSED', 'VM_ZOMBIE', "
+            "'NO_RECENT_BACKUP', 'FORGOTTEN_SNAPSHOT')"
         ),
         db.CheckConstraint("state IN ('ouverte', 'acquittée', 'résolue')"),
         db.CheckConstraint("severity IN ('info', 'mineure', 'majeure', 'critique')"),
@@ -185,7 +201,10 @@ class AnomalyException(db.Model):
     __table_args__ = (
         db.CheckConstraint(
             "code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', "
-            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')"
+            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', "
+            "'DNS_MISSING_PTR', 'PTR_MISMATCH', 'MISSING_REQUIRED_TAG', 'MISSING_TENANT', "
+            "'MISSING_SITE', 'DISK_OVER_90', 'RAM_SATURATED', 'VM_UNDERUSED', 'VM_ZOMBIE', "
+            "'NO_RECENT_BACKUP', 'FORGOTTEN_SNAPSHOT')"
         ),
         db.CheckConstraint("length(trim(target)) > 0"),
         db.CheckConstraint("length(trim(justification)) > 0"),
@@ -266,4 +285,54 @@ class Audit(db.Model):
         db.CheckConstraint("length(trim(target)) > 0"),
         db.Index("idx_audit_account", "account_id"),
         db.Index("idx_audit_date", "created_at"),
+    )
+
+
+class SnapshotObservation(db.Model):
+    __tablename__ = "snapshot_observation"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    run_id = db.Column(db.Integer, nullable=False)
+    asset_id = db.Column(db.Integer, nullable=False)
+    snapshot_id = db.Column(db.Text)
+    snapshot_created_at = db.Column(db.Text)
+
+    __table_args__ = (
+        db.ForeignKeyConstraint(["asset_id", "run_id"], ["asset.id", "asset.run_id"], ondelete="CASCADE"),
+        db.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="CASCADE"),
+        db.Index("idx_snapshot_run", "run_id"),
+        db.Index("idx_snapshot_asset_run", "asset_id", "run_id"),
+    )
+
+
+class BackupObservation(db.Model):
+    __tablename__ = "backup_observation"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    run_id = db.Column(db.Integer, nullable=False)
+    asset_id = db.Column(db.Integer, nullable=False)
+    backup_id = db.Column(db.Text)
+    backup_created_at = db.Column(db.Text)
+
+    __table_args__ = (
+        db.ForeignKeyConstraint(["asset_id", "run_id"], ["asset.id", "asset.run_id"], ondelete="CASCADE"),
+        db.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="CASCADE"),
+        db.Index("idx_backup_run", "run_id"),
+        db.Index("idx_backup_asset_run", "asset_id", "run_id"),
+    )
+
+
+class NodeCapacityObservation(db.Model):
+    __tablename__ = "node_capacity_observation"
+
+    id = db.Column(db.Integer, primary_key=True, nullable=True)
+    run_id = db.Column(db.Integer, db.ForeignKey("run.id", ondelete="CASCADE"), nullable=False)
+    node_capacity_name = db.Column(db.Text, nullable=False)
+    node_capacity_measured_at = db.Column(db.Text)
+    node_capacity_value = db.Column(db.REAL)
+    node_capacity_limit = db.Column(db.REAL)
+
+    __table_args__ = (
+        db.CheckConstraint("length(trim(node_capacity_name)) > 0"),
+        db.Index("idx_node_capacity_run_name", "run_id", "node_capacity_name"),
     )

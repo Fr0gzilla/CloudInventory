@@ -10,7 +10,7 @@ from app import db
 
 
 SCHEMA = Path(__file__).resolve().parents[1] / "docs/modele/schema.sql"
-TABLES = {"run_schedule", "run", "asset", "ipam_record", "consolidated_asset", "anomaly", "anomaly_exception", "auth_origin", "role", "permission", "account", "role_permission", "audit"}
+TABLES = {"run_schedule", "run", "asset", "ipam_record", "consolidated_asset", "anomaly", "anomaly_exception", "auth_origin", "role", "permission", "account", "role_permission", "audit", "snapshot_observation", "backup_observation", "node_capacity_observation"}
 
 
 def extract_checks(sql):
@@ -69,7 +69,7 @@ def inspect_schema(connection):
             "SELECT sql FROM sqlite_master WHERE type='table' AND name=?", (table,)
         ).fetchone()[0]
         checks = extract_checks(sql)
-        result[table] = (columns, foreign, indexes, checks)
+        result[table] = (columns, sorted((parent, action, tuple(sorted(parts))) for (_, parent, action), parts in foreign.items()), indexes, checks)
     return result
 
 
