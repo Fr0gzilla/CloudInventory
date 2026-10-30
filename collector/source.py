@@ -37,6 +37,11 @@ class IpamRecord(TypedDict):
     meta_zone: str
 
 
+class NetworkIpamRecord(IpamRecord, total=False):
+    network_prefix: str | None
+    ptr_name: str | None
+
+
 RecordT = TypeVar("RecordT")
 
 

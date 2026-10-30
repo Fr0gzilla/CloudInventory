@@ -13,7 +13,14 @@ from app.anomaly_exceptions import anomaly_coverage
 from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
 from app.notifications import notify_anomalies, should_alert
 from app.observability import collection_errors, log_run, run_anomalies, run_duration
-from collector.anomalies import duplicate_anomalies, match_anomalies, renamed_anomalies
+from collector.anomalies import (
+    duplicate_anomalies,
+    match_anomalies,
+    network_match_anomalies,
+    ptr_anomalies,
+    renamed_anomalies,
+    vm_ip_conflicts,
+)
 from collector.efficientip import EfficientIpSource
 from collector.exports import export_run
 from collector.matching import consolidate_asset
@@ -58,7 +65,7 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
     if asset is not None:
         target = (json.dumps(["vsphere", asset.vm_id]) if asset.virtual_source == "vsphere"
                   and asset.vm_id else asset.vm_id)
-    elif code == "DUPLICATE_DNS" and ipam is not None:
+    elif code in ("DUPLICATE_DNS", "DNS_MISSING_PTR", "PTR_MISMATCH") and ipam is not None:
         target = normalize(ipam.dns_name)
     elif code == "DUPLICATE_IP" and ipam is not None:
         target = ipam.ip
@@ -71,7 +78,9 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
     return Anomaly(run_id=run_id, asset_id=asset.id if asset else None,
                    ipam_record_id=ipam.id if ipam else None, code=code,
                     description=description, created_at=_now(),
-                    severity=None if code == "MATCH_CONFIDENCE_DOUBTFUL" else _severity_for(code),
+                     severity=None if code in ("MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX",
+                                               "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH")
+                     else _severity_for(code),
                    tracking_key=key, state=state,
                    state_changed_at=previous.state_changed_at if state == "acquittée" and previous else None)
 
@@ -207,6 +216,14 @@ def _run_inventory(
                 if custom is not None and not isinstance(custom, dict):
                     raise TypeError("Invalid IPAM custom fields")
                 ipam_row.custom_fields = json.dumps(custom) if custom is not None else None
+                for field in ("network_prefix", "ptr_name"):
+                    value = cast(dict[str, object], ipam_observation).get(
+                        field, custom.get(field) if custom else None)
+                    if value is not None and not isinstance(value, str):
+                        raise TypeError("Invalid IPAM network observation")
+                    setattr(ipam_row, field, value)
+                    if value is not None:
+                        cast(dict[str, object], ipam_snapshots[ipam_key])[field] = value
                 if ipam_row.id is None and not asynchronous:
                     db.session.flush()
             if not asynchronous:
@@ -252,7 +269,7 @@ def _run_inventory(
                     ))
                     db.session.flush()
                 counts[result["match_status"]] += 1
-                for anomaly in match_anomalies(result) + (
+                for anomaly in match_anomalies(result) + network_match_anomalies(result) + (
                     [renamed_by_vm[key]] if key in renamed_by_vm else []
                 ):
                     anomaly_count += 1
@@ -263,13 +280,23 @@ def _run_inventory(
                         db.session.flush()
             completed(5)
 
+            for anomaly in vm_ip_conflicts(asset_snapshots.values()):
+                snapshot = cast(AssetRecord, anomaly["asset"])
+                asset = stored_assets[(cast(str, snapshot.get("virtual_source", "proxmox")), snapshot["vm_id"])]
+                anomaly_count += 1
+                if asynchronous:
+                    pending_anomalies.append((asset, None, anomaly["code"], anomaly["description"]))
+                else:
+                    db.session.add(_tracked_anomaly(run.id, anomaly["code"], anomaly["description"], asset))
+                    db.session.flush()
+
             dns_counts = Counter(normalize(record.get("dns_name")) for record in unique_ipam
                                  if record.get("dns_name"))
             ip_counts = Counter(record.get("ip") for record in unique_ipam if record.get("ip"))
             for ipam_key, ipam_row in stored_ipam.items():
                 ipam_row.duplicate_dns = int(bool(ipam_key[2]) and dns_counts[normalize(ipam_key[2])] > 1)
                 ipam_row.duplicate_ip = int(bool(ipam_key[1]) and ip_counts[cast(str, ipam_key[1])] > 1)
-            for anomaly in duplicate_anomalies(unique_ipam):
+            for anomaly in duplicate_anomalies(unique_ipam) + ptr_anomalies(unique_ipam):
                 anomaly_count += 1
                 ipam_observation = cast(IpamObservation, anomaly["ipam_record"])
                 ipam = stored_ipam[(cast(str | None, ipam_observation.get("ipam_source", ipam_default)),
@@ -300,6 +327,8 @@ def _run_inventory(
                                 .filter(Anomaly.run_id == run.id, Anomaly.tracking_key.is_not(None))}
                 for old in Anomaly.query.filter_by(run_id=previous.id, state="acquittée").all():
                     if (old.tracking_key and old.tracking_key not in current_keys
+                            and old.code not in ("IP_OUT_OF_PREFIX", "VM_IP_CONFLICT",
+                                                 "DNS_MISSING_PTR", "PTR_MISMATCH")
                             and (old.code != "MATCH_CONFIDENCE_DOUBTFUL"
                                  or old.tracking_key in conclusive_doubt_keys)):
                         old.state = "résolue"

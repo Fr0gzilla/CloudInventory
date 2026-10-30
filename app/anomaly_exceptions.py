@@ -13,6 +13,7 @@ from app.models import Account, Anomaly, AnomalyException
 CODES = frozenset({
     "NO_MATCH", "MATCHED_IP", "HOSTNAME_MISMATCH", "STATUS_MISMATCH",
     "DUPLICATE_DNS", "DUPLICATE_IP", "RENAMED",
+    "IP_OUT_OF_PREFIX", "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH",
 })
 
 

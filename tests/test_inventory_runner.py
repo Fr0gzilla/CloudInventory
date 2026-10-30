@@ -47,8 +47,10 @@ def test_renamed_anomaly_records_names_and_current_asset_only(orm_app, scenario,
 def test_anomalies_default_to_info_without_severity_configuration(orm_app, monkeypatch):
     monkeypatch.delenv("ANOMALY_SEVERITIES", raising=False)
     run = run_inventory()
-    assert {item.severity for item in rows(Anomaly, run.id) if item.code != "MATCH_CONFIDENCE_DOUBTFUL"} == {"info"}
+    unclassified = {"MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX", "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH"}
+    assert {item.severity for item in rows(Anomaly, run.id) if item.code not in unclassified} == {"info"}
     assert {item.severity for item in rows(Anomaly, run.id) if item.code == "MATCH_CONFIDENCE_DOUBTFUL"} == {None}
+    assert {item.severity for item in rows(Anomaly, run.id) if item.code == "VM_IP_CONFLICT"} == {None}
 
 
 def test_explicit_anomaly_severity_is_applied(orm_app, monkeypatch):

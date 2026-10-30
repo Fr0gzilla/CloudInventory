@@ -1,10 +1,17 @@
 """Deterministic IPAM observations, including intentional duplicate records."""
 
+from typing import cast
+
 from collector.mock_proxmox import MockProxmoxSource
-from collector.source import IpamRecord
+from collector.source import IpamRecord, NetworkIpamRecord
 
 
 class MockIpamSource:
+    def __init__(self, scenario: str = "default") -> None:
+        if scenario not in ("default", "network"):
+            raise ValueError("Unknown mock scenario")
+        self.scenario = scenario
+
     def collect(self) -> list[IpamRecord]:
         records: list[IpamRecord] = []
         tenants = ("Production", "Infra", "Dev", "Staging", "Supervision", "DevOps")
@@ -50,4 +57,12 @@ class MockIpamSource:
                 "custom_fields": {"meta_zone": "staging"},
             },
         ))
+        if self.scenario == "network":
+            for record in records:
+                if record["dns_name"] == "web-a500":
+                    cast(NetworkIpamRecord, record)["network_prefix"] = "10.0.2.0/24"
+                elif record["dns_name"] == "web-a501":
+                    cast(NetworkIpamRecord, record)["ptr_name"] = ""
+                elif record["dns_name"] == "web-a502":
+                    cast(NetworkIpamRecord, record)["ptr_name"] = "unexpected.prod.local"
         return records

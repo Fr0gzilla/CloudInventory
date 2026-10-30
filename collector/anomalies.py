@@ -2,11 +2,15 @@
 
 from collections import Counter
 from collections.abc import Iterable
+from ipaddress import ip_address, ip_network
 from typing import TypedDict, cast
+
+import dns.exception
+import dns.name
 
 from collector.matching import ConsolidatedResult
 from collector.normalization import normalize
-from collector.source import AssetRecord, IpamRecord
+from collector.source import AssetRecord, IpamRecord, NetworkIpamRecord
 
 
 class AnomalyResult(TypedDict):
@@ -62,6 +66,69 @@ def duplicate_anomalies(ipam_records: Iterable[IpamRecord]) -> list[AnomalyResul
                 seen.add(key)
                 entries.append({"code": code, "description": f"{counts[key]} IPAM records share {field}: {key}",
                                 "asset": None, "ipam_record": record.copy()})
+    return entries
+
+
+def network_match_anomalies(result: ConsolidatedResult) -> list[AnomalyResult]:
+    """Check the reported VM IP against the matched IPAM observation's prefix."""
+    asset, ipam = result["asset"], result["ipam_record"]
+    prefix = cast(NetworkIpamRecord, ipam).get("network_prefix") if ipam else None
+    address = asset.get("ip_reported")
+    if not isinstance(prefix, str) or not prefix or not isinstance(address, str) or not address:
+        return []
+    try:
+        outside = ip_address(address) not in ip_network(prefix, strict=False)
+    except ValueError:
+        return []
+    return [{"code": "IP_OUT_OF_PREFIX", "description": f"VM IP {address} outside prefix {prefix}",
+             "asset": asset.copy(), "ipam_record": cast(IpamRecord, ipam).copy()}] if outside else []
+
+
+def vm_ip_conflicts(assets: Iterable[AssetRecord]) -> list[AnomalyResult]:
+    """Report each VM sharing an IP with another distinct VM, never an IPAM duplicate."""
+    records = tuple(assets)
+    identities: dict[str, set[tuple[str, str]]] = {}
+    for asset in records:
+        address = asset.get("ip_reported")
+        if isinstance(address, str) and address:
+            try:
+                normalized = str(ip_address(address))
+            except ValueError:
+                continue
+            identities.setdefault(normalized, set()).add((cast(str, asset.get("virtual_source", "proxmox")),
+                                                          asset["vm_id"]))
+    return [{"code": "VM_IP_CONFLICT", "description": f"VM IP {asset['ip_reported']} shared by distinct VMs",
+             "asset": asset.copy(), "ipam_record": None}
+            for asset in records if isinstance(asset.get("ip_reported"), str)
+            and _conflicted_ip(asset["ip_reported"], identities)]
+
+
+def _conflicted_ip(address: str, identities: dict[str, set[tuple[str, str]]]) -> bool:
+    try:
+        return len(identities.get(str(ip_address(address)), ())) > 1
+    except ValueError:
+        return False
+
+
+def ptr_anomalies(ipam_records: Iterable[IpamRecord]) -> list[AnomalyResult]:
+    """Compare only explicitly observed PTR values, without resolving DNS."""
+    entries: list[AnomalyResult] = []
+    for record in ipam_records:
+        name, ptr = record.get("dns_name"), cast(NetworkIpamRecord, record).get("ptr_name")
+        if not isinstance(name, str) or not name or not isinstance(ptr, str):
+            continue
+        if not ptr:
+            code, description = "DNS_MISSING_PTR", f"DNS {name} has no observed PTR"
+        else:
+            try:
+                mismatch = dns.name.from_text(name).canonicalize() != dns.name.from_text(ptr).canonicalize()
+            except (dns.exception.DNSException, ValueError):
+                continue
+            if not mismatch:
+                continue
+            code, description = "PTR_MISMATCH", f"PTR {ptr} differs from DNS {name}"
+        entries.append({"code": code, "description": description, "asset": None,
+                        "ipam_record": record.copy()})
     return entries
 
 
