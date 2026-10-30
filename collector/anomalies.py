@@ -3,6 +3,7 @@
 import re
 from collections import Counter
 from collections.abc import Iterable
+from datetime import UTC, datetime, timedelta
 from ipaddress import ip_address, ip_network
 from typing import TypedDict, cast
 
@@ -11,7 +12,13 @@ import dns.name
 
 from collector.matching import ConsolidatedResult
 from collector.normalization import normalize
-from collector.source import AssetRecord, IpamRecord, NetworkIpamRecord
+from collector.source import (
+    AssetRecord,
+    BackupRecord,
+    IpamRecord,
+    NetworkIpamRecord,
+    SnapshotRecord,
+)
 
 
 class AnomalyResult(TypedDict):
@@ -19,6 +26,38 @@ class AnomalyResult(TypedDict):
     description: str
     asset: AssetRecord | None
     ipam_record: IpamRecord | None
+
+
+def _source_date(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise TypeError("Invalid observation date")
+    date = datetime.fromisoformat(value)
+    if date.tzinfo is None or date.utcoffset() is None:
+        raise ValueError("Observation date requires timezone")
+    return date.astimezone(UTC)
+
+
+def snapshot_backup_anomalies(asset: AssetRecord, snapshots: Iterable[SnapshotRecord],
+                              backups: Iterable[BackupRecord], backup_status: str | None,
+                              now: datetime, snapshot_days: int, backup_days: int) -> list[AnomalyResult]:
+    """Only a successful backup collection can prove absence of recent backups."""
+    entries: list[AnomalyResult] = []
+    for snapshot in snapshots:
+        date = _source_date(snapshot["snapshot_created_at"])
+        if date is not None and now - date > timedelta(days=snapshot_days):
+            entries.append({"code": "FORGOTTEN_SNAPSHOT",
+                            "description": f"Snapshot {snapshot['snapshot_id']} older than {snapshot_days} days",
+                            "asset": asset.copy(), "ipam_record": None})
+    if backup_status == "réussie":
+        dates = [_source_date(backup["backup_created_at"]) for backup in backups]
+        if all(date is not None for date in dates) and not any(
+                now - date <= timedelta(days=backup_days) for date in dates if date is not None):
+            entries.append({"code": "NO_RECENT_BACKUP",
+                            "description": f"No backup in the last {backup_days} days",
+                            "asset": asset.copy(), "ipam_record": None})
+    return entries
 
 
 def match_anomalies(result: ConsolidatedResult) -> list[AnomalyResult]:

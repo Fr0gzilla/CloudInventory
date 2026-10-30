@@ -5,10 +5,11 @@ import os
 import re
 import ssl
 from collections.abc import Callable
+from datetime import UTC, datetime
 from urllib.parse import quote, urljoin, urlsplit
 from urllib.request import HTTPRedirectHandler, HTTPSHandler, Request, build_opener
 
-from collector.source import AssetRecord
+from collector.source import AssetRecord, SnapshotRecord
 
 Transport = Callable[[Request, float], bytes]
 
@@ -112,3 +113,36 @@ class ProxmoxSource:
                 "uptime": float(current.get("uptime") or 0),
             })
         return assets
+
+    def collect_snapshots(self, assets: list[AssetRecord]) -> list[SnapshotRecord]:
+        base = _base_url(os.environ.get("PROXMOX_URL", ""))
+        token_id = os.environ.get("PROXMOX_TOKEN_ID", "")
+        secret = os.environ.get("PROXMOX_TOKEN_SECRET", "")
+        if not token_id or not secret or "\n" in token_id or "\n" in secret:
+            raise ValueError("Proxmox token configuration missing or invalid")
+        api = urljoin(base, "api2/json/")
+        auth = f"PVEAPIToken={token_id}={secret}"
+        snapshots: list[SnapshotRecord] = []
+        for asset in assets:
+            if asset.get("virtual_source", "proxmox") != "proxmox":
+                continue
+            node, kind, vmid = asset["node"], asset["type"], asset["vm_id"]
+            if not node or kind not in ("qemu", "lxc") or not vmid.isdigit():
+                raise ValueError("Invalid Proxmox snapshot target")
+            path = f"nodes/{quote(node, safe='')}/{kind}/{vmid}/snapshot"
+            result = _read_json(urljoin(api, path), api, auth, self._transport, self._timeout)
+            if not isinstance(result, dict) or not isinstance(result.get("data"), list):
+                raise TypeError("Invalid Proxmox snapshot response")
+            for item in result["data"]:
+                if not isinstance(item, dict):
+                    raise TypeError("Invalid Proxmox snapshot entry")
+                if item.get("name") == "current":
+                    continue
+                name, timestamp = item.get("name"), item.get("snaptime")
+                if not isinstance(name, str) or not name or (timestamp is not None and
+                                                                (type(timestamp) is not int or timestamp < 0)):
+                    raise ValueError("Invalid Proxmox snapshot entry")
+                snapshots.append({"vm_id": vmid, "snapshot_id": name,
+                                  "snapshot_created_at": datetime.fromtimestamp(timestamp, UTC).isoformat()
+                                  if timestamp is not None else None})
+        return snapshots

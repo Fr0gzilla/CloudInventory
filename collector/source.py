@@ -29,6 +29,18 @@ class ZombieAssetRecord(AssetRecord, total=False):
     vm_stopped_since: str | None
 
 
+class SnapshotRecord(TypedDict):
+    vm_id: str
+    snapshot_id: str | None
+    snapshot_created_at: str | None
+
+
+class BackupRecord(TypedDict):
+    vm_id: str
+    backup_id: str | None
+    backup_created_at: str | None
+
+
 class IpamRecord(TypedDict):
     ip: str
     dns_name: str

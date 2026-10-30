@@ -1,6 +1,7 @@
 """Persist one seven-step inventory run as a single atomic collection."""
 
 import json
+import logging
 import os
 from collections import Counter
 from collections.abc import Callable
@@ -10,7 +11,15 @@ from typing import cast
 
 from app import db
 from app.anomaly_exceptions import anomaly_coverage
-from app.models import Anomaly, Asset, ConsolidatedAsset, IpamRecord, Run
+from app.models import (
+    Anomaly,
+    Asset,
+    BackupObservation,
+    ConsolidatedAsset,
+    IpamRecord,
+    Run,
+    SnapshotObservation,
+)
 from app.notifications import notify_anomalies, should_alert
 from app.observability import collection_errors, log_run, run_anomalies, run_duration
 from collector.anomalies import (
@@ -21,8 +30,10 @@ from collector.anomalies import (
     ptr_anomalies,
     renamed_anomalies,
     required_tag_anomalies,
+    snapshot_backup_anomalies,
     vm_ip_conflicts,
 )
+from collector.backup import PbsBackupSource
 from collector.efficientip import EfficientIpSource
 from collector.exports import export_run
 from collector.matching import consolidate_asset
@@ -35,7 +46,13 @@ from collector.normalization import normalize
 from collector.proxmox import ProxmoxSource
 from collector.purge import purge_old_runs
 from collector.run_lock import run_lock
-from collector.source import AssetRecord, Source, ZombieAssetRecord
+from collector.source import (
+    AssetRecord,
+    BackupRecord,
+    SnapshotRecord,
+    Source,
+    ZombieAssetRecord,
+)
 from collector.source import IpamRecord as IpamObservation
 from collector.vsphere import VsphereSource
 
@@ -48,6 +65,13 @@ def _zombie_days() -> int:
     value = os.environ.get("VM_ZOMBIE_DAYS", "30")
     if not value.isascii() or not value.isdecimal() or int(value) < 1:
         raise ValueError("Invalid VM zombie threshold")
+    return int(value)
+
+
+def _observation_days(name: str, default: str) -> int:
+    value = os.environ.get(name, default)
+    if not value.isascii() or not value.isdecimal() or int(value) < 1:
+        raise ValueError(f"Invalid {name} threshold")
     return int(value)
 
 
@@ -118,7 +142,8 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
                     description=description, created_at=_now(),
                       severity=None if code in ("MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX",
                                                 "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH",
-                                                "MISSING_REQUIRED_TAG", "MISSING_TENANT", "MISSING_SITE", "VM_ZOMBIE")
+                                                 "MISSING_REQUIRED_TAG", "MISSING_TENANT", "MISSING_SITE", "VM_ZOMBIE",
+                                                 "NO_RECENT_BACKUP", "FORGOTTEN_SNAPSHOT")
                      else _severity_for(code),
                    tracking_key=key, state=state,
                    state_changed_at=previous.state_changed_at if state == "acquittée" and previous else None)
@@ -128,9 +153,12 @@ def run_inventory(
     virtualization_source: Source[AssetRecord] | None = None,
     ipam_source: Source[IpamObservation] | None = None,
     after_step: Callable[[int], None] | None = None,
+    snapshot_source: Source[SnapshotRecord] | None = None,
+    backup_source: Source[BackupRecord] | None = None,
 ) -> Run:
     with run_lock():
-        return _run_inventory(virtualization_source, ipam_source, after_step)
+        return _run_inventory(virtualization_source, ipam_source, after_step,
+                              snapshot_source=snapshot_source, backup_source=backup_source)
 
 
 def _run_inventory(
@@ -138,6 +166,8 @@ def _run_inventory(
     ipam_source: Source[IpamObservation] | None = None,
     after_step: Callable[[int], None] | None = None,
     run_id: int | None = None,
+    snapshot_source: Source[SnapshotRecord] | None = None,
+    backup_source: Source[BackupRecord] | None = None,
 ) -> Run:
     """Run steps 1–7; after_step receives each completed step number (1 to 7).
 
@@ -171,6 +201,8 @@ def _run_inventory(
     ipam_default = getattr(ipam_source, "ipam_source", None)
     started_at = _now()
     zombie_days = _zombie_days()
+    snapshot_days = _observation_days("FORGOTTEN_SNAPSHOT_DAYS", "30")
+    backup_days = _observation_days("RECENT_BACKUP_DAYS", "7")
     completed_step = 0
     asynchronous = run_id is not None
     pending_consolidated = []
@@ -186,6 +218,11 @@ def _run_inventory(
             db.session.commit()
         if after_step is not None:
             after_step(step)
+
+    if not asynchronous and db.session().in_transaction() and not (
+        db.session.new or db.session.dirty or db.session.deleted
+    ):
+        db.session.rollback()
 
     try:
         with db.session.begin() if not asynchronous else nullcontext():
@@ -216,6 +253,33 @@ def _run_inventory(
                 collection_errors.inc()
                 raise
             completed(3)
+
+            snapshots: list[SnapshotRecord] = []
+            if snapshot_source is not None or isinstance(virtualization_source, ProxmoxSource):
+                try:
+                    if snapshot_source is None:
+                        snapshots = cast(ProxmoxSource, virtualization_source).collect_snapshots(assets)
+                    else:
+                        snapshots = snapshot_source.collect()
+                except (OSError, RuntimeError, ValueError, TypeError):
+                    collection_errors.inc()
+                    logging.getLogger(__name__).warning("Snapshot collection unavailable", exc_info=True)
+                    snapshots = []
+
+            if backup_source is None and os.environ.get("PBS_URL"):
+                backup_source = PbsBackupSource()
+            backups: list[BackupRecord] = []
+            backup_status = "inconnue"
+            if backup_source is not None:
+                try:
+                    backups = backup_source.collect()
+                    if not isinstance(backups, list):
+                        raise TypeError("Invalid backup collection")
+                    backup_status = "réussie"
+                except (OSError, RuntimeError, ValueError, TypeError):
+                    collection_errors.inc()
+                    logging.getLogger(__name__).warning("Backup collection unavailable", exc_info=True)
+                    backup_status = "échouée"
 
             stored_assets: dict[tuple[str, str], Asset] = {}
             asset_snapshots: dict[tuple[str, str], AssetRecord] = {}
@@ -272,6 +336,36 @@ def _run_inventory(
                     db.session.flush()
             if not asynchronous:
                 db.session.flush()
+            snapshots_by_vm: dict[tuple[str, str], list[dict[str, object]]] = {}
+            backups_by_vm: dict[tuple[str, str], list[dict[str, object]]] = {}
+            pending_observations: list[tuple[Asset, type[SnapshotObservation | BackupObservation], dict]] = []
+            for records, grouped, model, identity, created in (
+                (snapshots, snapshots_by_vm, SnapshotObservation, "snapshot_id", "snapshot_created_at"),
+                (backups, backups_by_vm, BackupObservation, "backup_id", "backup_created_at"),
+            ):
+                for record in cast(list[dict[str, object]], records):
+                    if not isinstance(record, dict) or not isinstance(record.get("vm_id"), str):
+                        raise TypeError("Invalid VM observation")
+                    source = record.get("virtual_source", "proxmox")
+                    key = (source, record["vm_id"])
+                    if source not in ("proxmox", "vsphere") or not record["vm_id"] or key not in stored_assets:
+                        raise ValueError("Observation does not match an inventoried VM")
+                    if record.get(identity) is not None and not isinstance(record[identity], str):
+                        raise TypeError("Invalid observation identifier")
+                    if record.get(created) is not None:
+                        if not isinstance(record[created], str):
+                            raise TypeError("Invalid observation date")
+                        _observed_at(cast(str, record[created]))
+                    grouped.setdefault(key, []).append(record)
+                    asset = stored_assets[key]
+                    details = {"run_id": run.id, identity: record.get(identity), created: record.get(created)}
+                    if asynchronous:
+                        pending_observations.append((asset, model, details))
+                    else:
+                        db.session.add(model(asset_id=asset.id, **details))
+            for key, asset in stored_assets.items():
+                if key[0] == "proxmox" or backup_source is not None:
+                    asset.backup_collection_status = backup_status
             completed(4)
 
             unique_ipam = list(ipam_snapshots.values())
@@ -315,7 +409,11 @@ def _run_inventory(
                 counts[result["match_status"]] += 1
                 for anomaly in match_anomalies(result) + network_match_anomalies(result) + required_tag_anomalies(observation) + (
                     [renamed_by_vm[key]] if key in renamed_by_vm else []
-                ):
+                ) + snapshot_backup_anomalies(
+                    observation, cast(list[SnapshotRecord], snapshots_by_vm.get(key, [])),
+                    cast(list[BackupRecord], backups_by_vm.get(key, [])),
+                    asset.backup_collection_status, datetime.fromisoformat(started_at),
+                    snapshot_days, backup_days):
                     anomaly_count += 1
                     if asynchronous:
                         pending_anomalies.append((asset, ipam, anomaly["code"], anomaly["description"]))
@@ -367,6 +465,9 @@ def _run_inventory(
                 for stored_row in (*stored_assets.values(), *stored_ipam.values()):
                     db.session.add(stored_row)
                     db.session.flush()
+                for asset, model, details in pending_observations:
+                    db.session.add(model(asset_id=asset.id, **details))
+                    db.session.flush()
                 for asset, ipam, details in pending_consolidated:
                     db.session.add(ConsolidatedAsset(
                         asset_id=asset.id, ipam_record_id=ipam.id if ipam else None, **details,
@@ -381,8 +482,9 @@ def _run_inventory(
                                 .filter(Anomaly.run_id == run.id, Anomaly.tracking_key.is_not(None))}
                 for old in Anomaly.query.filter_by(run_id=previous.id, state="acquittée").all():
                     if (old.tracking_key and old.tracking_key not in current_keys
-                            and old.code not in ("IP_OUT_OF_PREFIX", "VM_IP_CONFLICT",
-                                                 "DNS_MISSING_PTR", "PTR_MISMATCH")
+                             and old.code not in ("IP_OUT_OF_PREFIX", "VM_IP_CONFLICT",
+                                                  "DNS_MISSING_PTR", "PTR_MISMATCH",
+                                                  "FORGOTTEN_SNAPSHOT", "NO_RECENT_BACKUP")
                             and (old.code != "MATCH_CONFIDENCE_DOUBTFUL"
                                  or old.tracking_key in conclusive_doubt_keys)):
                         old.state = "résolue"
