@@ -134,7 +134,7 @@ class ConsolidatedAsset(db.Model):
         db.CheckConstraint("match_confidence BETWEEN 0 AND 100"),
         db.CheckConstraint("match_doubt IN (0, 1)"),
         db.CheckConstraint(
-            "match_status IN ('MATCHED_NAME', 'MATCHED_FQDN', 'MATCHED_IP', 'NO_MATCH')"
+            "match_status IN ('MATCHED_NAME', 'MATCHED_FQDN', 'MATCHED_IP', 'MATCHED_FUZZY', 'NO_MATCH')"
         ),
         db.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="CASCADE"),
         db.ForeignKeyConstraint(["asset_id", "run_id"], ["asset.id", "asset.run_id"], ondelete="CASCADE"),
@@ -167,13 +167,14 @@ class Anomaly(db.Model):
     __table_args__ = (
         db.CheckConstraint(
             "code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', "
-            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', "
+            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'MATCH_CONFIDENCE_DOUBTFUL', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', "
             "'DNS_MISSING_PTR', 'PTR_MISMATCH', 'MISSING_REQUIRED_TAG', 'MISSING_TENANT', "
             "'MISSING_SITE', 'DISK_OVER_90', 'RAM_SATURATED', 'VM_UNDERUSED', 'VM_ZOMBIE', "
             "'NO_RECENT_BACKUP', 'FORGOTTEN_SNAPSHOT')"
         ),
         db.CheckConstraint("state IN ('ouverte', 'acquittée', 'résolue')"),
         db.CheckConstraint("severity IN ('info', 'mineure', 'majeure', 'critique')"),
+        db.CheckConstraint("code <> 'MATCH_CONFIDENCE_DOUBTFUL' OR (asset_id IS NOT NULL AND severity IS NULL)"),
         db.ForeignKeyConstraint(["run_id"], ["run.id"], ondelete="CASCADE"),
         db.ForeignKeyConstraint(["asset_id", "run_id"], ["asset.id", "asset.run_id"], ondelete="RESTRICT"),
         db.ForeignKeyConstraint(
@@ -201,7 +202,7 @@ class AnomalyException(db.Model):
     __table_args__ = (
         db.CheckConstraint(
             "code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', "
-            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', "
+            "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'MATCH_CONFIDENCE_DOUBTFUL', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', "
             "'DNS_MISSING_PTR', 'PTR_MISMATCH', 'MISSING_REQUIRED_TAG', 'MISSING_TENANT', "
             "'MISSING_SITE', 'DISK_OVER_90', 'RAM_SATURATED', 'VM_UNDERUSED', 'VM_ZOMBIE', "
             "'NO_RECENT_BACKUP', 'FORGOTTEN_SNAPSHOT')"

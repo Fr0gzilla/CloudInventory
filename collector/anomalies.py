@@ -29,7 +29,11 @@ def match_anomalies(result: ConsolidatedResult) -> list[AnomalyResult]:
 
     if status == "NO_MATCH":
         add("NO_MATCH", "No IPAM match for this asset")
+        if result["match_doubt"]:
+            add("MATCH_CONFIDENCE_DOUBTFUL", "Ambiguous or uncertain IPAM match")
         return entries
+    if result["match_doubt"]:
+        add("MATCH_CONFIDENCE_DOUBTFUL", "Ambiguous or uncertain IPAM match")
     if status == "MATCHED_IP":
         add("MATCHED_IP", "Matched by IP only")
         name = normalize(asset.get("vm_name"))

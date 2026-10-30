@@ -70,7 +70,8 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
     state = previous.state if previous and previous.state != "résolue" else "ouverte"
     return Anomaly(run_id=run_id, asset_id=asset.id if asset else None,
                    ipam_record_id=ipam.id if ipam else None, code=code,
-                   description=description, created_at=_now(), severity=_severity_for(code),
+                    description=description, created_at=_now(),
+                    severity=None if code == "MATCH_CONFIDENCE_DOUBTFUL" else _severity_for(code),
                    tracking_key=key, state=state,
                    state_changed_at=previous.state_changed_at if state == "acquittée" and previous else None)
 
@@ -215,6 +216,7 @@ def _run_inventory(
             unique_ipam = list(ipam_snapshots.values())
             counts: Counter[str] = Counter()
             anomaly_count = 0
+            conclusive_doubt_keys: set[str] = set()
             renamed = renamed_anomalies(
                 asset_snapshots.values(),
                 [cast(AssetRecord, {"vm_id": row.vm_id, "vm_name": row.vm_name,
@@ -227,6 +229,10 @@ def _run_inventory(
                 key = (cast(str, observation.get("virtual_source", source_default)), observation["vm_id"])
                 asset = stored_assets[key]
                 result = consolidate_asset(observation, unique_ipam)
+                if result["match_confidence"] is not None and not result["match_doubt"]:
+                    target = (json.dumps(["vsphere", asset.vm_id]) if asset.virtual_source == "vsphere"
+                              and asset.vm_id else asset.vm_id)
+                    conclusive_doubt_keys.add(json.dumps(["MATCH_CONFIDENCE_DOUBTFUL", target]))
                 matched = result["ipam_record"]
                 ipam = stored_ipam[(cast(str | None, matched.get("ipam_source", ipam_default)),
                                     matched.get("ip"), matched.get("dns_name"))] if matched else None
@@ -234,7 +240,8 @@ def _run_inventory(
                 consolidated = {
                     "run_id": run.id, "ip_final": result["ip_final"], "dns_final": result["dns_final"],
                     "status_final": result["status_final"], "match_status": result["match_status"],
-                    "role": result["role"],
+                    "role": result["role"], "match_confidence": result["match_confidence"],
+                    "match_doubt": int(result["match_doubt"]),
                 }
                 if asynchronous:
                     pending_consolidated.append((asset, ipam, consolidated))
@@ -292,7 +299,9 @@ def _run_inventory(
                 current_keys = {key for (key,) in db.session.query(Anomaly.tracking_key)
                                 .filter(Anomaly.run_id == run.id, Anomaly.tracking_key.is_not(None))}
                 for old in Anomaly.query.filter_by(run_id=previous.id, state="acquittée").all():
-                    if old.tracking_key and old.tracking_key not in current_keys:
+                    if (old.tracking_key and old.tracking_key not in current_keys
+                            and (old.code != "MATCH_CONFIDENCE_DOUBTFUL"
+                                 or old.tracking_key in conclusive_doubt_keys)):
                         old.state = "résolue"
                         old.state_changed_at = _now()
 

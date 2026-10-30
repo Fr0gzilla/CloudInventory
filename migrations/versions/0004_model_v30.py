@@ -10,7 +10,7 @@ depends_on = None
 
 _CODES = (
     "'NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', "
-    "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'IP_OUT_OF_PREFIX', "
+    "'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'MATCH_CONFIDENCE_DOUBTFUL', 'IP_OUT_OF_PREFIX', "
     "'VM_IP_CONFLICT', 'DNS_MISSING_PTR', 'PTR_MISMATCH', 'MISSING_REQUIRED_TAG', "
     "'MISSING_TENANT', 'MISSING_SITE', 'DISK_OVER_90', 'RAM_SATURATED', "
     "'VM_UNDERUSED', 'VM_ZOMBIE', 'NO_RECENT_BACKUP', 'FORGOTTEN_SNAPSHOT'"
@@ -26,7 +26,7 @@ _ANOMALY_COLUMNS = (
 _EXCEPTION_COLUMNS = "id, code, target, justification, expires_at, author"
 
 
-def _replace_anomaly(codes, severity_nullable):
+def _replace_anomaly(codes, severity_nullable, doubtful=False):
     op.execute(f"""CREATE TABLE anomaly_v30 (
         id INTEGER PRIMARY KEY,
         run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
@@ -39,6 +39,7 @@ def _replace_anomaly(codes, severity_nullable):
         state TEXT NOT NULL DEFAULT 'ouverte' CHECK (state IN ('ouverte', 'acquittée', 'résolue')),
         state_changed_at TEXT,
         severity TEXT {'' if severity_nullable else 'NOT NULL '}CHECK (severity IN ('info', 'mineure', 'majeure', 'critique')),
+        {"CHECK (code <> 'MATCH_CONFIDENCE_DOUBTFUL' OR (asset_id IS NOT NULL AND severity IS NULL))," if doubtful else ''}
         FOREIGN KEY (asset_id, run_id) REFERENCES asset(id, run_id) ON DELETE RESTRICT,
         FOREIGN KEY (ipam_record_id, run_id) REFERENCES ipam_record(id, run_id) ON DELETE RESTRICT
     )""")
@@ -69,6 +70,39 @@ def _replace_exception(codes):
     op.rename_table("anomaly_exception_v30", "anomaly_exception")
 
 
+def _replace_consolidated(fuzzy):
+    columns = (
+        "id, run_id, asset_id, ipam_record_id, ip_final, dns_final, "
+        "status_final, match_status, role"
+    )
+    if fuzzy:
+        columns += ", match_confidence, match_doubt"
+    op.execute(f"""CREATE TABLE consolidated_asset_v30 (
+        id INTEGER PRIMARY KEY,
+        run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
+        asset_id INTEGER NOT NULL,
+        ipam_record_id INTEGER,
+        ip_final TEXT,
+        dns_final TEXT,
+        status_final TEXT,
+        match_status TEXT NOT NULL CHECK (match_status IN ('MATCHED_NAME', 'MATCHED_FQDN', 'MATCHED_IP', {"'MATCHED_FUZZY', " if fuzzy else ''}'NO_MATCH')),
+        role TEXT,
+        {"match_confidence INTEGER CHECK (match_confidence BETWEEN 0 AND 100), match_doubt INTEGER CHECK (match_doubt IN (0, 1))," if fuzzy else ''}
+        FOREIGN KEY (asset_id, run_id) REFERENCES asset(id, run_id) ON DELETE CASCADE,
+        FOREIGN KEY (ipam_record_id, run_id) REFERENCES ipam_record(id, run_id) ON DELETE RESTRICT,
+        UNIQUE (asset_id, run_id)
+    )""")
+    op.execute(f"INSERT INTO consolidated_asset_v30 ({columns}) SELECT {columns} FROM consolidated_asset")
+    op.drop_table("consolidated_asset")
+    op.rename_table("consolidated_asset_v30", "consolidated_asset")
+    for name, columns in (
+        ("idx_consolidated_run", ["run_id"]),
+        ("idx_consolidated_ipam_run", ["ipam_record_id", "run_id"]),
+        ("idx_consolidated_run_match", ["run_id", "match_status"]),
+    ):
+        op.create_index(name, "consolidated_asset", columns)
+
+
 def upgrade():
     for name, type_ in (
         ("disk_usage_percent", sa.REAL()), ("ram_usage_percent", sa.REAL()),
@@ -88,7 +122,8 @@ def upgrade():
     ):
         op.add_column("consolidated_asset", sa.Column(name, sa.Integer(), sa.CheckConstraint(check)))
 
-    _replace_anomaly(_CODES, True)
+    _replace_consolidated(True)
+    _replace_anomaly(_CODES, True, doubtful=True)
     _replace_exception(_CODES)
 
     for table, identifier in (("snapshot_observation", "snapshot"), ("backup_observation", "backup")):
@@ -127,6 +162,7 @@ def downgrade():
     with op.batch_alter_table("consolidated_asset") as batch:
         batch.drop_column("match_doubt")
         batch.drop_column("match_confidence")
+    _replace_consolidated(False)
     with op.batch_alter_table("ipam_record") as batch:
         batch.drop_column("ptr_name")
         batch.drop_column("network_prefix")

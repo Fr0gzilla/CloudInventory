@@ -96,7 +96,7 @@ def test_second_pass_includes_unmatched_ipam_and_uses_one_shot_iterables():
     records = [ipam("orphan", "192.0.2.8"), ipam("orphan.example", "192.0.2.8")]
     result = consolidate_asset(asset(name="lost", ip="192.0.2.1"), records)
     entries = collect_anomalies(iter([result]), iter(records))
-    assert codes(entries) == ["NO_MATCH", "DUPLICATE_DNS", "DUPLICATE_IP"]
+    assert codes(entries) == ["NO_MATCH", "MATCH_CONFIDENCE_DOUBTFUL", "DUPLICATE_DNS", "DUPLICATE_IP"]
 
 
 def test_results_are_repeatable_and_detached_from_source_observations():
