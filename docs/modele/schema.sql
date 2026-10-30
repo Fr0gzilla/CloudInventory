@@ -42,6 +42,10 @@ CREATE TABLE asset (
     ram REAL,
     disk REAL,
     uptime REAL,
+    disk_usage_percent REAL CHECK (disk_usage_percent BETWEEN 0 AND 100),
+    ram_usage_percent REAL CHECK (ram_usage_percent BETWEEN 0 AND 100),
+    vm_stopped_since TEXT,
+    backup_collection_status TEXT CHECK (backup_collection_status IN ('inconnue', 'réussie', 'échouée')),
     UNIQUE (id, run_id)
 );
 
@@ -59,6 +63,8 @@ CREATE TABLE ipam_record (
     duplicate_ip INTEGER NOT NULL DEFAULT 0 CHECK (duplicate_ip IN (0, 1)),
     meta_zone TEXT,
     custom_fields TEXT,
+    network_prefix TEXT,
+    ptr_name TEXT,
     UNIQUE (id, run_id)
 );
 
@@ -72,6 +78,8 @@ CREATE TABLE consolidated_asset (
     status_final TEXT,
     match_status TEXT NOT NULL CHECK (match_status IN ('MATCHED_NAME', 'MATCHED_FQDN', 'MATCHED_IP', 'NO_MATCH')),
     role TEXT,
+    match_confidence INTEGER CHECK (match_confidence BETWEEN 0 AND 100),
+    match_doubt INTEGER CHECK (match_doubt IN (0, 1)),
     FOREIGN KEY (asset_id, run_id) REFERENCES asset(id, run_id) ON DELETE CASCADE,
     FOREIGN KEY (ipam_record_id, run_id) REFERENCES ipam_record(id, run_id) ON DELETE RESTRICT,
     UNIQUE (asset_id, run_id)
@@ -82,20 +90,20 @@ CREATE TABLE anomaly (
     run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
     asset_id INTEGER,
     ipam_record_id INTEGER,
-    code TEXT NOT NULL CHECK (code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', 'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')),
+    code TEXT NOT NULL CHECK (code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', 'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', 'DNS_MISSING_PTR', 'PTR_MISMATCH', 'MISSING_REQUIRED_TAG', 'MISSING_TENANT', 'MISSING_SITE', 'DISK_OVER_90', 'RAM_SATURATED', 'VM_UNDERUSED', 'VM_ZOMBIE', 'NO_RECENT_BACKUP', 'FORGOTTEN_SNAPSHOT')),
     description TEXT NOT NULL,
     created_at TEXT NOT NULL,
     tracking_key TEXT,
     state TEXT NOT NULL DEFAULT 'ouverte' CHECK (state IN ('ouverte', 'acquittée', 'résolue')),
     state_changed_at TEXT,
-    severity TEXT NOT NULL CHECK (severity IN ('info', 'mineure', 'majeure', 'critique')),
+    severity TEXT CHECK (severity IN ('info', 'mineure', 'majeure', 'critique')),
     FOREIGN KEY (asset_id, run_id) REFERENCES asset(id, run_id) ON DELETE RESTRICT,
     FOREIGN KEY (ipam_record_id, run_id) REFERENCES ipam_record(id, run_id) ON DELETE RESTRICT
 );
 
 CREATE TABLE anomaly_exception (
     id INTEGER PRIMARY KEY,
-    code TEXT NOT NULL CHECK (code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', 'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED')),
+    code TEXT NOT NULL CHECK (code IN ('NO_MATCH', 'MATCHED_IP', 'HOSTNAME_MISMATCH', 'STATUS_MISMATCH', 'DUPLICATE_DNS', 'DUPLICATE_IP', 'RENAMED', 'IP_OUT_OF_PREFIX', 'VM_IP_CONFLICT', 'DNS_MISSING_PTR', 'PTR_MISMATCH', 'MISSING_REQUIRED_TAG', 'MISSING_TENANT', 'MISSING_SITE', 'DISK_OVER_90', 'RAM_SATURATED', 'VM_UNDERUSED', 'VM_ZOMBIE', 'NO_RECENT_BACKUP', 'FORGOTTEN_SNAPSHOT')),
     target TEXT NOT NULL CHECK (length(trim(target)) > 0),
     justification TEXT NOT NULL CHECK (length(trim(justification)) > 0),
     expires_at TEXT NOT NULL,
@@ -151,3 +159,36 @@ CREATE INDEX idx_account_role ON account(role_code);
 CREATE INDEX idx_role_permission_permission ON role_permission(permission_code);
 CREATE INDEX idx_audit_account ON audit(account_id);
 CREATE INDEX idx_audit_date ON audit(created_at);
+
+CREATE TABLE snapshot_observation (
+    id INTEGER PRIMARY KEY,
+    run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
+    asset_id INTEGER NOT NULL,
+    snapshot_id TEXT,
+    snapshot_created_at TEXT,
+    FOREIGN KEY (asset_id, run_id) REFERENCES asset(id, run_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_snapshot_run ON snapshot_observation(run_id);
+CREATE INDEX idx_snapshot_asset_run ON snapshot_observation(asset_id, run_id);
+
+CREATE TABLE backup_observation (
+    id INTEGER PRIMARY KEY,
+    run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
+    asset_id INTEGER NOT NULL,
+    backup_id TEXT,
+    backup_created_at TEXT,
+    FOREIGN KEY (asset_id, run_id) REFERENCES asset(id, run_id) ON DELETE CASCADE
+);
+CREATE INDEX idx_backup_run ON backup_observation(run_id);
+CREATE INDEX idx_backup_asset_run ON backup_observation(asset_id, run_id);
+
+CREATE TABLE node_capacity_observation (
+    id INTEGER PRIMARY KEY,
+    run_id INTEGER NOT NULL REFERENCES run(id) ON DELETE CASCADE,
+    node_capacity_name TEXT NOT NULL,
+    node_capacity_measured_at TEXT,
+    node_capacity_value REAL,
+    node_capacity_limit REAL,
+    CHECK (length(trim(node_capacity_name)) > 0)
+);
+CREATE INDEX idx_node_capacity_run_name ON node_capacity_observation(run_id, node_capacity_name);

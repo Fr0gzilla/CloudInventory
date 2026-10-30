@@ -13,6 +13,9 @@ sequenceDiagram
     participant ConsolidatedAsset
     participant Anomaly
     participant AnomalyException
+    participant SnapshotObservation
+    participant BackupObservation
+    participant NodeCapacityObservation
     Administrateur-)Run: déclencher inventaire sans attendre la fin
     Note over Run: Une transaction pour les sept étapes
     Run->>Run: 1 start() : RUNNING, started_at
@@ -25,12 +28,38 @@ sequenceDiagram
     Asset-->>-Run: observations Asset conservées
     Run->>+IpamRecord: 4 rapprocher par IP et nom DNS dans ce run
     IpamRecord-->>-Run: observations IPAM conservées
+    opt snapshots et sauvegardes collectés pour une VM observée
+        Run->>+SnapshotObservation: 4 conserver(run, Asset de ce run, snapshot)
+        SnapshotObservation-->>-Run: observation historique
+        Run->>+BackupObservation: 4 conserver(run, Asset de ce run, sauvegarde)
+        BackupObservation-->>-Run: observation historique
+    end
+    opt mesures de capacité disponibles par nœud
+        Run->>+NodeCapacityObservation: 4 conserver(run, nœud, mesure, limite éventuelle)
+        NodeCapacityObservation-->>-Run: historique de capacité
+    end
     Run->>+ConsolidatedAsset: 5 matchByPriority() : nom, FQDN réduit, IP, aucun
     ConsolidatedAsset-->>-Run: résultat et catégorie de correspondance
+    opt rapprochement flou évaluable
+        Run->>+ConsolidatedAsset: 5 evaluateFuzzyMatch() sans effacer les correspondances exactes
+        ConsolidatedAsset-->>-Run: confiance 0 à 100 et doute facultatifs
+    end
     Run->>+Asset: 5 deriveRole() : convention, tag, indéterminé
     Asset-->>-Run: rôle
     Run->>+Anomaly: 5 constater les anomalies de correspondance
     Anomaly-->>-Run: anomalies
+    opt données suffisantes pour les contrôles v3
+        Run->>+Asset: 5 vérifier tags, disque, RAM, historique de sous-utilisation et arrêt
+        Asset-->>-Run: constats évaluables ou indéterminés
+        Run->>+IpamRecord: 5 vérifier préfixe, PTR, tenant et site
+        IpamRecord-->>-Run: constats évaluables ou indéterminés
+        Run->>+Anomaly: 5 détecter conflit IP entre VM et snapshots oubliés si vérifiables
+        Anomaly-->>-Run: constats évaluables ou indéterminés
+        Run->>+Asset: 5 vérifier sauvegarde récente si collecte concluante
+        Asset-->>-Run: constat ou contrôle indéterminé
+    end
+    Run->>+NodeCapacityObservation: 5 forecastSaturation() sur historique disponible
+    NodeCapacityObservation-->>-Run: prévision ou impossible faute de données
     opt vm_id identique et vm_name changé depuis le run précédent
         Run->>+Anomaly: 5 detectRename(otherRun) : constater RENAMED
         Anomaly-->>-Run: anomalie RENAMED
@@ -56,9 +85,10 @@ sequenceDiagram
 
 ## Légende — pipeline
 
-- Flèche pleine : appel ou résultat ; flèche asynchrone : lancement non bloquant ; `alt` : réussite ou exception ; `opt` : traitement conditionnel. `Run`, `Asset`, `IpamRecord`, `ConsolidatedAsset`, `Anomaly` et `AnomalyException` sont les classes du modèle ; l'administrateur et les deux sources sont les acteurs des règles.
+- Flèche pleine : appel ou résultat ; flèche asynchrone : lancement non bloquant ; `alt` : réussite ou exception ; `opt` : traitement conditionnel. `Run`, `Asset`, `IpamRecord`, `ConsolidatedAsset`, `Anomaly`, `AnomalyException`, `SnapshotObservation`, `BackupObservation` et `NodeCapacityObservation` sont les classes du modèle ; l'administrateur et les deux sources sont les acteurs des règles.
 - Les étapes 1–7 sont ordonnées ; l'étape 4 représente la conservation/rapprochement intra-run, sans imposer de primitive SQL d'upsert absente du schéma. La branche d'exception peut survenir à chacune des étapes, et non uniquement après la détection des doublons.
 - `Asset.virtual_source` et `IpamRecord.ipam_source` conservent la provenance des valeurs reçues dans chaque run, même pour un enregistrement IPAM sans VM ; aucun `vm_id` d'une autre source n'est assimilé sur sa seule valeur. Les constats et observations des anciens runs ne sont pas écrasés.
+- Les snapshots et sauvegardes sont conservés avec leur VM `Asset` et le même `Run` ; la capacité est conservée par run et nœud. Le score `ConsolidatedAsset.match_confidence` (0–100) et `match_doubt` restent facultatifs, sans score ni seuil arbitraire pour les correspondances exactes.
 
 ## Traçabilité — pipeline
 
@@ -73,6 +103,10 @@ sequenceDiagram
 | Renommage et exception applicable | RG39–RG40, RG44–RG45 ; §18 EV12, EV15 |
 | Lancement non bloquant et consultation par étape | RG46, RG48 ; §20 EV30 |
 | Collecte qualifiée vSphere et EfficientIP, identité distincte par origine | RG49–RG51, RG58 ; §17 EV01–EV02, §23 EV59 |
+| Observations snapshot, sauvegarde et capacité propres au run et à la VM applicable | RG59, RG73, RG75 ; §17 EV09, §19 EV25 |
+| Matching flou, confiance et doute sans altération des correspondances exactes | RG61 ; §18 EV11 |
+| Contrôles réseau, tags, tenant/site, disque, RAM, sous-utilisation, zombie, sauvegarde et snapshot | RG60, RG62–RG72, RG76 ; §17 EV09, §18 EV17–EV21 |
+| Prévision possible ou impossible faute de données | RG74 ; §19 EV25 |
 
 ## Non représenté — pipeline
 
@@ -80,6 +114,7 @@ sequenceDiagram
 - Le mécanisme de persistance de FAIL après annulation de la transaction unique n'est pas prescrit ; la trace montre l'obligation métier sans inventer sa mise en œuvre.
 - Les sept étapes actualisent la progression (RG46) sans fixer les valeurs finales après rollback (Q13). Le planificateur externe peut déclencher un nouveau run selon `RunSchedule` (RG47–RG48), mais sa cadence et son fuseau restent hors de ce scénario manuel (Q15). Le suivi ouverte → acquittée → résolue est détaillé dans `etats.md`, pas dans le pipeline.
 - L'autorisation d'un lancement et sa trace d'audit sont illustrées dans le scénario d'accès ci-dessous ; elles ne modifient ni les sept étapes ni le cycle du run.
+- La source et les critères de collecte des snapshots, sauvegardes et capacités, le score exact et le seuil de doute, la vérification DNS réelle, la durée N, les seuils de RAM et de sauvegarde, et l'algorithme de prévision ne sont pas prescrits (Q20–Q26). Une collecte indisponible ne signifie pas « aucune sauvegarde » ; une prévision impossible n'est pas une anomalie inventée. Les codes v3 restent candidats, sans gravité supposée ; l'exception par code, cible et expiration s'applique également aux constats v3. Les observations et constats des runs v2 restent inchangés (RG72, RG75–RG76).
 
 ## Diagramme — authentification web et API
 

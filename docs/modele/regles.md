@@ -1,4 +1,4 @@
-# CloudInventory v2.3 — règles de gestion
+# CloudInventory v3.0 — règles de gestion
 
 ## Règles de gestion
 RG01 [structure] — Un run doit conserver son statut, ses dates, ses quatre compteurs de correspondance et son éventuel message d’erreur. (§6.1)
@@ -40,10 +40,10 @@ RG36 [comportement] — L’exploration des observations IPAM doit permettre de 
 RG37 [contrainte] — Une évolution de la base doit préserver les données existantes sans recréer la base. (§23, EV59)
 RG38 [contrainte] — La description SQL du schéma et le modèle ORM doivent rester cohérents à chaque évolution du schéma. (§23, EV59)
 RG39 [comportement] — Deux observations successives de même vm_id mais de vm_name différent doivent produire une anomalie RENAMED dans le run le plus récent. (§18 EV12 ; RG07)
-RG40 [contrainte] — Les codes d’anomalie autorisés doivent comprendre les six codes de RG06 et RENAMED, sans autre code. (§6.2, §18 EV12)
+RG40 [contrainte] — Les constats historiques doivent conserver les six codes de RG06 et RENAMED lors de l’extension des catégories d’anomalies prévue par RG76. (§6.2, §18 EV12 ; RG76)
 RG41 [comportement] — Une anomalie nouvellement constatée doit être ouverte et pouvoir passer à acquittée puis à résolue. (§18 EV14)
 RG42 [structure] — Le suivi d’une anomalie doit conserver son état entre runs sans écraser les constats historiques rattachés à chaque run. (§18 EV14 ; RG05, RG07)
-RG43 [contrainte] — Une anomalie doit porter une sévérité parmi info, mineure, majeure et critique, déterminée par son code. (§18 EV16)
+RG43 [contrainte] — La sévérité renseignée d’une anomalie doit appartenir à info, mineure, majeure ou critique et correspondre à la classification de son code ; une classification inconnue doit rester indéterminée et signalée. (§18 EV16 ; RG76)
 RG44 [structure] — Chaque exception doit préciser un code d’anomalie, une cible, une justification, une date d’expiration et un auteur. (§18 EV15)
 RG45 [comportement] — Une exception ne doit écarter un constat que si son code et sa cible correspondent et que sa date d’expiration n’est pas dépassée. (§18 EV15)
 RG46 [comportement] — Un run lancé doit pouvoir progresser sans immobiliser la requête de lancement, avec une progression consultable pour chacune des sept étapes de RG25–RG28. (§20 EV30 ; §8.2)
@@ -59,6 +59,24 @@ RG55 [contrainte] — Un compte authentifié localement ne doit conserver qu’u
 RG56 [comportement] — L’authentification annuaire doit permettre la connexion des comptes LDAP ou Active Directory sans mot de passe supplémentaire dans l’application. (§22 EV49)
 RG57 [structure] — Chaque lancement, acquittement, purge ou modification doit produire une trace d’audit précisant l’auteur, l’action, la date et la cible concernée. (§22 EV52)
 RG58 [contrainte] — La migration vers plusieurs comptes et sources ne doit pas effacer les observations, runs et constats historiques. (§23 EV59 ; RG07, RG37)
+RG59 [structure] — Les snapshots et sauvegardes collectés doivent rester rattachés à la VM observée et au run qui les a constatés, sans remplacer les observations antérieures. (§17 EV09 ; RG02, RG07)
+RG60 [comportement] — Les snapshots oubliés doivent pouvoir être signalés à partir des snapshots collectés. (§17 EV09)
+RG61 [comportement] — Le rapprochement flou doit attribuer une confiance comprise entre 0 et 100 et signaler les rapprochements douteux sans supprimer les correspondances exactes. (§18 EV11 ; RG09)
+RG62 [comportement] — Une IP de VM hors préfixe doit pouvoir produire une anomalie réseau. (§18 EV17)
+RG63 [comportement] — Une IP utilisée par deux VM distinctes doit pouvoir produire une anomalie de conflit distincte d’un doublon IPAM. (§18 EV17 ; RG18)
+RG64 [comportement] — Un nom DNS sans PTR doit pouvoir produire une anomalie réseau. (§18 EV17)
+RG65 [comportement] — Un PTR incohérent doit pouvoir produire une anomalie réseau. (§18 EV17)
+RG66 [comportement] — L’absence de chacun des tags env, owner et backup requis doit pouvoir produire une anomalie de conformité. (§18 EV18)
+RG67 [comportement] — Un tenant ou un site vide doit pouvoir produire une anomalie de conformité sur l’observation concernée. (§18 EV18)
+RG68 [comportement] — Un disque dont l’occupation dépasse 90 % doit pouvoir produire une anomalie de capacité. (§18 EV19)
+RG69 [comportement] — Une RAM saturée doit pouvoir produire une anomalie de capacité. (§18 EV19)
+RG70 [comportement] — Une VM sous-utilisée sur 30 runs doit pouvoir produire une anomalie de capacité fondée sur ces observations historiques. (§18 EV19 ; RG07)
+RG71 [comportement] — Une VM arrêtée depuis plus de N jours doit pouvoir être signalée comme zombie. (§18 EV20)
+RG72 [comportement] — Une VM sans sauvegarde récente doit pouvoir être signalée sans confondre absence de collecte et absence confirmée de sauvegarde. (§18 EV21 ; §17 EV09)
+RG73 [structure] — Les mesures de capacité variables par nœud doivent être conservées par run pour permettre les tendances et la prévision de saturation. (§19 EV25 ; RG07)
+RG74 [comportement] — La prévision de saturation par nœud doit s’appuyer sur les mesures historiques disponibles et signaler une prévision impossible faute de données. (§19 EV25 ; RG73)
+RG75 [contrainte] — L’extension du modèle doit préserver les runs et données v2 existants sans leur attribuer de mesures ou constats v3 fictifs. (§23 EV59 ; RG37, RG58)
+RG76 [contrainte] — Toute nouvelle catégorie d’anomalie doit rester compatible avec le suivi, les exceptions et la classification par code sans altérer les constats déjà enregistrés ni leur attribuer une sévérité inconnue. (§18 EV14–EV21 ; RG42–RG45)
 
 ## Dictionnaire des données
 Les longueurs non prescrites sont indiquées « non précisée » ; les types conceptuels n’imposent aucun format d’interface.
@@ -124,7 +142,7 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 | anomaly_date | datetime | — | obligatoire | §6.1 |
 | anomaly_state | énumération{ouverte,acquittée,résolue} | — | obligatoire, état courant du suivi ; constats par run inchangés | §18 EV14 |
 | anomaly_state_changed_at | datetime | — | date du dernier changement ; mesure de durée à préciser, Q9 | §18 EV14 |
-| anomaly_severity | énumération{info,mineure,majeure,critique} | — | obligatoire, sévérité par code ; correspondance Q10 | §18 EV16 |
+| anomaly_severity | énumération{info,mineure,majeure,critique} | — | facultatif si classification inconnue (NULL signalé) ; valeur renseignée issue du code, correspondance Q10 et Q26 | §18 EV16 ; RG76 |
 | exception_id | entier | — | identifiant candidat | §18 EV15 |
 | exception_code | énumération{NO_MATCH,MATCHED_IP,HOSTNAME_MISMATCH,STATUS_MISMATCH,DUPLICATE_DNS,DUPLICATE_IP,RENAMED} | — | obligatoire | §18 EV15, EV12 |
 | exception_target | texte | non précisée | obligatoire, cible stable selon le code ; Q11 | §18 EV15 |
@@ -153,6 +171,28 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 | audit_action | texte (à confirmer) | non précisée | lancement, acquittement, purge, modification ; autres actions Q19 | §22 EV52 |
 | audit_date | datetime | — | obligatoire, instant de l’action | §22 EV52 |
 | audit_target | texte (à confirmer) | non précisée | cible de l’action, format Q19 | §22 EV52 |
+| snapshot_id | texte (à confirmer) | non précisée | identité source éventuelle, Q20 | §17 EV09 |
+| snapshot_asset_ref | entier | — | référence à la VM observée du même run | §17 EV09 ; RG59 |
+| snapshot_run_id | entier | — | référence au run de collecte | §17 EV09 ; RG59 |
+| snapshot_created_at | datetime (à confirmer) | — | date source si disponible ; Q20 | §17 EV09 |
+| backup_id | texte (à confirmer) | non précisée | identité source éventuelle, Q20 | §17 EV09 |
+| backup_asset_ref | entier | — | référence à la VM observée du même run | §17 EV09 ; RG59 |
+| backup_run_id | entier | — | référence au run de collecte | §17 EV09 ; RG59 |
+| backup_created_at | datetime (à confirmer) | — | date source si disponible ; Q20 | §17 EV09, §18 EV21 |
+| backup_collection_status | énumération{inconnue,réussie,échouée} (à confirmer) | — | distingue absence prouvée et collecte indisponible ; Q20 | §17 EV09, §18 EV21 |
+| match_confidence | entier | — | 0 à 100, absent pour résultat sans rapprochement flou ; Q21 | §18 EV11 |
+| match_doubt | booléen | — | calculé selon seuil à confirmer ; Q21 | §18 EV11 |
+| network_prefix | texte (à confirmer) | non précisée | préfixe de référence par run si fourni ; Q22 | §18 EV17 |
+| ptr_name | texte (à confirmer) | non précisée | réponse PTR observée par run si disponible ; Q22 | §18 EV17 |
+| disk_usage_percent | décimal (précision à confirmer) | — | occupation par VM et run, seuil strictement > 90 ; Q23 | §18 EV19 |
+| ram_usage_percent | décimal (précision à confirmer) | — | occupation par VM et run ; Q23 | §18 EV19 |
+| vm_stopped_since | datetime (à confirmer) | — | date source ou historique observé, Q24 | §18 EV20 |
+| node_capacity_run_id | entier | — | référence obligatoire au run de mesure | §19 EV25 ; RG73 |
+| node_capacity_name | texte | non précisée | nœud mesuré, identité par source à confirmer ; Q25 | §19 EV25 |
+| node_capacity_measured_at | datetime | — | instant de mesure, si fourni ; Q25 | §19 EV25 |
+| node_capacity_value | décimal (précision à confirmer) | — | valeur et unité de capacité à confirmer ; Q25 | §19 EV25 |
+| node_capacity_limit | décimal (précision à confirmer) | — | seuil de saturation si fourni ; Q25 | §19 EV25 |
+| anomaly_code_v3 | énumération{IP_OUT_OF_PREFIX,VM_IP_CONFLICT,DNS_MISSING_PTR,PTR_MISMATCH,MISSING_REQUIRED_TAG,MISSING_TENANT,MISSING_SITE,DISK_OVER_90,RAM_SATURATED,VM_UNDERUSED,VM_ZOMBIE,NO_RECENT_BACKUP,FORGOTTEN_SNAPSHOT} (à confirmer) | — | codes candidats distincts des sept codes historiques ; Q26 | §17 EV09, §18 EV17–EV21 |
 
 ## Acteurs
 - Administrateur : déclenche et consulte les inventaires, comparaisons, exports et purges (§8.1–§8.10).
@@ -190,6 +230,11 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Gérer les comptes et leurs rôles — Administrateur — RG52–RG53.
 - Se connecter via l’annuaire — Opérateur, lecteur ou administrateur — RG54, RG56.
 - Consulter les actions auditées — Administrateur — RG57.
+- Collecter les snapshots et sauvegardes — Source de virtualisation et source de sauvegarde — RG59–RG60.
+- Examiner les rapprochements douteux — Administrateur — RG61.
+- Examiner les anomalies réseau, de conformité et de capacité — Administrateur — RG62–RG70.
+- Examiner les VM zombies et sans sauvegarde récente — Administrateur — RG71–RG72.
+- Consulter les tendances et prévisions par nœud — Administrateur — RG73–RG74.
 
 ## Questions ouvertes
 - Q1 — RG2, RG21 — Quel est le type exact de vm_id ? Par défaut, conserver sans conversion son identité textuelle source ; vérifier avant de fixer l’unicité dans un même run.
@@ -201,7 +246,7 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Q7 — RG29 — Quel mécanisme de session et de stockage du compte administrateur utiliser au-delà des exigences du §10.1 ? Par défaut, ne pas créer d’entité supplémentaire parmi les cinq entités du §6.1 et réserver l’authentification au compte unique configuré.
 - Q8 — RG35 — Quels types et quelles clés autorise NetBox pour ses custom fields ? Par défaut, conserver l’objet JSON complet sans supposer de clés supplémentaires ; une valeur absente reste absente et est signalée, sans remplacer les données sources.
 - Q9 — RG41–RG42 — Quelle identité relie les constats d’une anomalie entre runs et quelle durée mesure-t-on ? Par défaut, rattacher le suivi à code + cible stable, garder chaque constat historique et dater les transitions ; ne pas fusionner les cibles ambiguës.
-- Q10 — RG43 — Quelle sévérité attribuer à chaque code ? Par défaut, laisser la correspondance configurable et signaler les codes non classés plutôt que leur inventer une gravité.
+- Q10 — RG43 — Quelle sévérité attribuer à chaque code historique ? Par défaut, laisser la correspondance configurable et conserver NULL pour une classification inconnue en signalant le code non classé, sans inventer de gravité.
 - Q11 — RG44–RG45 — Quel format définit la cible d’exception pour chaque code, notamment les doublons ? Par défaut, cibler un identifiant stable explicite, conserver les groupes ambigus sans exception automatique.
 - Q12 — RG44 — Comment identifier l’auteur avant les comptes multiples ? Par défaut, enregistrer l’identifiant du compte administrateur existant ; ne pas fabriquer de personne.
 - Q13 — RG46 — Comment représenter la progression après rollback d’un run échoué ? Par défaut, conserver la dernière étape atteinte comme information de suivi, sans persister les observations annulées.
@@ -211,3 +256,10 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Q17 — RG53–RG56 — Comment lier une identité LDAP/AD à un compte local ou à plusieurs annuaires ? Par défaut, garder les identités séparées par origine et ne jamais enregistrer un mot de passe annuaire.
 - Q18 — RG52 — Quelles opérations précises sont autorisées à chaque rôle ? Par défaut, refuser toute opération non explicitement autorisée, sans attribuer automatiquement les droits admin aux comptes existants non identifiés.
 - Q19 — RG57 — Quelle portée d’audit, quel format des cibles et quelle politique de rétention ? Par défaut, conserver les traces des quatre familles d’actions citées et l’identité historique de l’auteur ; ne pas supprimer les traces lors d’une purge des runs.
+- Q20 — RG59–RG60, RG72 — Quels identifiants, dates, critères d’oubli et de récence, et quel périmètre de collecte des snapshots et sauvegardes ? Par défaut, préserver toute valeur source par run et signaler l’indisponibilité de la collecte ; ne pas conclure à une absence ou à un oubli sans durée définie.
+- Q21 — RG61 — Quelle métrique et quels seuils définissent rapprochement flou et cas douteux, et quel score attribuer aux correspondances exactes ? Par défaut, conserver la priorité des correspondances exactes et ne pas promouvoir automatiquement un candidat flou ambigu.
+- Q22 — RG62–RG65 — Quelle source fournit les préfixes, DNS et PTR, et quelle politique appliquer à une donnée absente ? Par défaut, conserver les observations par run, ne contrôler que les données disponibles et signaler les contrôles indéterminés.
+- Q23 — RG68–RG70 — Quelles unités, seuils RAM et sous-utilisation, et quelle fenêtre de 30 runs (globale ou par VM) ? Par défaut, ne pas inférer une occupation depuis la capacité allouée et ne pas déclarer sous-utilisée une VM avec historique incomplet.
+- Q24 — RG71 — Quelle valeur de N et quelle date fait foi pour « arrêtée depuis » ? Par défaut, garder l’instant source s’il existe, sinon les observations datées sans inventer une durée d’arrêt avant le premier constat.
+- Q25 — RG73–RG74 — Quelles ressources, limites, unités, horizon et méthode de prévision par nœud ? Par défaut, conserver chaque mesure source par run et présenter l’insuffisance des données plutôt qu’une saturation calculée sans limite.
+- Q26 — RG76 — Quels noms définitifs, cibles, sévérités et critères de résolution pour les nouveaux codes, notamment snapshots oubliés et confiance douteuse ? Par défaut, préserver les sept codes historiques, lier chaque nouveau constat à son run et conserver NULL pour une classification inconnue en signalant le code non classé, sans inventer de sévérité.

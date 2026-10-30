@@ -78,3 +78,35 @@ INSERT INTO audit(actor_identity,action,created_at,target) VALUES (' ','purge','
 DELETE FROM account WHERE id=1;
 -- attendu : 1 ligne(s)
 SELECT 1 WHERE (SELECT count(*) FROM audit WHERE account_id IS NULL AND actor_identity='local:alex' AND target='run:1')=1 AND (SELECT count(*) FROM pragma_foreign_key_check)=0 AND (SELECT count(*) FROM pragma_integrity_check WHERE integrity_check='ok')=1;
+-- attendu : accepté
+INSERT INTO snapshot_observation(run_id,asset_id,snapshot_id) VALUES (2,2,'snapshot-source');
+-- attendu : accepté
+INSERT INTO backup_observation(run_id,asset_id,backup_created_at) VALUES (2,2,'2026-01-02');
+-- attendu : accepté
+INSERT INTO node_capacity_observation(run_id,node_capacity_name,node_capacity_value) VALUES (2,'node-a',15);
+-- attendu : accepté
+UPDATE asset SET disk_usage_percent=91,backup_collection_status='inconnue' WHERE id=2;
+-- attendu : accepté
+UPDATE consolidated_asset SET match_confidence=0,match_doubt=1 WHERE run_id=2;
+-- attendu : accepté
+INSERT INTO anomaly(run_id,asset_id,code,description,created_at) VALUES (2,2,'DISK_OVER_90','test','2026-01-02');
+-- attendu : accepté
+INSERT INTO anomaly_exception(code,target,justification,expires_at,author) VALUES ('FORGOTTEN_SNAPSHOT','vm-2','justification','2026-12-31','admin');
+-- attendu : 1 ligne(s)
+SELECT 1 WHERE (SELECT count(*) FROM snapshot_observation WHERE run_id=2)=1 AND (SELECT count(*) FROM backup_observation WHERE run_id=2)=1 AND (SELECT count(*) FROM node_capacity_observation WHERE run_id=2)=1 AND (SELECT severity FROM anomaly WHERE code='DISK_OVER_90') IS NULL AND (SELECT count(*) FROM pragma_foreign_key_check)=0;
+-- attendu : refus
+INSERT INTO snapshot_observation(run_id,asset_id) VALUES (1,2);
+-- attendu : refus
+INSERT INTO backup_observation(run_id,asset_id) VALUES (2,999);
+-- attendu : refus
+INSERT INTO node_capacity_observation(run_id,node_capacity_name) VALUES (999,'node-a');
+-- attendu : refus
+INSERT INTO node_capacity_observation(run_id,node_capacity_name) VALUES (2,' ');
+-- attendu : refus
+UPDATE asset SET disk_usage_percent=101 WHERE id=2;
+-- attendu : refus
+UPDATE consolidated_asset SET match_confidence=-1 WHERE run_id=2;
+-- attendu : refus
+INSERT INTO anomaly(run_id,code,description,created_at) VALUES (2,'INVALID','test','2026-01-02');
+-- attendu : 1 ligne(s)
+SELECT 1 WHERE (SELECT count(*) FROM pragma_foreign_key_check)=0 AND (SELECT count(*) FROM pragma_integrity_check WHERE integrity_check='ok')=1;

@@ -47,6 +47,10 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | ram | REAL | oui | NULL | mesure source |
 | disk | REAL | oui | NULL | mesure source |
 | uptime | REAL | oui | NULL | mesure source |
+| disk_usage_percent | REAL | oui | NULL | CHECK 0 à 100 ; occupation source, non capacité allouée |
+| ram_usage_percent | REAL | oui | NULL | CHECK 0 à 100 ; occupation source |
+| vm_stopped_since | TEXT | oui | NULL | date source si disponible |
+| backup_collection_status | TEXT | oui | NULL | CHECK inconnue, réussie, échouée ; NULL historique inconnu |
 
 - PK : id ; UNIQUE(id, run_id) pour les références composites.
 - FK : run_id → run(id) ON DELETE CASCADE.
@@ -70,6 +74,8 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | duplicate_ip | INTEGER | non | 0 | CHECK (0, 1) |
 | meta_zone | TEXT | oui | NULL | zone source même sans VM |
 | custom_fields | TEXT | oui | NULL | objet NetBox complet sérialisé en JSON ; NULL si absent, objet vide distinct |
+| network_prefix | TEXT | oui | NULL | préfixe source si disponible |
+| ptr_name | TEXT | oui | NULL | réponse PTR source si disponible |
 
 - PK : id ; UNIQUE(id, run_id) pour les références composites ; aucune unicité de ip ou dns_name.
 - FK : run_id → run(id) ON DELETE CASCADE.
@@ -89,6 +95,8 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | status_final | TEXT | oui | NULL | statut retenu |
 | match_status | TEXT | non | — | CHECK MATCHED_NAME, MATCHED_FQDN, MATCHED_IP, NO_MATCH |
 | role | TEXT | oui | NULL | rôle instantané |
+| match_confidence | INTEGER | oui | NULL | CHECK 0 à 100 ; score non inventé |
+| match_doubt | INTEGER | oui | NULL | CHECK 0, 1 ; doute non déduit sans seuil |
 
 - PK : id ; UNIQUE(asset_id, run_id) réalise ASSET (0,1) ↔ résultat (1,1).
 - FK : run_id → run(id) ON DELETE CASCADE.
@@ -105,13 +113,13 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | run_id | INTEGER | non | — | appartenance au run |
 | asset_id | INTEGER | oui | NULL | VM facultative du même run |
 | ipam_record_id | INTEGER | oui | NULL | IPAM facultatif du même run |
-| code | TEXT | non | — | CHECK NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS, DUPLICATE_IP, RENAMED |
+| code | TEXT | non | — | CHECK sept codes historiques et IP_OUT_OF_PREFIX, VM_IP_CONFLICT, DNS_MISSING_PTR, PTR_MISMATCH, MISSING_REQUIRED_TAG, MISSING_TENANT, MISSING_SITE, DISK_OVER_90, RAM_SATURATED, VM_UNDERUSED, VM_ZOMBIE, NO_RECENT_BACKUP, FORGOTTEN_SNAPSHOT |
 | description | TEXT | non | — | détail du constat |
 | created_at | TEXT | non | — | date ISO 8601 |
 | tracking_key | TEXT | oui | NULL | cible de suivi entre runs, sans fusion des constats |
 | state | TEXT | non | ouverte | CHECK ouverte, acquittée, résolue |
 | state_changed_at | TEXT | oui | NULL | dernière transition datée |
-| severity | TEXT | non | — | CHECK info, mineure, majeure, critique ; classification par code applicative |
+| severity | TEXT | oui | NULL | CHECK info, mineure, majeure, critique ; NULL si classification inconnue |
 
 - PK : id.
 - FK : run_id → run(id) ON DELETE CASCADE.
@@ -125,7 +133,7 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | colonne | type | null | défaut | contrainte |
 | --- | --- | --- | --- | --- |
 | id | INTEGER | non | — | identité de l'exception |
-| code | TEXT | non | — | CHECK six codes historiques et RENAMED |
+| code | TEXT | non | — | CHECK sept codes historiques et treize candidats v3 (même domaine que anomaly.code) |
 | target | TEXT | non | — | CHECK non vide après trim |
 | justification | TEXT | non | — | CHECK non vide après trim |
 | expires_at | TEXT | non | — | date ISO 8601 |
@@ -229,9 +237,57 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 - Index : idx_audit_account(account_id) pour la FK ; idx_audit_date(created_at) pour la consultation chronologique.
 - Origine : AUDIT, identifier_auteur — RG57, RG58, Q19.
 
+### snapshot_observation
+
+| colonne | type | null | défaut | contrainte |
+| --- | --- | --- | --- | --- |
+| id | INTEGER | non | — | identité interne, distincte de la source |
+| run_id | INTEGER | non | — | run de collecte |
+| asset_id | INTEGER | non | — | VM du même run |
+| snapshot_id | TEXT | oui | NULL | identité source éventuelle |
+| snapshot_created_at | TEXT | oui | NULL | date source éventuelle |
+
+- PK : id.
+- FK : run_id → run(id) ON DELETE CASCADE.
+- FK : (asset_id, run_id) → asset(id, run_id) ON DELETE CASCADE.
+- Index : idx_snapshot_run (run_id) ; idx_snapshot_asset_run (asset_id, run_id) pour consulter les snapshots d'une VM par run.
+- Origine : SNAPSHOT_OBSERVATION, observer_snapshot, concerner_snapshot — RG59, RG60, RG75.
+
+### backup_observation
+
+| colonne | type | null | défaut | contrainte |
+| --- | --- | --- | --- | --- |
+| id | INTEGER | non | — | identité interne, distincte de la source |
+| run_id | INTEGER | non | — | run de collecte |
+| asset_id | INTEGER | non | — | VM du même run |
+| backup_id | TEXT | oui | NULL | identité source éventuelle |
+| backup_created_at | TEXT | oui | NULL | date source éventuelle |
+
+- PK : id.
+- FK : run_id → run(id) ON DELETE CASCADE.
+- FK : (asset_id, run_id) → asset(id, run_id) ON DELETE CASCADE.
+- Index : idx_backup_run (run_id) ; idx_backup_asset_run (asset_id, run_id) pour consulter l'historique de sauvegarde d'une VM.
+- Origine : BACKUP_OBSERVATION, observer_backup, concerner_backup — RG59, RG72, RG75.
+
+### node_capacity_observation
+
+| colonne | type | null | défaut | contrainte |
+| --- | --- | --- | --- | --- |
+| id | INTEGER | non | — | identité de la mesure |
+| run_id | INTEGER | non | — | run de mesure |
+| node_capacity_name | TEXT | non | — | CHECK non vide ; identité source à confirmer |
+| node_capacity_measured_at | TEXT | oui | NULL | date source éventuelle |
+| node_capacity_value | REAL | oui | NULL | valeur source, unité à confirmer |
+| node_capacity_limit | REAL | oui | NULL | limite source éventuelle |
+
+- PK : id ; plusieurs mesures par run et nœud autorisées.
+- FK : run_id → run(id) ON DELETE CASCADE.
+- Index : idx_node_capacity_run_name (run_id, node_capacity_name) pour les tendances par nœud et la FK.
+- Origine : NODE_CAPACITY_OBSERVATION, mesurer_capacite — RG73–RG75.
+
 ## Décisions
 
-- Treize entités → treize tables ; quatorze associations donnent quatorze liens (quatre appartenances au run, deux liens du résultat, deux liens de l'anomalie, un lien run → planification, deux liens du compte, deux de l'attribution et un de l'audit). Aucune association n:n conceptuelle ; role_permission est l'entité d'attribution explicite. Les FK composites contrôlent le même run.
+- Seize entités → seize tables ; dix-neuf associations → dix-neuf liens (les quatorze précédents et cinq liens des trois observations v3). Aucune association n:n conceptuelle ; role_permission est l'entité d'attribution explicite. Les FK composites contrôlent le même run.
 - 1FN : une colonne par propriété ; les tags restent une valeur textuelle source indivisible en attendant Q3, sans recherche de composant SQL. 2FN : chaque PK est simple ; les clés candidates composites (id, run_id) ne portent aucune dépendance partielle de données métier. 3FN : les résultats et rôles sont des instantanés calculés exigés par RG4, RG7, RG15–RG16 et RG22 ; compteurs du run et indicateurs de doublons sont des matérialisations prévues par RG1, RG17–RG19, recalculées dans le traitement du run, sans écraser les runs précédents.
 - Les colonnes physiques suivent le dictionnaire publié (`id`, `run_id`, `type`, `status`, `tags`, `role`, `ip`, `code`, `created_at`) ; elles réalisent respectivement les attributs conceptuels identifiant, run, asset_type, asset_status/ipam_status/run_status, asset_tags/ipam_tags, asset_role/consolidated_role, ipam_ip, anomaly_code et anomaly_date. Le SQL n'impose aucune longueur absente des règles.
 - CASCADE pour la suppression d'un run et de ses observations/résultats ; RESTRICT pour une observation encore référencée par une anomalie ou un rapprochement. Une FK composite facultative avec run_id non NULL est vérifiée dès que son identifiant de référence est présent.
@@ -241,6 +297,9 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 - 1FN, 2FN et 3FN des deux nouvelles tables : propriétés atomiques et clés simples ; la fréquence et la cible n'impliquent aucune dépendance transitive. Dans run et anomaly, progression, état et gravité dépendent de leur constat identifié ; l'état et la date de transition sont conservés ensemble sans dérivation SQL. Les compteurs, rôles et consolidations matérialisés restent les écarts volontaires expliqués ci-dessus.
 - v2.3 : les origines facultatives préservent les anciens instantanés sans provenance inventée ; `(virtual_source, vm_id)` qualifie le rapprochement sans imposer d'unicité intra-run (Q16). Les référentiels de rôles, d'origines et de permissions évitent les domaines implicites ; aucune permission n'est accordée par défaut (Q18). L'unicité `(origin_code, username)` est un choix technique révisable (Q17), sans assimilation LDAP/AD/local ; hash local obligatoire, jamais de hash annuaire. Audit indépendant du run : la purge garde auteur et cible en texte historique, même après suppression du compte (Q19). PK simples et attributs atomiques : 1FN, 2FN, 3FN ; l'identité historique de l'audit est une redondance volontaire imposée par RG58, non une dénormalisation par jointure recalculable.
 - Migration v2.2 → v2.3 : ajouter `virtual_source` et `ipam_source` nullables par ALTER TABLE ; créer les six nouvelles tables et leurs quatre index sans remplacer les tables historiques. Aucun ancien compte n'est inféré d'un secret configuré ; créer des comptes locaux seulement avec identité, rôle et hash vérifiés ; ne jamais accorder automatiquement une permission. Ne reconstruire aucune table historique ni toucher ses CHECK ; comparer le schéma ORM et le SQL avant de déclarer RG38 satisfait.
+- v3.0 : les huit attributs ajoutés aux observations et résultats sont nullables et sans valeur par défaut, pour ne fabriquer ni mesure, ni confiance, ni absence de sauvegarde (Q20–Q25). Les treize codes v3 candidats étendent les deux CHECK de code ; la sévérité devient nullable si la classification Q26 n'est pas décidée, tout en conservant les sévérités historiques et le CHECK sur les valeurs renseignées. Le code et la cible des exceptions restent soumis à RG45 côté application, sans association fictive. Aucune unicité source n'est présumée pour les observations et mesures ; leurs FK composites interdisent les croisements de runs. 1FN : les identifiants source et mesures restent atomiques ; 2FN : PK simples ; 3FN : chaque mesure dépend de son observation, sans dépendance entre mesures. Les matérialisations historiques déjà décrites restent les seuls écarts volontaires.
+- Migration v2.3 → v3.0 : `migration_v2_v3.sql` ajoute les colonnes nullables, reconstruit uniquement anomaly et anomaly_exception pour élargir leurs CHECK, copie leurs lignes avec identifiants et valeurs inchangés, recrée les index, puis crée trois tables d'observations vides. Exécuter sur connexion exclusive, hors transaction, avec FK désactivées uniquement pendant la transaction de reconstruction ; vérifier `foreign_key_check` et `integrity_check` après réactivation. Une base v2 plus ancienne exige d'abord sa migration vers v2.3 ; ne pas exécuter deux fois ce script. L'ORM doit être aligné avant déploiement (RG38).
+- Consommation les évolutions applicatives ultérieures : Tâche applicative 1 collecte les snapshots/sauvegardes et renseigne l'état de collecte par VM ; Tâche applicative 2 conserve le score et le doute seulement lorsqu'ils sont calculables ; Tâche applicative 3 lit préfixe, PTR et mesures VM pour les anomalies conditionnelles ; Tâche applicative 4 interprète les dates d'arrêt et de sauvegarde sans conclure sur NULL ; Tâche applicative 5 lit la série `node_capacity_observation` bornée par run et nœud, sans prévoir sans historique ni limite. Les noms de codes restent candidats (Q26), aucun seuil RAM, oubli ou récence n'est imposé par le SQL.
 
 ## Ordre de création
 
@@ -251,3 +310,4 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 5. auth_origin, role, permission (sans FK ; peuvent aussi précéder run)
 6. account (après auth_origin et role), role_permission (après role et permission)
 7. audit (après account ; sans dépendance à run)
+8. snapshot_observation, backup_observation (après run et asset) ; node_capacity_observation (après run).

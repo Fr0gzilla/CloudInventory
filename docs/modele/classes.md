@@ -43,7 +43,17 @@ classDiagram
         -Decimal ram
         -Decimal disk
         -Decimal uptime
+        -Decimal disk_usage_percent
+        -Decimal ram_usage_percent
+        -DateTime vm_stopped_since
+        -BackupCollectionStatus backup_collection_status
         +deriveRole() String
+        +checkRequiredTags() Boolean
+        +checkDiskUsage() Boolean
+        +checkRamSaturation() Boolean
+        +checkUnderuseAcrossRuns() Boolean
+        +checkZombie() Boolean
+        +checkRecentBackup() Boolean
     }
     class IpamRecord {
         -String ipam_ip
@@ -57,8 +67,14 @@ classDiagram
         -Boolean duplicate_ip
         -String meta_zone
         -String custom_fields
+        -String network_prefix
+        -String ptr_name
         +detectDuplicateDns() Boolean
         +detectDuplicateIp() Boolean
+        +checkIpPrefix() Boolean
+        +checkDnsPtr() Boolean
+        +checkPtrMismatch() Boolean
+        +checkTenantSite() Boolean
     }
     class ConsolidatedAsset {
         -String ip_final
@@ -66,8 +82,11 @@ classDiagram
         -String status_final
         -MatchStatus match_status
         -String consolidated_role
+        -Integer match_confidence
+        -Boolean match_doubt
         +matchByPriority() MatchStatus
         +retainVirtualizationData() void
+        +evaluateFuzzyMatch() Boolean
     }
     class Anomaly {
         -AnomalyCode anomaly_code
@@ -83,6 +102,8 @@ classDiagram
         +detectRename(otherRun) Boolean
         +transitionState(newState) void
         +classifySeverity() AnomalySeverity
+        +detectForgottenSnapshot() Boolean
+        +detectVmIpConflict() Boolean
     }
     class AnomalyException {
         -AnomalyCode exception_code
@@ -125,6 +146,27 @@ classDiagram
         -String audit_target
         +recordAction() void
     }
+    class SnapshotObservation {
+        -String snapshot_id
+        -DateTime snapshot_created_at
+    }
+    class BackupObservation {
+        -String backup_id
+        -DateTime backup_created_at
+    }
+    class NodeCapacityObservation {
+        -String node_capacity_name
+        -DateTime node_capacity_measured_at
+        -Decimal node_capacity_value
+        -Decimal node_capacity_limit
+        +forecastSaturation() Boolean
+    }
+    class BackupCollectionStatus {
+        <<enumeration>>
+        inconnue
+        reussie
+        echouee
+    }
     class AuthOriginCode {
         <<enumeration>>
         local
@@ -164,6 +206,19 @@ classDiagram
         DUPLICATE_DNS
         DUPLICATE_IP
         RENAMED
+        IP_OUT_OF_PREFIX
+        VM_IP_CONFLICT
+        DNS_MISSING_PTR
+        PTR_MISMATCH
+        MISSING_REQUIRED_TAG
+        MISSING_TENANT
+        MISSING_SITE
+        DISK_OVER_90
+        RAM_SATURATED
+        VM_UNDERUSED
+        VM_ZOMBIE
+        NO_RECENT_BACKUP
+        FORGOTTEN_SNAPSHOT
     }
     class AnomalyState {
         <<enumeration>>
@@ -202,6 +257,11 @@ classDiagram
     Role "1" -- "*" RolePermission : autoriser_role
     Permission "1" -- "*" RolePermission : definir_permission
     Account "0..1" -- "*" Audit : identifier_auteur
+    Run "1" *-- "*" SnapshotObservation : observer_snapshot
+    Asset "1" -- "*" SnapshotObservation : concerner_snapshot
+    Run "1" *-- "*" BackupObservation : observer_backup
+    Asset "1" -- "*" BackupObservation : concerner_backup
+    Run "1" *-- "*" NodeCapacityObservation : mesurer_capacite
     AnomalyException ..> Anomaly : appliquer_exception
 ```
 
@@ -224,6 +284,13 @@ classDiagram
 - Permission — entité PERMISSION ; code d'opération extensible (RG52, Q18), aucune attribution initiale supposée.
 - RolePermission — entité ROLE_PERMISSION ; association matérialisée sans attribut métier prescrit (RG52, Q18) ; permission_assignment désigne conceptuellement l'attribution du couple rôle/permission, et non une colonne additionnelle.
 - Audit — entité AUDIT ; auteur textuel historique, action, date et cible durables (RG57–RG58) ; recordAction() : RG57, pour lancement, acquittement, purge et modification.
+- SnapshotObservation — entité SNAPSHOT_OBSERVATION ; identité et date source facultatives, historique par VM et run (RG59, RG75) ; detectForgottenSnapshot() sur Anomaly : RG60, critère d'oubli non fixé (Q20).
+- BackupObservation — entité BACKUP_OBSERVATION ; identité et date source facultatives, historique par VM et run (RG59, RG72, RG75) ; checkRecentBackup() sur Asset : RG72, sans assimiler collecte indisponible à absence.
+- NodeCapacityObservation — entité NODE_CAPACITY_OBSERVATION ; nom du nœud, mesure, limite et date facultatives par run (RG73, RG75) ; forecastSaturation() : RG74, résultat indéterminé si historique ou limite insuffisants (Q25).
+- Compléments Asset — occupation disque/RAM, début d'arrêt, état de collecte (RG68–RG72) ; checkRequiredTags() : RG66 ; checkDiskUsage() : RG68 ; checkRamSaturation() : RG69 ; checkUnderuseAcrossRuns() : RG70 ; checkZombie() : RG71 ; checkRecentBackup() : RG72.
+- Compléments IpamRecord — préfixe et PTR observés, facultatifs (RG62–RG65) ; checkIpPrefix() : RG62 ; checkDnsPtr() : RG64 ; checkPtrMismatch() : RG65 ; checkTenantSite() : RG67.
+- Compléments ConsolidatedAsset — score facultatif 0–100 et doute facultatif (RG61) ; evaluateFuzzyMatch() : RG61, sans seuil ni score exact inventé.
+- Compléments Anomaly — codes candidats v3 compatibles avec suivi et exceptions (RG60, RG62–RG72, RG76) ; detectForgottenSnapshot() : RG60 ; detectVmIpConflict() : RG63, distinct des doublons IPAM.
 
 ## Relations
 
@@ -243,6 +310,11 @@ classDiagram
 | Role | association : attribution explicite de droit | RolePermission | 1 | * | RG52, Q18 |
 | Permission | association : permission réutilisable | RolePermission | 1 | * | RG52, Q18 |
 | Account | association facultative : audit historique autonome, sans cascade | Audit | 0..1 | * | RG57–RG58, Q19 |
+| Run | composition : observation historique propre au run | SnapshotObservation | 1 | * | RG59, RG75 |
+| Asset | association : snapshot rattaché à sa VM observée | SnapshotObservation | 1 | * | RG59 |
+| Run | composition : observation historique propre au run | BackupObservation | 1 | * | RG59, RG72 |
+| Asset | association : sauvegarde rattachée à sa VM observée | BackupObservation | 1 | * | RG59, RG72 |
+| Run | composition : mesure historique propre au run | NodeCapacityObservation | 1 | * | RG73, RG75 |
 | AnomalyException | dépendance ponctuelle : prédicat code + cible + expiration, sans cardinalité structurelle | Anomaly | — | — | RG44–RG45 |
 
 ## Limites Mermaid
@@ -256,3 +328,6 @@ classDiagram
 - AnomalyException est autonome dans le MCD : la dépendance pointillée représente seulement l'usage conditionnel RG45, sans FK ni multiplicité (Q11–Q12). Le calendrier et le fuseau restent à définir (Q15) ; les attributs décrivent la cible v2.2 et non l'ORM actuel.
 - ROLE_PERMISSION est une association matérialisée : Mermaid ne représente pas directement sa classe-association ni l'unicité du couple rôle/permission ; permission_assignment désigne seulement ce couple conceptuel, pas un champ SQL (RG52, Q18). Les codes des référentiels sont des identifiants métier, contrairement aux identifiants techniques omis du diagramme.
 - Origines et identités anciennes peuvent être inconnues durant la migration ; aucune valeur fictive ni mot de passe LDAP/AD n'est ajouté (RG49–RG58, Q16–Q19). La matrice des permissions, les règles de rapprochement de comptes et la rétention des audits restent ouvertes. Les liens UML et méthodes décrivent le modèle cible v2.3, non l'ORM actuel.
+- Les observations snapshot et sauvegarde appartiennent à la VM du même run ; les deux associations séparées ne garantissent pas cette contrainte transversale (RG59). Aucun snapshot ni mesure v3 fictive n'est imputé aux anciens runs (RG75).
+- BackupCollectionStatus transcrit sans accent les trois états conceptuels à confirmer ; NULL historique reste distinct de l'état « inconnue ». Les treize codes d'anomalie v3 sont candidats (Q26), non des classifications ni des seuils validés ; la sévérité reste indéterminée (Q10).
+- La conformité des tags, les critères de récence et d'oubli, les seuils RAM, la fenêtre de sous-utilisation, N jours, la confiance floue et la prévision restent ouverts (Q20–Q26) ; les méthodes Boolean représentent un contrôle dont l'issue peut être indéterminée faute de données, sans inventer de décision. Les relations et méthodes décrivent la cible v3, non l'ORM actuel.

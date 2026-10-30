@@ -16,6 +16,11 @@ erDiagram
     ROLE ||--o{ ROLE_PERMISSION : autoriser_role
     PERMISSION ||--o{ ROLE_PERMISSION : definir_permission
     ACCOUNT |o..o{ AUDIT : identifier_auteur
+    RUN ||--o{ SNAPSHOT_OBSERVATION : observer_snapshot
+    ASSET ||--o{ SNAPSHOT_OBSERVATION : concerner_snapshot
+    RUN ||--o{ BACKUP_OBSERVATION : observer_backup
+    ASSET ||--o{ BACKUP_OBSERVATION : concerner_backup
+    RUN ||--o{ NODE_CAPACITY_OBSERVATION : mesurer_capacite
     RUN {
         int run_id PK
         string run_status
@@ -48,6 +53,10 @@ erDiagram
         decimal ram
         decimal disk
         decimal uptime
+        decimal disk_usage_percent
+        decimal ram_usage_percent
+        datetime vm_stopped_since
+        string backup_collection_status
     }
     IPAM_RECORD {
         int ipam_record_id PK
@@ -62,6 +71,8 @@ erDiagram
         boolean duplicate_ip
         string meta_zone
         string custom_fields
+        string network_prefix
+        string ptr_name
     }
     CONSOLIDATED_ASSET {
         int consolidated_asset_id PK
@@ -70,6 +81,8 @@ erDiagram
         string status_final
         string match_status
         string consolidated_role
+        int match_confidence
+        boolean match_doubt
     }
     ANOMALY {
         int anomaly_id PK
@@ -119,19 +132,38 @@ erDiagram
         datetime audit_date
         string audit_target
     }
+    SNAPSHOT_OBSERVATION {
+        int snapshot_observation_id PK
+        string snapshot_id
+        datetime snapshot_created_at
+    }
+    BACKUP_OBSERVATION {
+        int backup_observation_id PK
+        string backup_id
+        datetime backup_created_at
+    }
+    NODE_CAPACITY_OBSERVATION {
+        int node_capacity_observation_id PK
+        string node_capacity_name
+        datetime node_capacity_measured_at
+        decimal node_capacity_value
+        decimal node_capacity_limit
+    }
 ```
 
 Les identifiants de liaison du dictionnaire sont représentés par les associations, non répétés comme attributs conceptuels. Les liens vers RUN sont identifiants pour l'appartenance à un instantané ; les rapprochements facultatifs sont non identifiants. Aucun caractère IP ou DNS n'est unique dans IPAM_RECORD (RG8). Chaque lien vers ASSET ou IPAM_RECORD doit viser le RUN du résultat ou de l'anomalie (RG4, RG5, RG7).
+
+Les observations de snapshots et de sauvegardes référencent la VM du même run que leur propre run ; NODE_CAPACITY_OBSERVATION est indexée conceptuellement par run et nœud, sans imposer d'unicité à une mesure source non caractérisée (RG59, RG73, Q20, Q25). Les identifiants internes des observations restent distincts des identifiants source facultatifs.
 
 ## Entités
 
 | Entité (RG) | Identifiant | Attributs conceptuels : type (longueur) ; référence au dictionnaire |
 | --- | --- | --- |
 | RUN (RG1, RG7, RG19, RG46, RG48) | run_id : entier | run_status : énumération RUNNING/SUCCESS/FAIL ; started_at, finished_at : datetime ; matched_name_count, matched_fqdn_count, matched_ip_count, no_match_count : entier ; error_message : texte (non précisée) ; current_step : entier facultatif (1 à 7) ; completed_steps : entier (0 à 7, facultatif pour anciens runs) ; run_trigger : énumération manuel/planifié (facultatif pour anciens runs). |
-| ASSET (RG2, RG7, RG21, RG49, RG51) | asset_id : entier | vm_id, virtual_source : texte à confirmer (non précisée) ; vm_name, fqdn, ip_reported, node : texte (non précisée) ; asset_type : énumération qemu/lxc ; asset_status, asset_tags : texte à confirmer (non précisée) ; asset_role, os, annotation : texte (non précisée) ; cpu, ram, disk, uptime : décimal, précision et unités à confirmer. |
-| IPAM_RECORD (RG3, RG8, RG24, RG35–RG36, RG50) | ipam_record_id : entier | ipam_ip, dns_name : texte (non précisée, doublons admis) ; ipam_source : texte à confirmer (non précisée) ; ipam_status, ipam_tags : texte à confirmer (non précisée) ; tenant, site, meta_zone : texte (non précisée) ; custom_fields : objet JSON source facultatif (non précisée), NULL si absent ; duplicate_dns, duplicate_ip : booléen. |
-| CONSOLIDATED_ASSET (RG4, RG7, RG14, RG22) | consolidated_asset_id : entier | ip_final, dns_final, consolidated_role : texte (non précisée) ; status_final : texte à confirmer (non précisée) ; match_status : énumération MATCHED_NAME/MATCHED_FQDN/MATCHED_IP/NO_MATCH. |
-| ANOMALY (RG5, RG6, RG39–RG43) | anomaly_id : entier | anomaly_code : énumération NO_MATCH/MATCHED_IP/HOSTNAME_MISMATCH/STATUS_MISMATCH/DUPLICATE_DNS/DUPLICATE_IP/RENAMED ; anomaly_description : texte (non précisée) ; anomaly_date, state_changed_at : datetime ; tracking_key : texte à confirmer (non précisée) ; anomaly_state : énumération ouverte/acquittée/résolue ; anomaly_severity : énumération info/mineure/majeure/critique (classification inconnue signalée, Q10). |
+| ASSET (RG2, RG7, RG21, RG49, RG51, RG68–RG72) | asset_id : entier | vm_id, virtual_source : texte à confirmer (non précisée) ; vm_name, fqdn, ip_reported, node : texte (non précisée) ; asset_type : énumération qemu/lxc ; asset_status, asset_tags : texte à confirmer (non précisée) ; asset_role, os, annotation : texte (non précisée) ; cpu, ram, disk, uptime : décimal, précision et unités à confirmer ; disk_usage_percent, ram_usage_percent : décimal facultatif, précision à confirmer ; vm_stopped_since : datetime facultatif ; backup_collection_status : énumération facultative à confirmer, distinction entre collecte indisponible et absence prouvée (Q20, Q23–Q24). |
+| IPAM_RECORD (RG3, RG8, RG24, RG35–RG36, RG50, RG62–RG65) | ipam_record_id : entier | ipam_ip, dns_name : texte (non précisée, doublons admis) ; ipam_source : texte à confirmer (non précisée) ; ipam_status, ipam_tags : texte à confirmer (non précisée) ; tenant, site, meta_zone : texte (non précisée) ; custom_fields : objet JSON source facultatif (non précisée), NULL si absent ; duplicate_dns, duplicate_ip : booléen ; network_prefix, ptr_name : texte source facultatif (non précisée), provenance à confirmer (Q22). |
+| CONSOLIDATED_ASSET (RG4, RG7, RG14, RG22, RG61) | consolidated_asset_id : entier | ip_final, dns_final, consolidated_role : texte (non précisée) ; status_final : texte à confirmer (non précisée) ; match_status : énumération MATCHED_NAME/MATCHED_FQDN/MATCHED_IP/NO_MATCH ; match_confidence : entier facultatif de 0 à 100 ; match_doubt : booléen facultatif ; valeurs historiques et score des correspondances exactes indéterminés (Q21). |
+| ANOMALY (RG5, RG6, RG39–RG43, RG60, RG62–RG72, RG76) | anomaly_id : entier | anomaly_code : sept codes historiques NO_MATCH/MATCHED_IP/HOSTNAME_MISMATCH/STATUS_MISMATCH/DUPLICATE_DNS/DUPLICATE_IP/RENAMED et codes candidats IP_OUT_OF_PREFIX/VM_IP_CONFLICT/DNS_MISSING_PTR/PTR_MISMATCH/MISSING_REQUIRED_TAG/MISSING_TENANT/MISSING_SITE/DISK_OVER_90/RAM_SATURATED/VM_UNDERUSED/VM_ZOMBIE/NO_RECENT_BACKUP/FORGOTTEN_SNAPSHOT (noms et critères à confirmer, Q26) ; anomaly_description : texte (non précisée) ; anomaly_date, state_changed_at : datetime ; tracking_key : texte à confirmer (non précisée) ; anomaly_state : énumération ouverte/acquittée/résolue ; anomaly_severity : énumération info/mineure/majeure/critique (classification inconnue signalée, Q10, Q26). |
 | ANOMALY_EXCEPTION (RG44, RG45) | exception_id : entier | exception_code : même domaine que anomaly_code ; exception_target, exception_justification, exception_author : texte (non précisée) ; exception_expires_at : datetime. |
 | RUN_SCHEDULE (RG47, RG48) | schedule_id : entier | schedule_frequency : énumération horaire/quotidien ; schedule_enabled : booléen ; schedule_next_at : datetime facultatif. |
 | AUTH_ORIGIN (RG53–RG56) | origin_code : énumération local/LDAP/AD | Aucun autre attribut prescrit ; origine de connexion, sans assimilation automatique entre annuaires (Q17). |
@@ -140,6 +172,9 @@ Les identifiants de liaison du dictionnaire sont représentés par les associati
 | PERMISSION (RG52, Q18) | permission_code : texte (non précisée) | Référentiel extensible d'opérations ; aucune permission effective présumée (Q18). |
 | ROLE_PERMISSION (RG52, Q18) | role_permission_id : entier | Attribution explicite d'une permission à un rôle ; unicité conceptuelle du couple rôle/permission ; aucune attribution initiale présumée. |
 | AUDIT (RG57–RG58) | audit_id : entier | audit_actor_identity : texte (non précisée), identité historique ; audit_action : texte à confirmer (non précisée), au minimum lancement/acquittement/purge/modification ; audit_date : datetime ; audit_target : texte à confirmer (non précisée), cible historique durable. |
+| SNAPSHOT_OBSERVATION (RG59–RG60) | snapshot_observation_id : entier interne | snapshot_id : texte source facultatif (non précisée) ; snapshot_created_at : datetime source facultatif ; aucune date d'oubli présumée (Q20). |
+| BACKUP_OBSERVATION (RG59, RG72) | backup_observation_id : entier interne | backup_id : texte source facultatif (non précisée) ; backup_created_at : datetime source facultatif ; collecte indisponible distincte d'une absence prouvée (Q20). |
+| NODE_CAPACITY_OBSERVATION (RG73–RG74) | node_capacity_observation_id : entier interne | node_capacity_name : texte source (non précisée, identité à confirmer) ; node_capacity_measured_at : datetime facultatif ; node_capacity_value, node_capacity_limit : décimal facultatif (précision et unités à confirmer, Q25). |
 
 Chaque identifiant interne est distinct entre runs ; vm_id sert d'identité source par run, sans imposer ici une unicité intra-run non confirmée (RG21, Q1). Tous les autres champs ont pour longueur « non précisée » quand aucune longueur n'est indiquée ci-dessus ; les dates, compteurs, booléens et énumérations n'ont pas de longueur prescrite.
 
@@ -163,6 +198,11 @@ Les cardinalités indiquent la participation de chaque occurrence de l'entité n
 | autoriser_role | ROLE | (0,n) RG52, Q18 | ROLE_PERMISSION | (1,1) RG52 | aucun | RG52, Q18 |
 | definir_permission | PERMISSION | (0,n) RG52, Q18 | ROLE_PERMISSION | (1,1) RG52 | aucun | RG52, Q18 |
 | identifier_auteur | ACCOUNT | (0,n) RG57, RG58, Q19 | AUDIT | (0,1) RG57, RG58, Q19 | aucun | RG57, RG58 |
+| observer_snapshot | RUN | (0,n) RG59, RG75 | SNAPSHOT_OBSERVATION | (1,1) RG59 | aucun | RG59, RG75 |
+| concerner_snapshot | ASSET | (0,n) RG59 | SNAPSHOT_OBSERVATION | (1,1) RG59 | aucun | RG59 |
+| observer_backup | RUN | (0,n) RG59, RG72 | BACKUP_OBSERVATION | (1,1) RG59 | aucun | RG59, RG72 |
+| concerner_backup | ASSET | (0,n) RG59, RG72 | BACKUP_OBSERVATION | (1,1) RG59 | aucun | RG59, RG72 |
+| mesurer_capacite | RUN | (0,n) RG73, RG75 | NODE_CAPACITY_OBSERVATION | (1,1) RG73 | aucun | RG73, RG75 |
 
 Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché au seul run ; ces deux références sont indépendamment facultatives (RG5). Une VM sans IPAM reste consolidable avec NO_MATCH et uniquement ses données de virtualisation ; un enregistrement IPAM non rapproché reste présent (RG3, RG14). Plusieurs anomalies peuvent concerner le même enregistrement sans fusionner les doublons (RG5, RG8).
 
@@ -200,6 +240,14 @@ Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché
 | definir_permission ; PERMISSION (0,n), ROLE_PERMISSION (1,1) | association et cardinalités | RG52, Q18 |
 | identifier_auteur ; ACCOUNT (0,n), AUDIT (0,1) | association et cardinalités facultatives ; identité historique conservée | RG57, RG58, Q19 |
 | appliquer_exception ; ANOMALY_EXCEPTION et ANOMALY | rapprochement conditionnel par code, cible et expiration, sans cardinalité imposée | RG44, RG45 |
+| SNAPSHOT_OBSERVATION ; BACKUP_OBSERVATION ; observer_snapshot ; concerner_snapshot ; observer_backup ; concerner_backup ; RUN (0,n), ASSET (0,n), chaque observation (1,1) sur chaque lien | entités, associations, cardinalités et historique | RG59, RG60, RG72, RG75 |
+| NODE_CAPACITY_OBSERVATION ; mesurer_capacite ; RUN (0,n), mesure (1,1) | entité, association, cardinalités et série historique | RG73, RG74, RG75 |
+| CONSOLIDATED_ASSET ; match_confidence, match_doubt | attributs facultatifs de rapprochement flou | RG61, RG75 |
+| IPAM_RECORD ; network_prefix, ptr_name ; ANOMALY | observations et contrôles réseau conditionnels | RG62, RG63, RG64, RG65, RG75 |
+| ASSET ; tags et conformité ; IPAM_RECORD ; tenant, site ; ANOMALY | contrôles de conformité par constat historique | RG66, RG67, RG75 |
+| ASSET ; disk_usage_percent, ram_usage_percent, vm_stopped_since ; ANOMALY | mesures source et contrôles historiques conditionnels | RG68, RG69, RG70, RG71, RG75 |
+| ASSET ; backup_collection_status ; BACKUP_OBSERVATION ; ANOMALY | distinction entre absence de collecte et absence prouvée | RG72, RG75 |
+| ANOMALY ; ANOMALY_EXCEPTION ; anomaly_code | extension compatible des catégories, suivi, exceptions et sévérité | RG60, RG62–RG72, RG76 |
 
 ## Écarts et questions
 
@@ -219,3 +267,10 @@ Une anomalie peut ne référencer ni VM ni IPAM lorsque son constat est attaché
 - Q17 : portée de l'unicité de account_username et rattachement entre comptes locaux/LDAP/AD non définis ; account_id reste distinct et l'origine qualifie l'identité, sans fusion automatique ; les anciens comptes ne reçoivent pas d'origine fictive (RG53–RG56, RG58).
 - Q18 : aucune matrice rôle/permission validée ; ROLE_PERMISSION prévoit des attributions explicites mais reste vide sans décision métier ; aucun droit hérité ou accordé automatiquement aux anciens comptes (RG52–RG53, RG58).
 - Q19 : format des cibles et durée de rétention non fixés ; AUDIT garde auteur et cible textuels durables même si le compte, le run ou la cible est supprimé ; le lien facultatif vers ACCOUNT ne commande aucune purge en cascade (RG57–RG58).
+- Q20 : identifiants et dates sources des snapshots/sauvegardes facultatifs ; seuil d'oubli et récence indéterminés. Chaque observation reste rattachée à sa VM dans son run ; aucune collecte indisponible n'est assimilée à une absence (RG59, RG60, RG72).
+- Q21 : calcul du score, seuil de doute et score des correspondances exactes non définis ; ni score ni candidat ambigu ne sont inventés ou promus automatiquement (RG61).
+- Q22 : origine des préfixes, DNS et PTR et politique d'absence indéterminées ; contrôles indéterminés si les données nécessaires manquent. Le conflit IP entre VM ne se confond pas avec un doublon IPAM (RG62–RG65).
+- Q23 : occupation disque distincte de la capacité allouée ; seuil de saturation RAM, sous-utilisation et portée des 30 runs à confirmer ; historique insuffisant n'est pas une sous-utilisation (RG68–RG70).
+- Q24 : N jours et date de référence de l'arrêt à confirmer ; pas de durée imputée avant la première observation disponible (RG71).
+- Q25 : ressource, unité, identité du nœud, limites, horizon et méthode de prévision à confirmer ; les mesures restent distinctes par run et aucune saturation n'est calculée sans limite ou historique suffisant (RG73–RG74).
+- Q26 : codes candidats, cibles, gravités et résolution à confirmer ; les sept codes historiques et leurs constats subsistent ; exceptions et suivi doivent accepter les nouveaux codes sans inventer leur sévérité (RG76). Les attributs v3 facultatifs n'attribuent aucun constat ni mesure fictive aux anciens runs (RG75).
