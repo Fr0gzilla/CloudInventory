@@ -110,3 +110,25 @@ UPDATE consolidated_asset SET match_confidence=-1 WHERE run_id=2;
 INSERT INTO anomaly(run_id,code,description,created_at) VALUES (2,'INVALID','test','2026-01-02');
 -- attendu : 1 ligne(s)
 SELECT 1 WHERE (SELECT count(*) FROM pragma_foreign_key_check)=0 AND (SELECT count(*) FROM pragma_integrity_check WHERE integrity_check='ok')=1;
+-- attendu : accepté
+UPDATE consolidated_asset SET match_status='MATCHED_FUZZY',match_confidence=62,match_doubt=1 WHERE run_id=2 AND asset_id=2;
+-- attendu : accepté
+INSERT INTO anomaly(run_id,asset_id,code,description,created_at,tracking_key) VALUES (2,2,'MATCH_CONFIDENCE_DOUBTFUL','doute','2026-01-02','vm-2');
+-- attendu : refus
+INSERT INTO anomaly(run_id,code,description,created_at) VALUES (2,'MATCH_CONFIDENCE_DOUBTFUL','sans VM','2026-01-02');
+-- attendu : refus
+INSERT INTO anomaly(run_id,asset_id,code,description,created_at,severity) VALUES (2,2,'MATCH_CONFIDENCE_DOUBTFUL','gravité renseignée','2026-01-02','mineure');
+-- attendu : accepté
+INSERT INTO anomaly_exception(code,target,justification,expires_at,author) VALUES ('MATCH_CONFIDENCE_DOUBTFUL','vm-2','justification','2026-12-31','admin');
+-- attendu : 1 ligne(s)
+SELECT 1 WHERE (SELECT count(*) FROM consolidated_asset WHERE run_id=2 AND asset_id=2 AND match_status='MATCHED_FUZZY' AND match_doubt=1)=1 AND (SELECT count(*) FROM anomaly WHERE code='MATCH_CONFIDENCE_DOUBTFUL' AND run_id=2 AND asset_id=2 AND severity IS NULL AND state='ouverte' AND tracking_key='vm-2')=1 AND (SELECT count(*) FROM anomaly_exception WHERE code='MATCH_CONFIDENCE_DOUBTFUL' AND target='vm-2' AND justification='justification' AND expires_at='2026-12-31')=1 AND (SELECT count(*) FROM anomaly WHERE code='RENAMED')=1 AND (SELECT count(*) FROM pragma_foreign_key_check)=0;
+-- attendu : refus
+INSERT INTO anomaly(run_id,asset_id,code,description,created_at) VALUES (1,2,'MATCH_CONFIDENCE_DOUBTFUL','autre run','2026-01-02');
+-- attendu : refus
+INSERT INTO anomaly(run_id,asset_id,code,description,created_at,severity) VALUES (2,2,'MATCH_CONFIDENCE_DOUBTFUL','gravité inconnue','2026-01-02','inconnue');
+-- attendu : refus
+INSERT INTO anomaly_exception(code,target,justification,expires_at,author) VALUES ('MATCH_CONFIDENCE_DOUBTFUL','vm-2',' ','2026-12-31','admin');
+-- attendu : refus
+UPDATE consolidated_asset SET match_status='FUZZY_UNKNOWN' WHERE run_id=2 AND asset_id=2;
+-- attendu : 1 ligne(s)
+SELECT 1 WHERE (SELECT count(*) FROM anomaly WHERE code='MATCH_CONFIDENCE_DOUBTFUL' AND state='ouverte' AND severity IS NULL)=1 AND (SELECT count(*) FROM pragma_integrity_check WHERE integrity_check='ok')=1;

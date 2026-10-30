@@ -89,6 +89,7 @@ classDiagram
         +evaluateFuzzyMatch() Boolean
     }
     class Anomaly {
+        %% MATCH_CONFIDENCE_DOUBTFUL : asset_id obligatoire dans le même run ; anomaly_severity NULL (CHECK SQL)
         -AnomalyCode anomaly_code
         -String anomaly_description
         -DateTime anomaly_date
@@ -195,6 +196,7 @@ classDiagram
         MATCHED_NAME
         MATCHED_FQDN
         MATCHED_IP
+        MATCHED_FUZZY
         NO_MATCH
     }
     class AnomalyCode {
@@ -206,6 +208,7 @@ classDiagram
         DUPLICATE_DNS
         DUPLICATE_IP
         RENAMED
+        MATCH_CONFIDENCE_DOUBTFUL
         IP_OUT_OF_PREFIX
         VM_IP_CONFLICT
         DNS_MISSING_PTR

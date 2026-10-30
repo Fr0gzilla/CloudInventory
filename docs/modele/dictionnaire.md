@@ -49,13 +49,13 @@ Les cinq ensembles sont `run`, `asset`, `ipam_record`, `consolidated_asset` et `
 | consolidated_asset | ip_final | TEXT | NULL | IP retenue pour ce run |
 | consolidated_asset | dns_final | TEXT | NULL | DNS retenu pour ce run |
 | consolidated_asset | status_final | TEXT | NULL | statut retenu pour ce run, sens à confirmer |
-| consolidated_asset | match_status | TEXT | NON NULL | MATCHED_NAME, MATCHED_FQDN, MATCHED_IP ou NO_MATCH |
+| consolidated_asset | match_status | TEXT | NON NULL | MATCHED_NAME, MATCHED_FQDN, MATCHED_IP, MATCHED_FUZZY ou NO_MATCH ; le statut flou reste distinct (RG80) |
 | consolidated_asset | role | TEXT | NULL | rôle calculé à cette exécution |
 | anomaly | id | INTEGER | NON NULL | identité interne de l’anomalie |
 | anomaly | run_id | INTEGER | NON NULL | exécution où elle est constatée |
 | anomaly | asset_id | INTEGER | NULL | VM concernée si applicable |
 | anomaly | ipam_record_id | INTEGER | NULL | IPAM concerné si applicable |
-| anomaly | code | TEXT | NON NULL | NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS, DUPLICATE_IP ou RENAMED (§18 EV12) |
+| anomaly | code | TEXT | NON NULL | sept codes historiques dont RENAMED, MATCH_CONFIDENCE_DOUBTFUL (asset_id obligatoire du même run et severity NULL obligatoire, RG77–RG78), ou treize codes v3 candidats (Q26) |
 | anomaly | description | TEXT | NON NULL | détail de l’anomalie |
 | anomaly | created_at | TEXT | NON NULL | date du constat |
 | anomaly | tracking_key | TEXT | NULL | clé de suivi inter-runs, forme à confirmer (Q9) ; les constats restent attachés à leur run |
@@ -63,7 +63,7 @@ Les cinq ensembles sont `run`, `asset`, `ipam_record`, `consolidated_asset` et `
 | anomaly | state_changed_at | TEXT | NULL | date ISO 8601 du dernier changement d’état (Q9) |
 | anomaly | severity | TEXT | NULL | info, mineure, majeure, critique si classification par code connue ; NULL signalé si inconnue (Q10, Q26) |
 | anomaly_exception | id | INTEGER | NON NULL | identifiant interne de l’exception (§18 EV15) |
-| anomaly_exception | code | TEXT | NON NULL | un des sept codes historiques, dont RENAMED, ou un des treize codes v3 candidats (Q26) |
+| anomaly_exception | code | TEXT | NON NULL | même domaine que anomaly.code : sept codes historiques, MATCH_CONFIDENCE_DOUBTFUL ou treize codes v3 candidats (RG78, Q26) |
 | anomaly_exception | target | TEXT | NON NULL | cible stable explicite, format selon code à préciser (Q11) |
 | anomaly_exception | justification | TEXT | NON NULL | texte non vide |
 | anomaly_exception | expires_at | TEXT | NON NULL | date/heure ISO 8601 d’expiration ; comparaison explicite avant suppression (Q11) |
@@ -137,10 +137,12 @@ Migration SQLite depuis v2.3 : préserver les lignes et les sept codes existants
 | ipam_record | network_prefix TEXT, ptr_name TEXT | NULL ; observations réseau sources éventuelles (Q22) |
 | consolidated_asset | match_confidence INTEGER | NULL ; CHECK 0 à 100, NULL sans score calculable (Q21) |
 | consolidated_asset | match_doubt INTEGER | NULL ; CHECK 0 ou 1, NULL sans seuil défini (Q21) |
-| anomaly, anomaly_exception | code TEXT | NON NULL ; sept codes historiques plus IP_OUT_OF_PREFIX, VM_IP_CONFLICT, DNS_MISSING_PTR, PTR_MISMATCH, MISSING_REQUIRED_TAG, MISSING_TENANT, MISSING_SITE, DISK_OVER_90, RAM_SATURATED, VM_UNDERUSED, VM_ZOMBIE, NO_RECENT_BACKUP, FORGOTTEN_SNAPSHOT (Q26) |
+| anomaly, anomaly_exception | code TEXT | NON NULL ; sept codes historiques plus MATCH_CONFIDENCE_DOUBTFUL et IP_OUT_OF_PREFIX, VM_IP_CONFLICT, DNS_MISSING_PTR, PTR_MISMATCH, MISSING_REQUIRED_TAG, MISSING_TENANT, MISSING_SITE, DISK_OVER_90, RAM_SATURATED, VM_UNDERUSED, VM_ZOMBIE, NO_RECENT_BACKUP, FORGOTTEN_SNAPSHOT (RG77–RG78, Q26) |
 | anomaly | severity TEXT | NULL ; CHECK info, mineure, majeure, critique si classification connue ; valeurs historiques conservées (Q10, Q26) |
 | snapshot_observation | id INTEGER, run_id INTEGER, asset_id INTEGER, snapshot_id TEXT, snapshot_created_at TEXT | PK id ; run_id et asset_id NON NULL ; FK run et FK composite (asset_id, run_id), CASCADE ; sources NULL si inconnues (Q20) |
 | backup_observation | id INTEGER, run_id INTEGER, asset_id INTEGER, backup_id TEXT, backup_created_at TEXT | PK id ; run_id et asset_id NON NULL ; FK run et FK composite (asset_id, run_id), CASCADE ; sources NULL si inconnues (Q20) |
 | node_capacity_observation | id INTEGER, run_id INTEGER, node_capacity_name TEXT, node_capacity_measured_at TEXT, node_capacity_value REAL, node_capacity_limit REAL | PK id ; run_id et nom NON NULL ; nom non vide ; date et mesures NULL si indisponibles (Q25) |
 
 Les trois tables d'observation nouvelles sont vides à la migration. Les index sont détaillés dans le MLD ; les colonnes texte libres ne sont pas indexées. les évolutions applicatives ultérieures consomment ces attributs sans déduire une absence de NULL ni fabriquer seuil ou sévérité. La migration élargit les CHECK sur les deux tables de codes en préservant les identifiants, les données et les index ; l'ORM reste à synchroniser avant déploiement.
+
+RG77–RG80 : MATCH_CONFIDENCE_DOUBTFUL cible `anomaly.asset_id` dans `anomaly.run_id` (FK composite), avec sévérité NULL signalée tant que Q26 est ouverte. `anomaly.tracking_key`, `state`, `state_changed_at` conservent le suivi ; `anomaly_exception` accepte le même code et exige cible, justification, expiration et auteur, avec application conditionnelle RG45. Une résolution exige un run ultérieur comparable et une VM observée dont le rapprochement n'est plus douteux ; sans critère de Q21, aucune résolution automatique. `consolidated_asset.match_status` accepte MATCHED_FUZZY sans remplacer les quatre états historiques ; les index existants suffisent.

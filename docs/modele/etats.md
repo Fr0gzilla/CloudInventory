@@ -58,6 +58,7 @@ stateDiagram-v2
 
 - `[*]` désigne l'entrée et la fin du suivi, sans suppression du constat ; les flèches portent événement, garde éventuelle et effet. `Ouverte`, `Acquittee`, `Resolue` correspondent aux valeurs `ouverte`, `acquittée`, `résolue` de `Anomaly.anomaly_state` (`AnomalyState`) ; `state_changed_at` date les changements.
 - Le suivi se rattache à une cible stable entre runs via `Anomaly.tracking_key` ; les constats `Anomaly` propres à chaque `Run` demeurent historiques. Une exception applicable filtre le constat avant son ouverture, sans devenir un état. Les codes candidats v3 (réseau, conformité, capacité, zombie, absence confirmée de sauvegarde et snapshot oublié) empruntent le même cycle ; la sévérité par code demeure indéterminée tant que sa classification n'est pas fixée (RG60, RG62–RG72, RG76, Q26).
+- MATCH_CONFIDENCE_DOUBTFUL suit ce même cycle, avec VM du run comme cible et sévérité NULL signalée tant que sa classification est inconnue. Une exception justifiée et non expirée peut filtrer le constat ; résoudre exige la même VM observée dans un run ultérieur comparable avec un rapprochement non douteux. Absence de VM ou contrôle impossible ne résout rien (RG77–RG79, Q21).
 
 ## Traçabilité
 
@@ -68,8 +69,9 @@ stateDiagram-v2
 | Résoudre acquittée → résolue | RG41–RG42 ; §18 EV14 |
 | Résolue → fin du suivi | RG41–RG42 ; §18 EV14 |
 | Constater un code v3 → ouverte, si données suffisantes et sans exception applicable | RG45, RG60, RG62–RG72, RG76 ; §17 EV09, §18 EV17–EV21 |
+| MATCH_CONFIDENCE_DOUBTFUL : constater → ouverte, exception applicable ; acquittée → résolue seulement après run comparable non douteux | RG41–RG45, RG77–RG79 ; §18 EV11, EV14–EV16 |
 
 ## Non représenté
 
 - La fin est une convention graphique, non une transition métier supplémentaire ni une suppression. Aucun retour vers ouverte ni passage direct à résolue n'est prescrit. L'identité exacte inter-runs et la durée à mesurer restent à préciser (Q9) ; les critères code, cible et expiration des exceptions relèvent de RG45, non du cycle d'état.
-- Le doute du matching (RG61) n'est pas un nouvel état d'anomalie et aucun code dédié n'est prescrit. L'absence de collecte ne prouve pas l'absence de sauvegarde (RG72) ; seuils et dates d'oubli, durée N et classification des nouveaux codes restent à préciser (Q20–Q26).
+- Le doute du matching (RG61, RG77) n'est pas un nouvel état d'anomalie ; métrique et seuil restent indéterminés (Q21), donc ni constat ni résolution automatiques sans contrôle comparable. L'absence de collecte ne prouve pas l'absence de sauvegarde (RG72) ; seuils et dates d'oubli, durée N et classification des nouveaux codes restent à préciser (Q20–Q26).

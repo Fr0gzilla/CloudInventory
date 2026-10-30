@@ -77,6 +77,10 @@ RG73 [structure] — Les mesures de capacité variables par nœud doivent être 
 RG74 [comportement] — La prévision de saturation par nœud doit s’appuyer sur les mesures historiques disponibles et signaler une prévision impossible faute de données. (§19 EV25 ; RG73)
 RG75 [contrainte] — L’extension du modèle doit préserver les runs et données v2 existants sans leur attribuer de mesures ou constats v3 fictifs. (§23 EV59 ; RG37, RG58)
 RG76 [contrainte] — Toute nouvelle catégorie d’anomalie doit rester compatible avec le suivi, les exceptions et la classification par code sans altérer les constats déjà enregistrés ni leur attribuer une sévérité inconnue. (§18 EV14–EV21 ; RG42–RG45)
+RG77 [comportement] — Un rapprochement flou jugé douteux doit produire un constat de code MATCH_CONFIDENCE_DOUBTFUL, ciblant la VM rapprochée dans le run observé. (§18 EV11 ; RG61, RG76)
+RG78 [contrainte] — Un constat MATCH_CONFIDENCE_DOUBTFUL doit garder une sévérité indéterminée tant que la classification de ce code n’est pas décidée, sans empêcher son suivi ni une exception justifiée et expirante. (§18 EV14–EV16 ; RG43, RG76)
+RG79 [comportement] — Un constat MATCH_CONFIDENCE_DOUBTFUL ne doit être résolu que lorsque le rapprochement de cette VM n’est plus douteux lors d’un run ultérieur comparable ; une VM non observée ou un contrôle impossible ne doit pas valoir résolution. (§18 EV11, EV14 ; RG61, RG76)
+RG80 [contrainte] — Un rapprochement flou doit rester distinguable d’une correspondance exacte et d’une absence de correspondance dans les résultats conservés par run. (§18 EV11 ; RG07, RG61)
 
 ## Dictionnaire des données
 Les longueurs non prescrites sont indiquées « non précisée » ; les types conceptuels n’imposent aucun format d’interface.
@@ -131,20 +135,20 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 | ip_final | texte | non précisée | instantané, comparaison, export | §6.1, §8.6 |
 | dns_final | texte | non précisée | instantané, comparaison, export | §6.1, §8.6 |
 | status_final | texte (à confirmer) | non précisée | instantané, comparaison ; Q2 | §6.1, §8.6 |
-| match_status | énumération{MATCHED_NAME,MATCHED_FQDN,MATCHED_IP,NO_MATCH} | — | obligatoire, comparaison, filtre, export | §7.1, §8.6 |
+| match_status | énumération{MATCHED_NAME,MATCHED_FQDN,MATCHED_IP,MATCHED_FUZZY,NO_MATCH} | — | obligatoire, comparaison, filtre, export ; MATCHED_FUZZY distingue un rapprochement flou d’un rapprochement exact | §7.1, §8.6, §18 EV11 ; RG80 |
 | consolidated_role | texte | non précisée | instantané, export | §7.3, §8.10 |
 | anomaly_id | entier | — | identifiant candidat | §6.1 |
 | anomaly_run_id | entier | — | obligatoire, référence run_id | §6.1 |
 | anomaly_asset_ref | entier | — | facultatif, référence asset_id du même run | §6.1 |
 | anomaly_ipam_ref | entier | — | facultatif, référence ipam_record_id du même run | §6.1 |
-| anomaly_code | énumération{NO_MATCH,MATCHED_IP,HOSTNAME_MISMATCH,STATUS_MISMATCH,DUPLICATE_DNS,DUPLICATE_IP,RENAMED} | — | obligatoire | §6.2, §18 EV12 |
+| anomaly_code | énumération{NO_MATCH,MATCHED_IP,HOSTNAME_MISMATCH,STATUS_MISMATCH,DUPLICATE_DNS,DUPLICATE_IP,RENAMED,MATCH_CONFIDENCE_DOUBTFUL} | — | obligatoire ; nouveau code ciblant la VM rapprochée du run | §6.2, §18 EV11–EV12 ; RG77 |
 | anomaly_description | texte | non précisée | obligatoire | §6.1 |
 | anomaly_date | datetime | — | obligatoire | §6.1 |
 | anomaly_state | énumération{ouverte,acquittée,résolue} | — | obligatoire, état courant du suivi ; constats par run inchangés | §18 EV14 |
 | anomaly_state_changed_at | datetime | — | date du dernier changement ; mesure de durée à préciser, Q9 | §18 EV14 |
 | anomaly_severity | énumération{info,mineure,majeure,critique} | — | facultatif si classification inconnue (NULL signalé) ; valeur renseignée issue du code, correspondance Q10 et Q26 | §18 EV16 ; RG76 |
 | exception_id | entier | — | identifiant candidat | §18 EV15 |
-| exception_code | énumération{NO_MATCH,MATCHED_IP,HOSTNAME_MISMATCH,STATUS_MISMATCH,DUPLICATE_DNS,DUPLICATE_IP,RENAMED} | — | obligatoire | §18 EV15, EV12 |
+| exception_code | énumération{NO_MATCH,MATCHED_IP,HOSTNAME_MISMATCH,STATUS_MISMATCH,DUPLICATE_DNS,DUPLICATE_IP,RENAMED,MATCH_CONFIDENCE_DOUBTFUL} | — | obligatoire | §18 EV11, EV15 ; RG78 |
 | exception_target | texte | non précisée | obligatoire, cible stable selon le code ; Q11 | §18 EV15 |
 | exception_justification | texte | non précisée | obligatoire, non vide | §18 EV15 |
 | exception_expires_at | datetime | — | obligatoire, expiration | §18 EV15 |
@@ -257,9 +261,9 @@ Les longueurs non prescrites sont indiquées « non précisée » ; les types co
 - Q18 — RG52 — Quelles opérations précises sont autorisées à chaque rôle ? Par défaut, refuser toute opération non explicitement autorisée, sans attribuer automatiquement les droits admin aux comptes existants non identifiés.
 - Q19 — RG57 — Quelle portée d’audit, quel format des cibles et quelle politique de rétention ? Par défaut, conserver les traces des quatre familles d’actions citées et l’identité historique de l’auteur ; ne pas supprimer les traces lors d’une purge des runs.
 - Q20 — RG59–RG60, RG72 — Quels identifiants, dates, critères d’oubli et de récence, et quel périmètre de collecte des snapshots et sauvegardes ? Par défaut, préserver toute valeur source par run et signaler l’indisponibilité de la collecte ; ne pas conclure à une absence ou à un oubli sans durée définie.
-- Q21 — RG61 — Quelle métrique et quels seuils définissent rapprochement flou et cas douteux, et quel score attribuer aux correspondances exactes ? Par défaut, conserver la priorité des correspondances exactes et ne pas promouvoir automatiquement un candidat flou ambigu.
+- Q21 — RG61, RG77, RG79 — Quelle métrique et quels seuils définissent rapprochement flou et cas douteux, et quel score attribuer aux correspondances exactes ? Par défaut, conserver la priorité des correspondances exactes et ne pas promouvoir automatiquement un candidat flou ambigu ; sans critère de doute défini, ne pas déclarer automatiquement un constat douteux ni sa résolution.
 - Q22 — RG62–RG65 — Quelle source fournit les préfixes, DNS et PTR, et quelle politique appliquer à une donnée absente ? Par défaut, conserver les observations par run, ne contrôler que les données disponibles et signaler les contrôles indéterminés.
 - Q23 — RG68–RG70 — Quelles unités, seuils RAM et sous-utilisation, et quelle fenêtre de 30 runs (globale ou par VM) ? Par défaut, ne pas inférer une occupation depuis la capacité allouée et ne pas déclarer sous-utilisée une VM avec historique incomplet.
 - Q24 — RG71 — Quelle valeur de N et quelle date fait foi pour « arrêtée depuis » ? Par défaut, garder l’instant source s’il existe, sinon les observations datées sans inventer une durée d’arrêt avant le premier constat.
 - Q25 — RG73–RG74 — Quelles ressources, limites, unités, horizon et méthode de prévision par nœud ? Par défaut, conserver chaque mesure source par run et présenter l’insuffisance des données plutôt qu’une saturation calculée sans limite.
-- Q26 — RG76 — Quels noms définitifs, cibles, sévérités et critères de résolution pour les nouveaux codes, notamment snapshots oubliés et confiance douteuse ? Par défaut, préserver les sept codes historiques, lier chaque nouveau constat à son run et conserver NULL pour une classification inconnue en signalant le code non classé, sans inventer de sévérité.
+- Q26 — RG76–RG79 — Quels noms définitifs, cibles, sévérités et critères de résolution pour les autres nouveaux codes, notamment snapshots oubliés, et quelle sévérité attribuer à MATCH_CONFIDENCE_DOUBTFUL ? Par défaut, préserver les sept codes historiques, lier chaque nouveau constat à son run et conserver NULL pour une classification inconnue en signalant le code non classé, sans inventer de sévérité ; la résolution du code de doute attend le critère de Q21.

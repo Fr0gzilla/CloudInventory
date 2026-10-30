@@ -93,7 +93,7 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | ip_final | TEXT | oui | NULL | IP retenue |
 | dns_final | TEXT | oui | NULL | DNS retenu |
 | status_final | TEXT | oui | NULL | statut retenu |
-| match_status | TEXT | non | — | CHECK MATCHED_NAME, MATCHED_FQDN, MATCHED_IP, NO_MATCH |
+| match_status | TEXT | non | — | CHECK MATCHED_NAME, MATCHED_FQDN, MATCHED_IP, MATCHED_FUZZY, NO_MATCH ; statut flou distinct des correspondances exactes (RG80) |
 | role | TEXT | oui | NULL | rôle instantané |
 | match_confidence | INTEGER | oui | NULL | CHECK 0 à 100 ; score non inventé |
 | match_doubt | INTEGER | oui | NULL | CHECK 0, 1 ; doute non déduit sans seuil |
@@ -111,29 +111,30 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 | --- | --- | --- | --- | --- |
 | id | INTEGER | non | — | identité du constat |
 | run_id | INTEGER | non | — | appartenance au run |
-| asset_id | INTEGER | oui | NULL | VM facultative du même run |
+| asset_id | INTEGER | oui | NULL | VM du même run ; obligatoire si code = MATCH_CONFIDENCE_DOUBTFUL |
 | ipam_record_id | INTEGER | oui | NULL | IPAM facultatif du même run |
-| code | TEXT | non | — | CHECK sept codes historiques et IP_OUT_OF_PREFIX, VM_IP_CONFLICT, DNS_MISSING_PTR, PTR_MISMATCH, MISSING_REQUIRED_TAG, MISSING_TENANT, MISSING_SITE, DISK_OVER_90, RAM_SATURATED, VM_UNDERUSED, VM_ZOMBIE, NO_RECENT_BACKUP, FORGOTTEN_SNAPSHOT |
+| code | TEXT | non | — | CHECK sept codes historiques, MATCH_CONFIDENCE_DOUBTFUL et IP_OUT_OF_PREFIX, VM_IP_CONFLICT, DNS_MISSING_PTR, PTR_MISMATCH, MISSING_REQUIRED_TAG, MISSING_TENANT, MISSING_SITE, DISK_OVER_90, RAM_SATURATED, VM_UNDERUSED, VM_ZOMBIE, NO_RECENT_BACKUP, FORGOTTEN_SNAPSHOT ; code douteux : asset_id du même run obligatoire (RG77) |
 | description | TEXT | non | — | détail du constat |
 | created_at | TEXT | non | — | date ISO 8601 |
 | tracking_key | TEXT | oui | NULL | cible de suivi entre runs, sans fusion des constats |
 | state | TEXT | non | ouverte | CHECK ouverte, acquittée, résolue |
 | state_changed_at | TEXT | oui | NULL | dernière transition datée |
-| severity | TEXT | oui | NULL | CHECK info, mineure, majeure, critique ; NULL si classification inconnue |
+| severity | TEXT | oui | NULL | CHECK info, mineure, majeure, critique ; NULL obligatoire si code = MATCH_CONFIDENCE_DOUBTFUL |
 
 - PK : id.
 - FK : run_id → run(id) ON DELETE CASCADE.
 - FK : (asset_id, run_id) → asset(id, run_id) ON DELETE RESTRICT.
 - FK : (ipam_record_id, run_id) → ipam_record(id, run_id) ON DELETE RESTRICT.
+- CHECK : `code <> 'MATCH_CONFIDENCE_DOUBTFUL' OR (asset_id IS NOT NULL AND severity IS NULL)` ; la FK composite garantit le même run.
 - Index : idx_anomaly_run (run_id) pour la consultation ; idx_anomaly_asset_run (asset_id, run_id) ; idx_anomaly_ipam_run (ipam_record_id, run_id) pour les FK et les fiches liées ; idx_anomaly_tracking (tracking_key, created_at) pour le suivi historique ; idx_anomaly_severity (severity) pour le tri.
-- Origine : ANOMALY, constater, concerner_vm, concerner_ipam — RG5, RG6, RG11, RG12, RG13, RG17, RG18, RG39–RG43.
+- Origine : ANOMALY, constater, concerner_vm, concerner_ipam — RG5, RG6, RG11, RG12, RG13, RG17, RG18, RG39–RG43, RG77–RG79.
 
 ### anomaly_exception
 
 | colonne | type | null | défaut | contrainte |
 | --- | --- | --- | --- | --- |
 | id | INTEGER | non | — | identité de l'exception |
-| code | TEXT | non | — | CHECK sept codes historiques et treize candidats v3 (même domaine que anomaly.code) |
+| code | TEXT | non | — | CHECK sept codes historiques, MATCH_CONFIDENCE_DOUBTFUL et treize candidats v3 (même domaine que anomaly.code) |
 | target | TEXT | non | — | CHECK non vide après trim |
 | justification | TEXT | non | — | CHECK non vide après trim |
 | expires_at | TEXT | non | — | date ISO 8601 |
@@ -142,7 +143,7 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 - PK : id.
 - FK : aucune ; application conditionnelle par code, cible et expiration, sans association persistante.
 - Index : PK implicite ; aucun filtre SQL imposé pour la cible libre.
-- Origine : ANOMALY_EXCEPTION — RG44, RG45.
+- Origine : ANOMALY_EXCEPTION — RG44, RG45, RG78.
 
 ### run_schedule
 
@@ -298,6 +299,7 @@ Les identifiants physiques `id` correspondent aux identifiants conceptuels de ch
 - v2.3 : les origines facultatives préservent les anciens instantanés sans provenance inventée ; `(virtual_source, vm_id)` qualifie le rapprochement sans imposer d'unicité intra-run (Q16). Les référentiels de rôles, d'origines et de permissions évitent les domaines implicites ; aucune permission n'est accordée par défaut (Q18). L'unicité `(origin_code, username)` est un choix technique révisable (Q17), sans assimilation LDAP/AD/local ; hash local obligatoire, jamais de hash annuaire. Audit indépendant du run : la purge garde auteur et cible en texte historique, même après suppression du compte (Q19). PK simples et attributs atomiques : 1FN, 2FN, 3FN ; l'identité historique de l'audit est une redondance volontaire imposée par RG58, non une dénormalisation par jointure recalculable.
 - Migration v2.2 → v2.3 : ajouter `virtual_source` et `ipam_source` nullables par ALTER TABLE ; créer les six nouvelles tables et leurs quatre index sans remplacer les tables historiques. Aucun ancien compte n'est inféré d'un secret configuré ; créer des comptes locaux seulement avec identité, rôle et hash vérifiés ; ne jamais accorder automatiquement une permission. Ne reconstruire aucune table historique ni toucher ses CHECK ; comparer le schéma ORM et le SQL avant de déclarer RG38 satisfait.
 - v3.0 : les huit attributs ajoutés aux observations et résultats sont nullables et sans valeur par défaut, pour ne fabriquer ni mesure, ni confiance, ni absence de sauvegarde (Q20–Q25). Les treize codes v3 candidats étendent les deux CHECK de code ; la sévérité devient nullable si la classification Q26 n'est pas décidée, tout en conservant les sévérités historiques et le CHECK sur les valeurs renseignées. Le code et la cible des exceptions restent soumis à RG45 côté application, sans association fictive. Aucune unicité source n'est présumée pour les observations et mesures ; leurs FK composites interdisent les croisements de runs. 1FN : les identifiants source et mesures restent atomiques ; 2FN : PK simples ; 3FN : chaque mesure dépend de son observation, sans dépendance entre mesures. Les matérialisations historiques déjà décrites restent les seuls écarts volontaires.
+- RG77–RG80 : MATCHED_FUZZY distingue un résultat flou des statuts exacts et NO_MATCH ; MATCH_CONFIDENCE_DOUBTFUL étend les deux domaines de code sans retirer les valeurs historiques. Pour ce code, le CHECK impose asset_id non NULL et severity NULL ; la FK composite impose la VM du même run. La cohérence avec le résultat flou/douteux reste contrôlée par le traitement ; les autres codes gardent leurs contraintes. Sa sévérité reste NULL et signalée tant que Q26 n'est pas classée ; suivi par tracking_key, état et transitions, exception justifiée code + cible + expiration suivent RG41–RG45. Résoudre seulement sur un run ultérieur comparable où la même VM n'est plus douteuse ; absence de VM ou contrôle impossible ne résout rien (Q21). Aucun index nouveau : ceux des FK, du suivi et du filtre match_status existent. Ces attributs dépendent de leur observation identifiée (1FN–3FN inchangées).
 - Migration v2.3 → v3.0 : `migration_v2_v3.sql` ajoute les colonnes nullables, reconstruit uniquement anomaly et anomaly_exception pour élargir leurs CHECK, copie leurs lignes avec identifiants et valeurs inchangés, recrée les index, puis crée trois tables d'observations vides. Exécuter sur connexion exclusive, hors transaction, avec FK désactivées uniquement pendant la transaction de reconstruction ; vérifier `foreign_key_check` et `integrity_check` après réactivation. Une base v2 plus ancienne exige d'abord sa migration vers v2.3 ; ne pas exécuter deux fois ce script. L'ORM doit être aligné avant déploiement (RG38).
 - Consommation les évolutions applicatives ultérieures : Tâche applicative 1 collecte les snapshots/sauvegardes et renseigne l'état de collecte par VM ; Tâche applicative 2 conserve le score et le doute seulement lorsqu'ils sont calculables ; Tâche applicative 3 lit préfixe, PTR et mesures VM pour les anomalies conditionnelles ; Tâche applicative 4 interprète les dates d'arrêt et de sauvegarde sans conclure sur NULL ; Tâche applicative 5 lit la série `node_capacity_observation` bornée par run et nœud, sans prévoir sans historique ni limite. Les noms de codes restent candidats (Q26), aucun seuil RAM, oubli ou récence n'est imposé par le SQL.
 
