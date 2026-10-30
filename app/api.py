@@ -307,6 +307,23 @@ def configure_api(app, authenticate):
     app.add_url_rule("/api/runs/compare", endpoint="api.compare_runs", view_func=compare_runs, methods=["GET"])
     app.add_url_rule("/api/runs/<int:id>", endpoint="api.run_detail", view_func=run_detail, methods=["GET"])
 
+    def anomaly_proposal(id):
+        from app.audit import record_action
+        from app.netbox_proposals import propose
+
+        if id < 1 or request.args or (request.content_length and request.content_length > 1024) or request.get_data():
+            return jsonify(error="Invalid anomaly proposal"), 400
+        anomaly = db.session.get(Anomaly, id)
+        if anomaly is None:
+            return jsonify(error="Anomaly not found"), 404
+        result = propose(anomaly)
+        record_action(db.session.connection(), "proposition NetBox demandée", f"anomalie:{id}")
+        db.session.commit()
+        return jsonify(result)
+
+    app.add_url_rule("/api/anomalies/<int:id>/proposal", endpoint="api.anomaly_proposal",
+                     view_func=anomaly_proposal, methods=["POST"])
+
     from .inventory_api import configure_inventory_api
 
     configure_inventory_api(app)

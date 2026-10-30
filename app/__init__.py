@@ -431,6 +431,7 @@ def create_app(database_uri: str | None = None) -> Flask:
         "web.remove_anomaly_exception", "api.create_run", "api.delete_anomaly_exception",
         "api.acknowledge_anomaly", "api.resolve_anomaly", "api.create_anomaly_exception",
         "api.anomaly_exceptions",
+        "api.anomaly_proposal",
     }
     admin_endpoints = {
         "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",

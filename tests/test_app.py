@@ -212,7 +212,7 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
                              "api.runs", "api.create_run", "api.run_detail", "api.compare_runs", "api.node_capacity",
                              "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
-                              "api.acknowledge_anomaly", "api.resolve_anomaly", "api.anomaly_exceptions", "api.delete_anomaly_exception",
+                               "api.acknowledge_anomaly", "api.resolve_anomaly", "api.anomaly_proposal", "api.anomaly_exceptions", "api.delete_anomaly_exception",
                                 "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",
                                  "accounts.list_accounts", "accounts.create_account", "accounts.update_account",
                                  "audit.audit_page"}
