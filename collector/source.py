@@ -46,6 +46,13 @@ class BackupRecord(TypedDict):
     backup_created_at: str | None
 
 
+class NodeCapacityRecord(TypedDict):
+    node_capacity_name: str
+    node_capacity_measured_at: str | None
+    node_capacity_value: float | None
+    node_capacity_limit: float | None
+
+
 class IpamRecord(TypedDict):
     ip: str
     dns_name: str

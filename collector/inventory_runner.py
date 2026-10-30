@@ -18,6 +18,7 @@ from app.models import (
     BackupObservation,
     ConsolidatedAsset,
     IpamRecord,
+    NodeCapacityObservation,
     Run,
     SnapshotObservation,
 )
@@ -52,6 +53,7 @@ from collector.source import (
     AssetRecord,
     BackupRecord,
     CapacityAssetRecord,
+    NodeCapacityRecord,
     SnapshotRecord,
     Source,
     ZombieAssetRecord,
@@ -283,6 +285,39 @@ def _run_inventory(
             except Exception:
                 collection_errors.inc()
                 raise
+            capacity_collector = getattr(virtualization_source, "collect_node_capacity", None)
+            capacity_records: list[NodeCapacityRecord] = (
+                capacity_collector(assets) if capacity_collector is not None else
+                [{"node_capacity_name": name, "node_capacity_measured_at": None,
+                  "node_capacity_value": None, "node_capacity_limit": None}
+                 for name in sorted({asset["node"] for asset in assets if asset.get("node")})]
+            )
+            if not isinstance(capacity_records, list):
+                raise TypeError("Invalid node capacity observations")
+            for capacity_entry in capacity_records:
+                if not isinstance(capacity_entry, dict):
+                    raise TypeError("Invalid node capacity observation")
+                name = capacity_entry.get("node_capacity_name")
+                measured = capacity_entry.get("node_capacity_measured_at")
+                if not isinstance(name, str) or not name.strip():
+                    raise ValueError("Invalid node capacity name")
+                if measured is not None:
+                    if not isinstance(measured, str):
+                        raise TypeError("Invalid node capacity date")
+                    _observed_at(measured)
+                values = (capacity_entry.get("node_capacity_value"),
+                          capacity_entry.get("node_capacity_limit"))
+                if any(value is not None and (type(value) not in (int, float) or not math.isfinite(value))
+                       for value in values):
+                    raise ValueError("Invalid node capacity value or limit")
+                if values[1] is not None and values[1] <= 0:
+                    raise ValueError("Invalid node capacity limit")
+                db.session.add(NodeCapacityObservation(
+                    run_id=run.id, node_capacity_name=name,
+                    node_capacity_measured_at=measured or started_at,
+                    node_capacity_value=values[0], node_capacity_limit=values[1],
+                ))
+                db.session.flush()
             completed(2)
 
             try:

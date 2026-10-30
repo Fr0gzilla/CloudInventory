@@ -1,6 +1,6 @@
 """Deterministic virtualization observations; no hypervisor connection."""
 
-from collector.source import AssetRecord
+from collector.source import AssetRecord, NodeCapacityRecord
 
 
 class MockProxmoxSource:
@@ -60,3 +60,8 @@ class MockProxmoxSource:
                             "ip_reported": "10.0.9.200"})
             assets.append(created)
         return assets
+
+    def collect_node_capacity(self, assets: list[AssetRecord]) -> list[NodeCapacityRecord]:
+        return [{"node_capacity_name": name, "node_capacity_measured_at": None,
+                 "node_capacity_value": float(45 + 5 * index), "node_capacity_limit": 100.0}
+                for index, name in enumerate(sorted({asset["node"] for asset in assets}), start=1)]

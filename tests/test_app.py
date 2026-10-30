@@ -210,7 +210,7 @@ def test_only_expected_business_routes_are_registered(valid_secrets):
     assert all(endpoint in {"web.health", "web.index", "web.dashboard_data", "web.dashboard_run", "web.run_status", "web.inventory_page", "web.inventory_data", "web.inventory_export",
                              "web.runs_page", "web.run_page", "web.run_compare_page", "web.anomalies_page", "web.anomaly_action", "web.add_anomaly_exception", "web.remove_anomaly_exception", "web.asset_page",
                             "static", "login_page.login", "login_page.logout", "api.login", "api.stats",
-                            "api.runs", "api.create_run", "api.run_detail", "api.compare_runs",
+                             "api.runs", "api.create_run", "api.run_detail", "api.compare_runs", "api.node_capacity",
                              "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
                               "api.acknowledge_anomaly", "api.resolve_anomaly", "api.anomaly_exceptions", "api.delete_anomaly_exception",
                                 "scheduling.schedules_page", "scheduling.save_schedule", "metrics.metrics_page",

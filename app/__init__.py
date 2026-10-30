@@ -422,7 +422,7 @@ def create_app(database_uri: str | None = None) -> Flask:
         "web.index", "web.dashboard_data", "web.run_status", "web.inventory_page",
         "web.inventory_data", "web.inventory_export", "web.runs_page", "web.run_page",
         "web.run_compare_page", "web.anomalies_page", "web.asset_page", "web.health",
-        "api.stats", "api.runs", "api.compare_runs", "api.run_detail",
+        "api.stats", "api.runs", "api.compare_runs", "api.run_detail", "api.node_capacity",
         "api.inventory", "api.inventory_export", "api.asset_detail", "api.anomalies",
         "api.anomaly_exceptions",
     }

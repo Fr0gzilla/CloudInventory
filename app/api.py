@@ -3,7 +3,8 @@ from collections import Counter
 from flask import g, jsonify, request
 from flask_jwt_extended import create_access_token
 
-from app.models import Anomaly, Asset, ConsolidatedAsset, Run
+from app.capacity import node_capacity_trend
+from app.models import Anomaly, Asset, ConsolidatedAsset, NodeCapacityObservation, Run
 from collector.async_runner import start_inventory
 from collector.run_lock import RunAlreadyActive
 
@@ -293,6 +294,13 @@ def configure_api(app, authenticate):
                         "disappeared": [old[key] for key in sorted(old.keys() - new.keys())],
                         "changed": changed})
 
+    def node_capacity():
+        names = [name for (name,) in db.session.query(NodeCapacityObservation.node_capacity_name)
+                 .distinct().order_by(NodeCapacityObservation.node_capacity_name).all()]
+        return jsonify(items=[node_capacity_trend(name) for name in names])
+
+    app.add_url_rule("/api/capacity/nodes", endpoint="api.node_capacity", view_func=node_capacity,
+                     methods=["GET"])
     app.add_url_rule("/api/stats", endpoint="api.stats", view_func=stats, methods=["GET"])
     app.add_url_rule("/api/runs", endpoint="api.runs", view_func=runs, methods=["GET"])
     app.add_url_rule("/api/runs", endpoint="api.create_run", view_func=create_run, methods=["POST"])
