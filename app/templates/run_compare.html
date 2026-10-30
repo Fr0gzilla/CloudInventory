@@ -17,6 +17,11 @@
 <section><h2>Assets supprimés ({{ comparison.disappeared|length }})</h2>
 {% if comparison.disappeared %}<div class="table-responsive"><table class="table table-striped"><thead><tr><th scope="col">VM</th><th scope="col">Nom</th><th scope="col">IP</th><th scope="col">DNS</th><th scope="col">Statut</th><th scope="col">Correspondance</th></tr></thead><tbody>{% for asset in comparison.disappeared %}<tr><th scope="row">{{ asset.vm_id }}</th><td>{{ asset.vm_name or '—' }}</td><td>{{ asset.ip_final or '—' }}</td><td>{{ asset.dns_final or '—' }}</td><td>{{ asset.status_final or '—' }}</td><td>{{ asset.match_status or '—' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p>Aucun asset supprimé.</p>{% endif %}</section>
 <section><h2>Assets modifiés ({{ comparison.changed|length }})</h2>
-{% if comparison.changed %}<div class="table-responsive"><table class="table table-striped"><thead><tr><th scope="col">VM</th><th scope="col">Champs modifiés</th><th scope="col">Avant (IP / DNS / statut / correspondance)</th><th scope="col">Après (IP / DNS / statut / correspondance)</th></tr></thead><tbody>{% for item in comparison.changed %}<tr><th scope="row">{{ item.vm_id }}</th><td>{{ item.fields|join(', ') }}</td><td>{{ item.before.ip_final or '—' }} / {{ item.before.dns_final or '—' }} / {{ item.before.status_final or '—' }} / {{ item.before.match_status or '—' }}</td><td>{{ item.after.ip_final or '—' }} / {{ item.after.dns_final or '—' }} / {{ item.after.status_final or '—' }} / {{ item.after.match_status or '—' }}</td></tr>{% endfor %}</tbody></table></div>{% else %}<p>Aucun asset modifié.</p>{% endif %}</section>
+{% if comparison.changed %}
+<div class="table-responsive"><table class="table table-striped"><thead><tr><th scope="col">VM</th><th scope="col">Champ modifié</th><th scope="col">Avant</th><th scope="col">Après</th></tr></thead><tbody>
+{% for item in comparison.changed %}{% for field in item.fields %}
+<tr><th scope="row">{{ item.vm_id }}</th><th scope="row">{{ field }}</th><td>{% if item.before[field] is none %}<em>Absent</em>{% elif item.before[field] == '' %}<em>Chaîne vide</em>{% else %}{{ item.before[field] }}{% endif %}</td><td>{% if item.after[field] is none %}<em>Absent</em>{% elif item.after[field] == '' %}<em>Chaîne vide</em>{% else %}{{ item.after[field] }}{% endif %}</td></tr>
+{% endfor %}{% endfor %}
+</tbody></table></div>{% else %}<p>Aucun asset modifié.</p>{% endif %}</section>
 {% endif %}
 {% endblock %}

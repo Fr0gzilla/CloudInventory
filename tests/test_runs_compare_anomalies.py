@@ -120,7 +120,7 @@ def test_comparison_identifies_appeared_disappeared_and_changed_assets(client):
     assert [row for row in rows if row and row[0] in ("gone", "new", "same")] == [
         ["new", "created", "10.0.0.2", "—", "—", "MATCHED_NAME"],
         ["gone", "deleted", "10.0.0.1", "—", "—", "MATCHED_NAME"],
-        ["same", "ip_final", "10.0.0.3 / — / — / MATCHED_NAME", "10.0.0.4 / — / — / MATCHED_NAME"],
+        ["same", "ip_final", "10.0.0.3", "10.0.0.4"],
     ]
 
 

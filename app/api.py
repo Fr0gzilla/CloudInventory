@@ -19,13 +19,20 @@ def _run_json(run):
 
 def _snapshot(run_id):
     rows = (db.session.query(Asset, ConsolidatedAsset)
-            .join(ConsolidatedAsset, (ConsolidatedAsset.asset_id == Asset.id) &
-                  (ConsolidatedAsset.run_id == Asset.run_id))
+            .outerjoin(ConsolidatedAsset, (ConsolidatedAsset.asset_id == Asset.id) &
+                       (ConsolidatedAsset.run_id == Asset.run_id))
             .filter(Asset.run_id == run_id).order_by(Asset.id).all())
     return {asset.vm_id: {
-        "vm_id": asset.vm_id, "vm_name": asset.vm_name, "ip_final": item.ip_final,
-        "dns_final": item.dns_final, "status_final": item.status_final,
-        "match_status": item.match_status, "role": item.role,
+        **{field: getattr(asset, field) for field in (
+            "vm_id", "virtual_source", "vm_name", "fqdn", "ip_reported", "node", "type",
+            "status", "tags", "os", "annotation", "cpu", "ram", "disk", "uptime",
+            "disk_usage_percent", "ram_usage_percent", "vm_stopped_since",
+            "backup_collection_status",
+        )},
+        "asset_role": asset.role,
+        **{field: getattr(item, field) if item is not None else None for field in (
+            "ip_final", "dns_final", "status_final", "match_status", "role",
+        )},
     } for asset, item in rows}
 
 
@@ -270,7 +277,13 @@ def configure_api(app, authenticate):
             return jsonify(error="Invalid comparison"), 400
         old = _snapshot(old_id)
         new = _snapshot(new_id)
-        fields = ("ip_final", "dns_final", "status_final", "match_status")
+        fields = (
+            "virtual_source", "vm_name", "fqdn", "ip_reported", "node", "type", "status",
+            "tags", "asset_role", "os", "annotation", "cpu", "ram", "disk", "uptime",
+            "disk_usage_percent", "ram_usage_percent", "vm_stopped_since",
+            "backup_collection_status", "ip_final", "dns_final", "status_final",
+            "match_status", "role",
+        )
         changed = [{"vm_id": vm_id, "before": old[vm_id], "after": new[vm_id],
                     "fields": [field for field in fields if old[vm_id][field] != new[vm_id][field]]}
                    for vm_id in sorted(old.keys() & new.keys())
