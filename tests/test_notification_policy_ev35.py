@@ -14,7 +14,8 @@ class Source:
 
 
 def collect(identifiers):
-    return run_inventory(Source([{"vm_id": name, "vm_name": name, "type": "qemu"}
+    return run_inventory(Source([{"vm_id": name, "vm_name": name, "type": "qemu",
+                                  "tags": "env:prod owner:ops backup:yes"}
                                  for name in identifiers]), Source([]))
 
 

@@ -25,6 +25,10 @@ class AssetRecord(TypedDict):
     uptime: float
 
 
+class ZombieAssetRecord(AssetRecord, total=False):
+    vm_stopped_since: str | None
+
+
 class IpamRecord(TypedDict):
     ip: str
     dns_name: str

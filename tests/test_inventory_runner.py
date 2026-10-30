@@ -47,7 +47,7 @@ def test_renamed_anomaly_records_names_and_current_asset_only(orm_app, scenario,
 def test_anomalies_default_to_info_without_severity_configuration(orm_app, monkeypatch):
     monkeypatch.delenv("ANOMALY_SEVERITIES", raising=False)
     run = run_inventory()
-    unclassified = {"MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX", "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH"}
+    unclassified = {"MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX", "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH", "MISSING_REQUIRED_TAG", "MISSING_TENANT", "MISSING_SITE", "VM_ZOMBIE"}
     assert {item.severity for item in rows(Anomaly, run.id) if item.code not in unclassified} == {"info"}
     assert {item.severity for item in rows(Anomaly, run.id) if item.code == "MATCH_CONFIDENCE_DOUBTFUL"} == {None}
     assert {item.severity for item in rows(Anomaly, run.id) if item.code == "VM_IP_CONFLICT"} == {None}
@@ -111,7 +111,7 @@ def test_acknowledged_anomaly_disappearing_is_resolved_without_erasing_history(o
     assert second.status == "SUCCESS"
     db.session.expire_all()
     assert (db.session.get(Anomaly, original.id).state,
-            len(rows(Anomaly, first.id))) == ("résolue", 1)
+            len([row for row in rows(Anomaly, first.id) if row.code == "NO_MATCH"])) == ("résolue", 1)
 
 
 def test_acknowledgement_is_inherited_without_replacing_previous_observation(orm_app):

@@ -5,7 +5,7 @@ import os
 from collections import Counter
 from collections.abc import Callable
 from contextlib import nullcontext
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import cast
 
 from app import db
@@ -16,9 +16,11 @@ from app.observability import collection_errors, log_run, run_anomalies, run_dur
 from collector.anomalies import (
     duplicate_anomalies,
     match_anomalies,
+    missing_ipam_fields,
     network_match_anomalies,
     ptr_anomalies,
     renamed_anomalies,
+    required_tag_anomalies,
     vm_ip_conflicts,
 )
 from collector.efficientip import EfficientIpSource
@@ -33,13 +35,45 @@ from collector.normalization import normalize
 from collector.proxmox import ProxmoxSource
 from collector.purge import purge_old_runs
 from collector.run_lock import run_lock
-from collector.source import AssetRecord, Source
+from collector.source import AssetRecord, Source, ZombieAssetRecord
 from collector.source import IpamRecord as IpamObservation
 from collector.vsphere import VsphereSource
 
 
 def _now() -> str:
     return datetime.now(UTC).isoformat()
+
+
+def _zombie_days() -> int:
+    value = os.environ.get("VM_ZOMBIE_DAYS", "30")
+    if not value.isascii() or not value.isdecimal() or int(value) < 1:
+        raise ValueError("Invalid VM zombie threshold")
+    return int(value)
+
+
+def _observed_at(value: str) -> datetime:
+    date = datetime.fromisoformat(value)
+    if date.tzinfo is None or date.utcoffset() is None:
+        raise ValueError("Invalid VM stop observation date")
+    return date.astimezone(UTC)
+
+
+def _zombie_since(asset: Asset, started_at: str) -> datetime:
+    first = _observed_at(started_at)
+    source_date = _observed_at(asset.vm_stopped_since) if asset.vm_stopped_since else None
+    history = (db.session.query(Run.started_at, Asset.status)
+               .outerjoin(Asset, (Asset.run_id == Run.id) & (Asset.vm_id == asset.vm_id) &
+                          (Asset.virtual_source == asset.virtual_source))
+               .filter(Run.status == "SUCCESS").order_by(Run.id.desc()).all())
+    for observed_at, status in history:
+        if (status or "").strip().lower() != "stopped":
+            if source_date and source_date > _observed_at(observed_at):
+                return source_date
+            break
+        first = _observed_at(observed_at)
+    else:
+        return source_date or first
+    return first
 
 
 def _severity_for(code: str) -> str:
@@ -65,8 +99,12 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
     if asset is not None:
         target = (json.dumps(["vsphere", asset.vm_id]) if asset.virtual_source == "vsphere"
                   and asset.vm_id else asset.vm_id)
-    elif code in ("DUPLICATE_DNS", "DNS_MISSING_PTR", "PTR_MISMATCH") and ipam is not None:
+        if code == "MISSING_REQUIRED_TAG" and target:
+            target = f"{target}:{description.removeprefix('Missing required tag: ')}"
+    elif code in ("DUPLICATE_DNS", "DNS_MISSING_PTR", "PTR_MISMATCH", "MISSING_TENANT", "MISSING_SITE") and ipam is not None:
         target = normalize(ipam.dns_name)
+        if not target:
+            target = ipam.ip
     elif code == "DUPLICATE_IP" and ipam is not None:
         target = ipam.ip
     else:
@@ -78,8 +116,9 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
     return Anomaly(run_id=run_id, asset_id=asset.id if asset else None,
                    ipam_record_id=ipam.id if ipam else None, code=code,
                     description=description, created_at=_now(),
-                     severity=None if code in ("MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX",
-                                               "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH")
+                      severity=None if code in ("MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX",
+                                                "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH",
+                                                "MISSING_REQUIRED_TAG", "MISSING_TENANT", "MISSING_SITE", "VM_ZOMBIE")
                      else _severity_for(code),
                    tracking_key=key, state=state,
                    state_changed_at=previous.state_changed_at if state == "acquittée" and previous else None)
@@ -131,6 +170,7 @@ def _run_inventory(
         }[(ipam_name, ipam_mode)]()
     ipam_default = getattr(ipam_source, "ipam_source", None)
     started_at = _now()
+    zombie_days = _zombie_days()
     completed_step = 0
     asynchronous = run_id is not None
     pending_consolidated = []
@@ -193,6 +233,10 @@ def _run_inventory(
                 for field in ("vm_name", "fqdn", "ip_reported", "node", "type", "status", "tags",
                               "os", "annotation", "cpu", "ram", "disk", "uptime"):
                     setattr(row, field, observation.get(field))
+                stopped_since = cast(ZombieAssetRecord, observation).get("vm_stopped_since")
+                if stopped_since is not None and not isinstance(stopped_since, str):
+                    raise TypeError("Invalid VM stop observation date")
+                row.vm_stopped_since = stopped_since
                 if row.id is None and not asynchronous:
                     db.session.flush()
 
@@ -269,7 +313,7 @@ def _run_inventory(
                     ))
                     db.session.flush()
                 counts[result["match_status"]] += 1
-                for anomaly in match_anomalies(result) + network_match_anomalies(result) + (
+                for anomaly in match_anomalies(result) + network_match_anomalies(result) + required_tag_anomalies(observation) + (
                     [renamed_by_vm[key]] if key in renamed_by_vm else []
                 ):
                     anomaly_count += 1
@@ -278,6 +322,16 @@ def _run_inventory(
                     else:
                         db.session.add(_tracked_anomaly(run.id, anomaly["code"], anomaly["description"], asset, ipam))
                         db.session.flush()
+                if (asset.status or "").strip().lower() == "stopped":
+                    since = _zombie_since(asset, started_at)
+                    if _observed_at(started_at) - since > timedelta(days=zombie_days):
+                        anomaly_count += 1
+                        description = f"VM stopped for more than {zombie_days} days"
+                        if asynchronous:
+                            pending_anomalies.append((asset, None, "VM_ZOMBIE", description))
+                        else:
+                            db.session.add(_tracked_anomaly(run.id, "VM_ZOMBIE", description, asset))
+                            db.session.flush()
             completed(5)
 
             for anomaly in vm_ip_conflicts(asset_snapshots.values()):
@@ -296,7 +350,7 @@ def _run_inventory(
             for ipam_key, ipam_row in stored_ipam.items():
                 ipam_row.duplicate_dns = int(bool(ipam_key[2]) and dns_counts[normalize(ipam_key[2])] > 1)
                 ipam_row.duplicate_ip = int(bool(ipam_key[1]) and ip_counts[cast(str, ipam_key[1])] > 1)
-            for anomaly in duplicate_anomalies(unique_ipam) + ptr_anomalies(unique_ipam):
+            for anomaly in duplicate_anomalies(unique_ipam) + ptr_anomalies(unique_ipam) + missing_ipam_fields(unique_ipam):
                 anomaly_count += 1
                 ipam_observation = cast(IpamObservation, anomaly["ipam_record"])
                 ipam = stored_ipam[(cast(str | None, ipam_observation.get("ipam_source", ipam_default)),

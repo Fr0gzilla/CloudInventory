@@ -21,7 +21,7 @@ class Source:
 
 def unmatched_run():
     return run_inventory(Source([{"vm_id": "vm-1", "vm_name": "unmatched",
-                                  "type": "qemu"}]), Source([]))
+                                  "type": "qemu", "tags": "env:prod owner:ops backup:yes"}]), Source([]))
 
 
 def navigation_badge(client):

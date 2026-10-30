@@ -35,6 +35,7 @@ ANOMALY_CODES = {
     "NO_MATCH", "MATCHED_IP", "HOSTNAME_MISMATCH", "STATUS_MISMATCH",
     "DUPLICATE_DNS", "DUPLICATE_IP", "RENAMED",
     "IP_OUT_OF_PREFIX", "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH",
+    "MISSING_REQUIRED_TAG", "MISSING_TENANT", "MISSING_SITE", "VM_ZOMBIE",
 }
 
 
@@ -261,7 +262,7 @@ def configure_inventory_api(app):
         security: [{Bearer: []}]
         parameters:
           - {in: query, name: run_id, type: integer, minimum: 1, description: Default latest run}
-          - {in: query, name: code, type: string, enum: [NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS, DUPLICATE_IP, RENAMED]}
+          - {in: query, name: code, type: string, enum: [NO_MATCH, MATCHED_IP, HOSTNAME_MISMATCH, STATUS_MISMATCH, DUPLICATE_DNS, DUPLICATE_IP, RENAMED, MISSING_REQUIRED_TAG, MISSING_TENANT, MISSING_SITE, VM_ZOMBIE]}
           - {in: query, name: severity, type: string, enum: [info, mineure, majeure, critique]}
           - {in: query, name: state, type: string, enum: [ouverte, acquittée, résolue]}
         responses:

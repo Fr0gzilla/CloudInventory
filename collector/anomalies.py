@@ -1,5 +1,6 @@
 """Pure matching anomalies and a separate, run-wide IPAM duplicate pass."""
 
+import re
 from collections import Counter
 from collections.abc import Iterable
 from ipaddress import ip_address, ip_network
@@ -130,6 +131,25 @@ def ptr_anomalies(ipam_records: Iterable[IpamRecord]) -> list[AnomalyResult]:
         entries.append({"code": code, "description": description, "asset": None,
                         "ipam_record": record.copy()})
     return entries
+
+
+def required_tag_anomalies(asset: AssetRecord) -> list[AnomalyResult]:
+    """Report each missing nonempty required VM tag independently."""
+    tags = asset.get("tags") or ""
+    present = {match.group(1).lower() for match in re.finditer(
+        r"(?:^|[\s,;])(env|owner|backup)\s*[:=]\s*([^\s,;]+)", tags, re.IGNORECASE)}
+    return [{"code": "MISSING_REQUIRED_TAG", "description": f"Missing required tag: {tag}",
+             "asset": asset.copy(), "ipam_record": None}
+            for tag in ("env", "owner", "backup") if tag not in present]
+
+
+def missing_ipam_fields(records: Iterable[IpamRecord]) -> list[AnomalyResult]:
+    """Check tenant and site on each IPAM observation, including unmatched ones."""
+    return [{"code": code, "description": f"Missing IPAM {field}",
+             "asset": None, "ipam_record": record.copy()}
+            for record in records for field, code in (
+                ("tenant", "MISSING_TENANT"), ("site", "MISSING_SITE"))
+            if not isinstance(record.get(field), str) or not cast(str, record.get(field)).strip()]
 
 
 def renamed_anomalies(current: Iterable[AssetRecord], previous: Iterable[AssetRecord]) -> list[AnomalyResult]:
