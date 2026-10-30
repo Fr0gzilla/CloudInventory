@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import os
 from collections import Counter
 from collections.abc import Callable
@@ -23,6 +24,7 @@ from app.models import (
 from app.notifications import notify_anomalies, should_alert
 from app.observability import collection_errors, log_run, run_anomalies, run_duration
 from collector.anomalies import (
+    capacity_anomalies,
     duplicate_anomalies,
     match_anomalies,
     missing_ipam_fields,
@@ -49,6 +51,7 @@ from collector.run_lock import run_lock
 from collector.source import (
     AssetRecord,
     BackupRecord,
+    CapacityAssetRecord,
     SnapshotRecord,
     Source,
     ZombieAssetRecord,
@@ -73,6 +76,28 @@ def _observation_days(name: str, default: str) -> int:
     if not value.isascii() or not value.isdecimal() or int(value) < 1:
         raise ValueError(f"Invalid {name} threshold")
     return int(value)
+
+
+def _capacity_threshold(name: str, default: str) -> float:
+    value = os.environ.get(name, default)
+    try:
+        threshold = float(value)
+    except ValueError as error:
+        raise ValueError(f"Invalid {name} threshold") from error
+    if not math.isfinite(threshold) or not 0 <= threshold <= 100:
+        raise ValueError(f"Invalid {name} threshold")
+    return threshold
+
+
+def _usage_percent(value: object) -> float | None:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        raise TypeError("Invalid capacity usage observation")
+    number = float(value)
+    if not math.isfinite(number) or not 0 <= number <= 100:
+        raise ValueError("Invalid capacity usage observation")
+    return number
 
 
 def _observed_at(value: str) -> datetime:
@@ -143,7 +168,8 @@ def _tracked_anomaly(run_id: int, code: str, description: str,
                       severity=None if code in ("MATCH_CONFIDENCE_DOUBTFUL", "IP_OUT_OF_PREFIX",
                                                 "VM_IP_CONFLICT", "DNS_MISSING_PTR", "PTR_MISMATCH",
                                                  "MISSING_REQUIRED_TAG", "MISSING_TENANT", "MISSING_SITE", "VM_ZOMBIE",
-                                                 "NO_RECENT_BACKUP", "FORGOTTEN_SNAPSHOT")
+                                                 "NO_RECENT_BACKUP", "FORGOTTEN_SNAPSHOT",
+                                                 "DISK_OVER_90", "RAM_SATURATED", "VM_UNDERUSED")
                      else _severity_for(code),
                    tracking_key=key, state=state,
                    state_changed_at=previous.state_changed_at if state == "acquittée" and previous else None)
@@ -203,6 +229,10 @@ def _run_inventory(
     zombie_days = _zombie_days()
     snapshot_days = _observation_days("FORGOTTEN_SNAPSHOT_DAYS", "30")
     backup_days = _observation_days("RECENT_BACKUP_DAYS", "7")
+    disk_threshold = _capacity_threshold("DISK_USAGE_THRESHOLD", "90")
+    ram_threshold = _capacity_threshold("RAM_SATURATION_THRESHOLD", "95")
+    underused_threshold = _capacity_threshold("VM_UNDERUSED_THRESHOLD", "20")
+    underused_window = _observation_days("VM_UNDERUSED_RUNS", "30")
     completed_step = 0
     asynchronous = run_id is not None
     pending_consolidated = []
@@ -230,6 +260,14 @@ def _run_inventory(
             previous_assets = (
                 db.session.query(Asset).filter(Asset.run_id == previous.id).all() if previous else []
             )
+            recent_ids = [identifier for (identifier,) in db.session.query(Run.id)
+                          .filter(Run.status == "SUCCESS").order_by(Run.id.desc())
+                          .limit(underused_window - 1).all()]
+            capacity_history: dict[tuple[str, str], dict[int, Asset]] = {}
+            if len(recent_ids) == underused_window - 1 and recent_ids:
+                for past in db.session.query(Asset).filter(Asset.run_id.in_(recent_ids)).all():
+                    capacity_history.setdefault((past.virtual_source or "proxmox", past.vm_id), {})[
+                        past.run_id] = past
             if run_id is None:
                 run = Run(status="RUNNING", started_at=started_at, run_trigger="manuel")
                 db.session.add(run)
@@ -301,6 +339,8 @@ def _run_inventory(
                 if stopped_since is not None and not isinstance(stopped_since, str):
                     raise TypeError("Invalid VM stop observation date")
                 row.vm_stopped_since = stopped_since
+                row.disk_usage_percent = _usage_percent(observation.get("disk_usage_percent"))
+                row.ram_usage_percent = _usage_percent(observation.get("ram_usage_percent"))
                 if row.id is None and not asynchronous:
                     db.session.flush()
 
@@ -407,7 +447,16 @@ def _run_inventory(
                     ))
                     db.session.flush()
                 counts[result["match_status"]] += 1
-                for anomaly in match_anomalies(result) + network_match_anomalies(result) + required_tag_anomalies(observation) + (
+                past_assets = capacity_history.get(key, {})
+                history = ([(past_assets[identifier].status,
+                             past_assets[identifier].disk_usage_percent,
+                             past_assets[identifier].ram_usage_percent)
+                            for identifier in recent_ids]
+                           if len(past_assets) == len(recent_ids) and len(recent_ids) == underused_window - 1
+                           else [])
+                for anomaly in match_anomalies(result) + network_match_anomalies(result) + required_tag_anomalies(observation) + capacity_anomalies(
+                    cast(CapacityAssetRecord, observation), history, disk_threshold,
+                    ram_threshold, underused_threshold, underused_window) + (
                     [renamed_by_vm[key]] if key in renamed_by_vm else []
                 ) + snapshot_backup_anomalies(
                     observation, cast(list[SnapshotRecord], snapshots_by_vm.get(key, [])),
@@ -484,7 +533,8 @@ def _run_inventory(
                     if (old.tracking_key and old.tracking_key not in current_keys
                              and old.code not in ("IP_OUT_OF_PREFIX", "VM_IP_CONFLICT",
                                                   "DNS_MISSING_PTR", "PTR_MISMATCH",
-                                                  "FORGOTTEN_SNAPSHOT", "NO_RECENT_BACKUP")
+                                                   "FORGOTTEN_SNAPSHOT", "NO_RECENT_BACKUP",
+                                                   "DISK_OVER_90", "RAM_SATURATED", "VM_UNDERUSED")
                             and (old.code != "MATCH_CONFIDENCE_DOUBTFUL"
                                  or old.tracking_key in conclusive_doubt_keys)):
                         old.state = "résolue"

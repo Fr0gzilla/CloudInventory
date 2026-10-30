@@ -15,6 +15,7 @@ from collector.normalization import normalize
 from collector.source import (
     AssetRecord,
     BackupRecord,
+    CapacityAssetRecord,
     IpamRecord,
     NetworkIpamRecord,
     SnapshotRecord,
@@ -57,6 +58,35 @@ def snapshot_backup_anomalies(asset: AssetRecord, snapshots: Iterable[SnapshotRe
             entries.append({"code": "NO_RECENT_BACKUP",
                             "description": f"No backup in the last {backup_days} days",
                             "asset": asset.copy(), "ipam_record": None})
+    return entries
+
+
+def capacity_anomalies(asset: CapacityAssetRecord,
+                       history: Iterable[tuple[str | None, float | None, float | None]],
+                       disk_threshold: float, ram_threshold: float,
+                       underused_threshold: float, window: int) -> list[AnomalyResult]:
+    """Require observed usage in every one of the consecutive successful runs."""
+    disk = asset.get("disk_usage_percent")
+    ram = asset.get("ram_usage_percent")
+    entries: list[AnomalyResult] = []
+    if disk is not None and disk > disk_threshold:
+        entries.append({"code": "DISK_OVER_90", "description": f"Disk usage above {disk_threshold}%",
+                        "asset": asset.copy(), "ipam_record": None})
+    if ram is not None and ram >= ram_threshold:
+        entries.append({"code": "RAM_SATURATED", "description": f"RAM usage at least {ram_threshold}%",
+                        "asset": asset.copy(), "ipam_record": None})
+    observations = list(history)
+    if ((asset.get("status") or "").strip().lower() == "running"
+            and disk is not None and ram is not None
+            and disk <= underused_threshold and ram <= underused_threshold
+            and len(observations) == window - 1
+            and all((status or "").strip().lower() == "running"
+                    and past_disk is not None and past_ram is not None
+                    and past_disk <= underused_threshold and past_ram <= underused_threshold
+                    for status, past_disk, past_ram in observations)):
+        entries.append({"code": "VM_UNDERUSED",
+                        "description": f"Disk and RAM usage at most {underused_threshold}% for {window} runs",
+                        "asset": asset.copy(), "ipam_record": None})
     return entries
 
 

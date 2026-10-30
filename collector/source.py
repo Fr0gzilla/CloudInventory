@@ -29,6 +29,11 @@ class ZombieAssetRecord(AssetRecord, total=False):
     vm_stopped_since: str | None
 
 
+class CapacityAssetRecord(AssetRecord, total=False):
+    disk_usage_percent: float | None
+    ram_usage_percent: float | None
+
+
 class SnapshotRecord(TypedDict):
     vm_id: str
     snapshot_id: str | None
