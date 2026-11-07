@@ -245,6 +245,7 @@ class Account(db.Model):
     role_code = db.Column(db.Text, db.ForeignKey("role.role_code", ondelete="RESTRICT"), nullable=False)
     username = db.Column(db.Text, nullable=False)
     local_password_hash = db.Column(db.Text)
+    session_version = db.Column(db.Integer, nullable=False, default=0, server_default="0")
 
     __table_args__ = (
         db.UniqueConstraint("origin_code", "username"),

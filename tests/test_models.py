@@ -73,6 +73,19 @@ def inspect_schema(connection):
     return result
 
 
+def published_schema_with_session_version(connection):
+    schema = inspect_schema(connection)
+    columns, foreign, indexes, checks = schema["account"]
+    assert "session_version" not in columns
+    schema["account"] = (
+        {**columns, "session_version": ("INTEGER", 1, "'0'", 0)},
+        foreign,
+        indexes,
+        checks,
+    )
+    return schema
+
+
 def insert(table, **values):
     fields = ", ".join(values)
     parameters = ", ".join(f":{key}" for key in values)
@@ -97,7 +110,7 @@ def test_thirteen_tables_match_reference_schema(orm_app):
         with db.engine.connect() as connection:
             actual = inspect_schema(connection.connection.driver_connection)
         assert set(actual) == TABLES
-        assert actual == inspect_schema(reference)
+        assert actual == published_schema_with_session_version(reference)
     finally:
         reference.close()
 

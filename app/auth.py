@@ -20,7 +20,7 @@ from flask import (
     session,
     url_for,
 )
-from flask_login import UserMixin, login_required, login_user, logout_user
+from flask_login import UserMixin, current_user, login_required, login_user, logout_user
 from werkzeug.security import check_password_hash
 
 from . import db, login_manager
@@ -110,7 +110,9 @@ def configure_auth(app, username, password):
             session.clear()
             return None
         account = db.session.get(Account, int(user_id)) if user_id.isdecimal() else None
-        if account is None or (account.origin_code == "local" and account.local_password_hash.startswith("disabled:")):
+        if (account is None or type(session.get("sv")) is not int or
+                session["sv"] != account.session_version or
+                (account.origin_code == "local" and account.local_password_hash.startswith("disabled:"))):
             session.clear()
             return None
         session["last_seen"] = now
@@ -230,6 +232,7 @@ def configure_auth(app, username, password):
         login_user(LocalUser(g.auth_account))
         session.permanent = True
         session["epoch"] = state["epoch"]
+        session["sv"] = g.auth_account.session_version
         session["login_at"] = session["last_seen"] = time.time()
         session["csrf_token"] = secrets.token_urlsafe(32)
         return redirect(destination)
@@ -238,7 +241,12 @@ def configure_auth(app, username, password):
     @login_required
     def logout():
         security_log.info("auth result=logout channel=web ip=%s", request.remote_addr or "unknown")
-        state["epoch"] = secrets.randbits(128)
+        db.session.execute(
+            db.update(Account).where(Account.id == current_user.id).values(
+                session_version=Account.session_version + 1
+            )
+        )
+        db.session.commit()
         logout_user()
         session.clear()
         return redirect(url_for("login_page.login"))

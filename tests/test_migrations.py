@@ -9,7 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.pool import StaticPool
 
 from app import db
-from tests.test_models import SCHEMA, extract_checks, inspect_schema
+from tests.test_models import SCHEMA, extract_checks, inspect_schema, published_schema_with_session_version
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -36,7 +36,7 @@ def test_baseline_matches_published_sql_and_orm(orm_app):
             migrated_schema.pop("alembic_version")
             with db.engine.connect() as orm_connection:
                 orm_schema = inspect_schema(orm_connection.connection.driver_connection)
-            assert migrated_schema == inspect_schema(reference) == orm_schema
+            assert migrated_schema == published_schema_with_session_version(reference) == orm_schema
             command.downgrade(config, "base")
             assert not (set(inspect_schema(migrated)) - {"alembic_version"})
     finally:
@@ -160,5 +160,36 @@ def test_upgrade_v23_filled_database_preserves_rows_and_enforces_v30_constraints
             ):
                 with pytest.raises(sqlite3.IntegrityError):
                     raw.execute(statement, values)
+    finally:
+        engine.dispose()
+
+
+def test_upgrade_from_filled_v30_preserves_rows_and_initializes_session_version():
+    engine = create_engine("sqlite://", poolclass=StaticPool, connect_args={"check_same_thread": False})
+    try:
+        with engine.begin() as connection:
+            config = migration_config(connection)
+            command.upgrade(config, "0004_model_v30")
+            raw = connection.connection.driver_connection
+            raw.execute("PRAGMA foreign_keys=ON")
+            raw.execute("INSERT INTO auth_origin (origin_code) VALUES ('local')")
+            raw.execute("INSERT INTO role (role_code) VALUES ('admin')")
+            raw.execute("INSERT INTO account (id, origin_code, role_code, username, local_password_hash) VALUES (41, 'local', 'admin', 'existing', 'hash')")
+            raw.execute("INSERT INTO audit (id, account_id, actor_identity, action, created_at, target) VALUES (42, 41, 'existing', 'login', '2026-01-01', 'account')")
+            before = raw.execute("SELECT id, origin_code, role_code, username, local_password_hash FROM account WHERE id=41").fetchone()
+            audit_before = raw.execute("SELECT id, account_id, actor_identity, action, created_at, target FROM audit WHERE id=42").fetchone()
+            command.upgrade(config, "head")
+            assert raw.execute("SELECT id, origin_code, role_code, username, local_password_hash FROM account WHERE id=41").fetchone() == before
+            assert raw.execute("SELECT id, account_id, actor_identity, action, created_at, target FROM audit WHERE id=42").fetchone() == audit_before
+            assert raw.execute("SELECT session_version FROM account WHERE id=41").fetchone() == (0,)
+            column = next(row for row in raw.execute("PRAGMA table_info(account)") if row[1] == "session_version")
+            assert (column[2], column[3], column[4]) == ("INTEGER", 1, "'0'")
+            assert db.metadata.tables["account"].c.session_version.default.arg == 0
+            raw.execute("INSERT INTO account (origin_code, role_code, username, local_password_hash) VALUES ('local', 'admin', 'new', 'hash')")
+            assert raw.execute("SELECT session_version FROM account WHERE username='new'").fetchone() == (0,)
+            with pytest.raises(sqlite3.IntegrityError):
+                raw.execute("UPDATE account SET session_version=NULL WHERE id=41")
+            assert raw.execute("PRAGMA foreign_key_check").fetchall() == []
+            assert raw.execute("PRAGMA integrity_check").fetchall() == [("ok",)]
     finally:
         engine.dispose()
