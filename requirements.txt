@@ -14,3 +14,4 @@ openpyxl>=3.1,<4
 rapidfuzz>=3.14.3,<4
 dnspython>=2.6,<3
 numpy>=1.26,<3
+weasyprint==70.0

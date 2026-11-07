@@ -1,10 +1,17 @@
 from collections import Counter
 
-from flask import g, jsonify, request
-from flask_jwt_extended import create_access_token
+from flask import abort, g, jsonify, request
+from flask_jwt_extended import create_access_token, get_jwt_identity
 
 from app.capacity import node_capacity_trend
-from app.models import Anomaly, Asset, ConsolidatedAsset, NodeCapacityObservation, Run
+from app.models import (
+    Account,
+    Anomaly,
+    Asset,
+    ConsolidatedAsset,
+    NodeCapacityObservation,
+    Run,
+)
 from collector.async_runner import start_inventory
 from collector.run_lock import RunAlreadyActive
 
@@ -295,10 +302,20 @@ def configure_api(app, authenticate):
                         "changed": changed})
 
     def node_capacity():
+        if request.path == "/api/reports/monthly":
+            identity = get_jwt_identity()
+            account = db.session.get(Account, int(identity))
+            if account.role_code not in ("admin", "opérateur"):
+                abort(403)
+            from app.monthly_report import monthly_report
+
+            return monthly_report(_snapshot)
         names = [name for (name,) in db.session.query(NodeCapacityObservation.node_capacity_name)
-                 .distinct().order_by(NodeCapacityObservation.node_capacity_name).all()]
+                  .distinct().order_by(NodeCapacityObservation.node_capacity_name).all()]
         return jsonify(items=[node_capacity_trend(name) for name in names])
 
+    app.add_url_rule("/api/reports/monthly", endpoint="api.node_capacity", view_func=node_capacity,
+                     methods=["GET"])
     app.add_url_rule("/api/capacity/nodes", endpoint="api.node_capacity", view_func=node_capacity,
                      methods=["GET"])
     app.add_url_rule("/api/stats", endpoint="api.stats", view_func=stats, methods=["GET"])
