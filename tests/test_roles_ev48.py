@@ -201,6 +201,8 @@ def test_role_change_revokes_existing_privilege(orm_app, roles):
     account = Account.query.filter_by(username='operator').one()
     assert admin.post(f'/accounts/{account.id}', data={'action': 'role', 'role': 'lecteur',
                                                        'csrf_token': csrf}).status_code == 302
+    assert operator.post('/dashboard/run', data={}).status_code == 302
+    operator, _ = login_web(orm_app, 'operator', 'test-password-123')
     assert operator.post('/dashboard/run', data={}).status_code == 403
 
 

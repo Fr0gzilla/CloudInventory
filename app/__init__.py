@@ -24,7 +24,12 @@ from flask import (
     session,
     url_for,
 )
-from flask_jwt_extended import JWTManager, get_jwt_identity, verify_jwt_in_request
+from flask_jwt_extended import (
+    JWTManager,
+    get_jwt,
+    get_jwt_identity,
+    verify_jwt_in_request,
+)
 from flask_login import LoginManager, current_user, login_required
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import event
@@ -492,7 +497,9 @@ def create_app(database_uri: str | None = None) -> Flask:
 
             identity = get_jwt_identity()
             account = db.session.get(Account, int(identity)) if isinstance(identity, str) and identity.isdecimal() else None
-            if account is None or (account.origin_code == "local" and account.local_password_hash.startswith("disabled:")):
+            if (account is None or type(get_jwt().get("sv")) is not int or
+                    get_jwt()["sv"] != account.session_version or
+                    (account.origin_code == "local" and account.local_password_hash.startswith("disabled:"))):
                 return jsonify(error="Unauthorized"), 401
             role = account.role_code
         elif not current_user.is_authenticated:

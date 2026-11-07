@@ -77,11 +77,15 @@ def update_account(id):
         if not others:
             abort(400)
     if action == "role":
-        account.role_code = role
+        if account.role_code != role:
+            account.role_code = role
+            account.session_version += 1
     elif action == "disable":
         account.local_password_hash = "disabled:" + account.local_password_hash
+        account.session_version += 1
     else:
         account.local_password_hash = hasher.hash(password)
+        account.session_version += 1
     try:
         db.session.commit()
     except IntegrityError:

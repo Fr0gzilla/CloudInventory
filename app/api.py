@@ -118,7 +118,9 @@ def configure_api(app, authenticate):
             return response
         if result == "invalid":
             return jsonify(error="Invalid credentials"), 401
-        return jsonify(access_token=create_access_token(identity=str(g.auth_account.id)))
+        return jsonify(access_token=create_access_token(
+            identity=str(g.auth_account.id), additional_claims={"sv": g.auth_account.session_version}
+        ))
 
     app.add_url_rule("/api/login", endpoint="api.login", view_func=login, methods=["POST"])
 
